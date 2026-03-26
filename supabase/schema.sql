@@ -1,9 +1,7 @@
 -- ============================================================
--- Wealth OS — Supabase Database Schema
--- Run this in the Supabase SQL Editor to set up the database
+-- Wealth OS — Supabase Database Schema (idempotent version)
+-- Safe to run multiple times — drops existing policies first
 -- ============================================================
-
--- Enable Row Level Security on all tables
 
 -- ─── Profiles ────────────────────────────────────────────────
 create table if not exists public.profiles (
@@ -13,26 +11,24 @@ create table if not exists public.profiles (
   currency text default 'USD',
   created_at timestamptz default now()
 );
-
 alter table public.profiles enable row level security;
+drop policy if exists "Users can view own profile" on public.profiles;
+drop policy if exists "Users can update own profile" on public.profiles;
+create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
+create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
 
-create policy "Users can view own profile"
-  on public.profiles for select using (auth.uid() = id);
-
-create policy "Users can update own profile"
-  on public.profiles for update using (auth.uid() = id);
-
--- Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
   insert into public.profiles (id, full_name)
-  values (new.id, new.raw_user_meta_data->>'full_name');
+  values (new.id, new.raw_user_meta_data->>'full_name')
+  on conflict (id) do nothing;
   return new;
 end;
 $$ language plpgsql security definer;
 
-create or replace trigger on_auth_user_created
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
@@ -51,11 +47,9 @@ create table if not exists public.assets (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
-
 alter table public.assets enable row level security;
-
-create policy "Users can manage own assets"
-  on public.assets for all using (auth.uid() = user_id);
+drop policy if exists "Users can manage own assets" on public.assets;
+create policy "Users can manage own assets" on public.assets for all using (auth.uid() = user_id);
 
 -- ─── Transactions ────────────────────────────────────────────
 create table if not exists public.transactions (
@@ -69,11 +63,9 @@ create table if not exists public.transactions (
   account text,
   created_at timestamptz default now()
 );
-
 alter table public.transactions enable row level security;
-
-create policy "Users can manage own transactions"
-  on public.transactions for all using (auth.uid() = user_id);
+drop policy if exists "Users can manage own transactions" on public.transactions;
+create policy "Users can manage own transactions" on public.transactions for all using (auth.uid() = user_id);
 
 -- ─── Budgets ─────────────────────────────────────────────────
 create table if not exists public.budgets (
@@ -81,15 +73,13 @@ create table if not exists public.budgets (
   user_id uuid references auth.users on delete cascade not null,
   category text not null,
   monthly_limit numeric not null,
-  month text not null, -- format: YYYY-MM
+  month text not null,
   created_at timestamptz default now(),
   unique(user_id, category, month)
 );
-
 alter table public.budgets enable row level security;
-
-create policy "Users can manage own budgets"
-  on public.budgets for all using (auth.uid() = user_id);
+drop policy if exists "Users can manage own budgets" on public.budgets;
+create policy "Users can manage own budgets" on public.budgets for all using (auth.uid() = user_id);
 
 -- ─── Goals ───────────────────────────────────────────────────
 create table if not exists public.goals (
@@ -104,28 +94,24 @@ create table if not exists public.goals (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
-
 alter table public.goals enable row level security;
-
-create policy "Users can manage own goals"
-  on public.goals for all using (auth.uid() = user_id);
+drop policy if exists "Users can manage own goals" on public.goals;
+create policy "Users can manage own goals" on public.goals for all using (auth.uid() = user_id);
 
 -- ─── Net Worth History ───────────────────────────────────────
 create table if not exists public.net_worth_history (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references auth.users on delete cascade not null,
-  date text not null, -- format: YYYY-MM
+  date text not null,
   total_assets numeric not null,
   total_liabilities numeric not null,
   net_worth numeric generated always as (total_assets - total_liabilities) stored,
   created_at timestamptz default now(),
   unique(user_id, date)
 );
-
 alter table public.net_worth_history enable row level security;
-
-create policy "Users can manage own net worth history"
-  on public.net_worth_history for all using (auth.uid() = user_id);
+drop policy if exists "Users can manage own net worth history" on public.net_worth_history;
+create policy "Users can manage own net worth history" on public.net_worth_history for all using (auth.uid() = user_id);
 
 -- ─── Indexes ─────────────────────────────────────────────────
 create index if not exists assets_user_id_idx on public.assets(user_id);
