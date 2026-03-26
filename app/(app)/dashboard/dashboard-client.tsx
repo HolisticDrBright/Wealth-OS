@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { formatCurrency, formatPercentage } from '@/lib/utils'
 import { spendingByCategory } from '@/lib/mock-data'
 import type { Asset, Transaction, NetWorthEntry } from '@/lib/types'
+import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
+import { HealthScore } from '@/components/health-score'
 import {
   AreaChart,
   Area,
@@ -109,6 +111,7 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
 
   return (
     <div className="p-6 space-y-6">
+      {isDemo && <OnboardingWizard />}
       {isDemo && (
         <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex items-start gap-3">
           <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
@@ -146,6 +149,14 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
           </Card>
         ))}
       </div>
+
+      {/* Financial Health Score */}
+      <HealthScore
+        assets={assets}
+        transactions={transactions}
+        savingsRate={savingsRate}
+        totalAssets={totalAssets}
+      />
 
       {/* Net Worth Chart + Spending */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
