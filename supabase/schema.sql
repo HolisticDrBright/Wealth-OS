@@ -253,3 +253,26 @@ create index if not exists traders_source_idx on public.traders(source);
 create index if not exists trader_trades_trader_id_idx on public.trader_trades(trader_id, trade_date desc);
 create index if not exists user_followed_traders_user_id_idx on public.user_followed_traders(user_id);
 create index if not exists user_copied_positions_user_id_idx on public.user_copied_positions(user_id, opened_at desc);
+
+-- ─── User Settings ────────────────────────────────────────────────────────
+create table if not exists public.user_settings (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade unique not null,
+  full_name text,
+  email text,
+  autopilot_enabled boolean default false,
+  copy_budget_usd numeric default 1000,
+  risk_profile text default 'moderate' check (risk_profile in ('conservative','moderate','aggressive')),
+  notify_trades boolean default true,
+  notify_weekly_summary boolean default true,
+  notify_risk_alerts boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.user_settings enable row level security;
+drop policy if exists "Users can view own settings" on public.user_settings;
+drop policy if exists "Users can update own settings" on public.user_settings;
+drop policy if exists "Users can insert own settings" on public.user_settings;
+create policy "Users can view own settings" on public.user_settings for select using (auth.uid() = user_id);
+create policy "Users can update own settings" on public.user_settings for update using (auth.uid() = user_id);
+create policy "Users can insert own settings" on public.user_settings for insert with check (auth.uid() = user_id);

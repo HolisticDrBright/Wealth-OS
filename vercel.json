@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron?task=sync",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron?task=copy",
+      "schedule": "*/30 9-16 * * 1-5"
+    }
+  ]
+}

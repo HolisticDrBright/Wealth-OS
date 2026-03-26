@@ -5,8 +5,52 @@ export interface PriceResult {
   price: number
   change: number
   changePercent: number
-  source: 'finnhub' | 'coingecko' | 'error'
+  source: 'finnhub' | 'coingecko' | 'coinstats' | 'error'
   error?: string
+  marketCap?: number
+  volume24h?: number
+}
+
+// ─── CoinStats enrichment ─────────────────────────────────────────────────
+
+const COINSTATS_ID_MAP: Record<string, string> = {
+  BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', ADA: 'cardano',
+  DOT: 'polkadot', DOGE: 'dogecoin', AVAX: 'avalanche', MATIC: 'polygon',
+  LINK: 'chainlink', UNI: 'uniswap', LTC: 'litecoin', XRP: 'xrp',
+  BNB: 'bnb', ATOM: 'cosmos', SHIB: 'shiba-inu', NEAR: 'near-protocol',
+  APT: 'aptos', ARB: 'arbitrum', WIF: 'dogwifhat',
+}
+
+export async function fetchCoinStatsPrices(symbols: string[]): Promise<PriceResult[]> {
+  const apiKey = process.env.COINSTATS_API_KEY
+  if (!apiKey || symbols.length === 0) return []
+
+  try {
+    const res = await fetch('https://openapiv1.coinstats.app/coins?limit=100', {
+      headers: { 'X-API-KEY': apiKey, Accept: 'application/json' },
+      cache: 'no-store',
+    })
+    if (!res.ok) throw new Error(`CoinStats ${res.status}`)
+    const { result } = await res.json() as { result: Array<{ symbol: string; price: number; priceChange1d: number; marketCap: number; volume: number }> }
+
+    const priceMap = new Map(result.map(c => [c.symbol.toUpperCase(), c]))
+
+    return symbols.map((symbol): PriceResult => {
+      const coin = priceMap.get(symbol.toUpperCase())
+      if (!coin) return { symbol, price: 0, change: 0, changePercent: 0, source: 'error', error: 'Not found in CoinStats' }
+      return {
+        symbol,
+        price: coin.price,
+        change: (coin.price * coin.priceChange1d) / (100 + coin.priceChange1d),
+        changePercent: coin.priceChange1d,
+        marketCap: coin.marketCap,
+        volume24h: coin.volume,
+        source: 'coinstats',
+      }
+    })
+  } catch (err) {
+    return symbols.map(s => ({ symbol: s, price: 0, change: 0, changePercent: 0, source: 'error' as const, error: String(err) }))
+  }
 }
 
 const CRYPTO_ID_MAP: Record<string, string> = {
@@ -56,6 +100,14 @@ export async function fetchStockPrices(symbols: string[], apiKey: string): Promi
 
 export async function fetchCryptoPrices(symbols: string[]): Promise<PriceResult[]> {
   if (symbols.length === 0) return []
+
+  // Try CoinStats first if API key is configured
+  if (process.env.COINSTATS_API_KEY) {
+    const results = await fetchCoinStatsPrices(symbols)
+    if (results.some(r => r.source === 'coinstats')) return results
+  }
+
+  // Fall back to CoinGecko
   const ids = symbols.map(s => CRYPTO_ID_MAP[s.toUpperCase()]).filter(Boolean)
   if (ids.length === 0) return symbols.map(symbol => ({ symbol, price: 0, change: 0, changePercent: 0, source: 'error' as const, error: 'Unknown symbol' }))
 

@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import { updateCopySettings, unfollowTrader } from '@/lib/actions/traders'
+import { CIODecisionModal } from '@/components/agents/cio-decision-modal'
 import type { UserCopiedPosition } from '@/lib/types'
+import type { TradeContext } from '@/lib/agents/types'
 import {
   Zap, ZapOff, TrendingUp, TrendingDown, RefreshCw,
   Settings2, Trash2, AlertCircle, CheckCircle2, Clock,
-  XCircle, DollarSign, BarChart2,
+  XCircle, DollarSign, BarChart2, Brain,
 } from 'lucide-react'
 
 interface FollowedTrader {
@@ -187,6 +189,28 @@ export function AutopilotClient({ followedTraders, positions }: Props) {
   const router = useRouter()
   const [executing, setExecuting] = useState(false)
   const [execMsg, setExecMsg] = useState<string | null>(null)
+  const [cioModal, setCioModal] = useState<{ open: boolean; context: TradeContext | null }>({ open: false, context: null })
+
+  function openCIOAnalysis(position: UserCopiedPosition) {
+    const context: TradeContext = {
+      trade: {
+        symbol: position.symbol,
+        action: position.action as TradeContext['trade']['action'],
+        asset_class: position.asset_class as TradeContext['trade']['asset_class'],
+        notional_value: position.notional_value,
+        trader_name: position.trader?.name ?? 'Unknown',
+        trader_handle: position.trader?.handle ?? '',
+        trader_return_pct: 0,
+        trader_win_rate: 0,
+      },
+      user: {
+        id: 'current',
+        total_net_worth: positions.reduce((s, p) => s + p.notional_value, 0),
+        portfolio: [],
+      },
+    }
+    setCioModal({ open: true, context })
+  }
 
   const autoCopyCount = followedTraders.filter(f => f.auto_copy_enabled).length
   const openPositions = positions.filter(p => p.status === 'open')
@@ -299,7 +323,7 @@ export function AutopilotClient({ followedTraders, positions }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/10">
-                    {['Trader', 'Symbol', 'Action', 'Size', 'P&L', 'Status', 'Broker', 'Date'].map(h => (
+                    {['Trader', 'Symbol', 'Action', 'Size', 'P&L', 'Status', 'Broker', 'Date', 'Analysis'].map(h => (
                       <th key={h} className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider pr-4">{h}</th>
                     ))}
                   </tr>
@@ -330,6 +354,17 @@ export function AutopilotClient({ followedTraders, positions }: Props) {
                       <td className="py-3 text-xs text-gray-500">
                         {new Date(p.opened_at).toLocaleDateString()}
                       </td>
+                      <td className="py-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openCIOAnalysis(p)}
+                          className="h-7 px-2 text-xs gap-1.5"
+                        >
+                          <Brain className="h-3.5 w-3.5 text-indigo-400" />
+                          Analyze
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -338,6 +373,15 @@ export function AutopilotClient({ followedTraders, positions }: Props) {
           </Card>
         )}
       </div>
+
+      {/* CIO Decision Modal */}
+      {cioModal.open && cioModal.context && (
+        <CIODecisionModal
+          open={cioModal.open}
+          onClose={() => setCioModal({ open: false, context: null })}
+          tradeContext={cioModal.context}
+        />
+      )}
 
       {/* Disclaimer */}
       <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-start gap-3">
