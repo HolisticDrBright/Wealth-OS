@@ -20,7 +20,9 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, Info } from 'lucide-react'
+import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, Info, RefreshCw } from 'lucide-react'
+import { refreshAssetPrices } from '@/lib/actions/prices'
+import type { PriceResult } from '@/app/api/prices/route'
 
 const categoryColors: Record<string, string> = {
   stock: '#6366f1',
@@ -50,6 +52,28 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [priceData, setPriceData] = useState<PriceResult[]>([])
+  const [refreshMsg, setRefreshMsg] = useState('')
+
+  function handleRefreshPrices() {
+    setIsRefreshing(true)
+    setRefreshMsg('')
+    startTransition(async () => {
+      const result = await refreshAssetPrices()
+      setIsRefreshing(false)
+      if (result.error) {
+        setRefreshMsg(`Error: ${result.error}`)
+      } else {
+        setLastUpdated(new Date().toLocaleTimeString())
+        setPriceData(result.prices ?? [])
+        setRefreshMsg(`Updated ${result.updated} position${result.updated !== 1 ? 's' : ''}`)
+        // Refresh page data
+        window.location.reload()
+      }
+    })
+  }
 
   const totalValue = assets.reduce((s, a) => s + a.current_value, 0)
 
@@ -106,6 +130,22 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
           </p>
         </div>
       )}
+
+      {/* Refresh bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="outline" onClick={handleRefreshPrices} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh Prices'}
+          </Button>
+          {lastUpdated && <span className="text-xs text-gray-500">Updated {lastUpdated}</span>}
+        </div>
+        {refreshMsg && (
+          <span className={`text-xs font-medium ${refreshMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
+            {refreshMsg}
+          </span>
+        )}
+      </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -262,8 +302,9 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
                     <th className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
                     <th className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                     <th className="pb-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                    <th className="pb-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">24h</th>
                     <th className="pb-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Allocation</th>
-                    <th className="pb-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Gain/Loss</th>
+                    <th className="pb-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Return</th>
                     <th className="pb-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -287,6 +328,22 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
                         </td>
                         <td className="py-3 text-right font-medium text-white">
                           {formatCurrency(asset.current_value)}
+                          {asset.symbol && priceData.find(p => p.symbol.toUpperCase() === asset.symbol?.toUpperCase())?.price ? (
+                            <p className="text-xs text-gray-500">
+                              @ {formatCurrency(priceData.find(p => p.symbol.toUpperCase() === asset.symbol?.toUpperCase())!.price)}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="py-3 text-right">
+                          {(() => {
+                            const p = asset.symbol ? priceData.find(pd => pd.symbol.toUpperCase() === asset.symbol?.toUpperCase()) : null
+                            if (!p || p.source === 'error') return <span className="text-gray-600 text-xs">—</span>
+                            return (
+                              <span className={`text-xs font-medium ${p.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {p.changePercent >= 0 ? '+' : ''}{p.changePercent.toFixed(2)}%
+                              </span>
+                            )
+                          })()}
                         </td>
                         <td className="py-3 text-right text-gray-400">
                           {totalValue > 0 ? ((asset.current_value / totalValue) * 100).toFixed(1) : 0}%
