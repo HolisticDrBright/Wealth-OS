@@ -12,6 +12,8 @@ import {
   LogOut,
   ChevronRight,
   DollarSign,
+  Users,
+  Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +23,8 @@ const navItems = [
   { href: '/budget', label: 'Budget', icon: Wallet },
   { href: '/planning', label: 'Wealth Planning', icon: Target },
   { href: '/tax', label: 'Tax Advisor', icon: FileText },
+  { href: '/traders', label: 'Top Traders', icon: Users },
+  { href: '/autopilot', label: 'Autopilot', icon: Zap },
 ]
 
 export function Sidebar() {

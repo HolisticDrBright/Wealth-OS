@@ -119,3 +119,101 @@ create index if not exists transactions_user_id_date_idx on public.transactions(
 create index if not exists goals_user_id_idx on public.goals(user_id);
 create index if not exists budgets_user_id_month_idx on public.budgets(user_id, month);
 create index if not exists net_worth_history_user_id_idx on public.net_worth_history(user_id, date desc);
+
+-- ─── Traders (global — written by sync workers via service role) ──
+create table if not exists public.traders (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  handle text unique not null,
+  asset_class text not null check (asset_class in ('stock','crypto','forex','polymarket')),
+  source text not null check (source in ('unusual_whales','quiver_quant','nansen','arkham','myfxbook','polymarket','manual')),
+  source_id text,
+  avatar_url text,
+  bio text,
+  total_return_pct numeric default 0,
+  ytd_return_pct numeric default 0,
+  win_rate_pct numeric default 0,
+  avg_trade_size_usd numeric default 0,
+  trade_count integer default 0,
+  followers_count integer default 0,
+  verified boolean default false,
+  is_active boolean default true,
+  metadata jsonb default '{}',
+  last_synced_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.traders enable row level security;
+drop policy if exists "Authenticated users can read traders" on public.traders;
+create policy "Authenticated users can read traders" on public.traders for select using (auth.role() = 'authenticated');
+
+-- ─── Trader Trades ────────────────────────────────────────────
+create table if not exists public.trader_trades (
+  id uuid default gen_random_uuid() primary key,
+  trader_id uuid references public.traders on delete cascade not null,
+  asset_class text not null,
+  symbol text not null,
+  action text not null check (action in ('buy','sell','short','cover')),
+  quantity numeric,
+  price numeric,
+  notional_value numeric,
+  trade_date timestamptz not null default now(),
+  source_trade_id text unique,
+  metadata jsonb default '{}',
+  created_at timestamptz default now()
+);
+alter table public.trader_trades enable row level security;
+drop policy if exists "Authenticated users can read trader trades" on public.trader_trades;
+create policy "Authenticated users can read trader trades" on public.trader_trades for select using (auth.role() = 'authenticated');
+
+-- ─── User Followed Traders ────────────────────────────────────
+create table if not exists public.user_followed_traders (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  trader_id uuid references public.traders on delete cascade not null,
+  auto_copy_enabled boolean default false,
+  max_allocation_pct_per_trade numeric default 5 check (max_allocation_pct_per_trade between 1 and 25),
+  copy_asset_classes text[] default '{stock,crypto,forex,polymarket}',
+  risk_level text default 'moderate' check (risk_level in ('conservative','moderate','aggressive')),
+  max_daily_copy_usd numeric,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id, trader_id)
+);
+alter table public.user_followed_traders enable row level security;
+drop policy if exists "Users can manage own followed traders" on public.user_followed_traders;
+create policy "Users can manage own followed traders" on public.user_followed_traders for all using (auth.uid() = user_id);
+
+-- ─── User Copied Positions ────────────────────────────────────
+create table if not exists public.user_copied_positions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  trader_id uuid references public.traders on delete cascade not null,
+  trader_trade_id uuid references public.trader_trades on delete set null,
+  symbol text not null,
+  asset_class text not null,
+  action text not null,
+  quantity numeric,
+  entry_price numeric,
+  current_price numeric,
+  notional_value numeric default 0,
+  pnl_usd numeric default 0,
+  pnl_pct numeric default 0,
+  status text default 'pending' check (status in ('pending','open','closed','failed')),
+  broker text,
+  broker_order_id text,
+  error_message text,
+  opened_at timestamptz default now(),
+  closed_at timestamptz,
+  created_at timestamptz default now()
+);
+alter table public.user_copied_positions enable row level security;
+drop policy if exists "Users can manage own copied positions" on public.user_copied_positions;
+create policy "Users can manage own copied positions" on public.user_copied_positions for all using (auth.uid() = user_id);
+
+-- ─── Copy Trading Indexes ─────────────────────────────────────
+create index if not exists traders_asset_class_idx on public.traders(asset_class);
+create index if not exists traders_source_idx on public.traders(source);
+create index if not exists trader_trades_trader_id_idx on public.trader_trades(trader_id, trade_date desc);
+create index if not exists user_followed_traders_user_id_idx on public.user_followed_traders(user_id);
+create index if not exists user_copied_positions_user_id_idx on public.user_copied_positions(user_id, opened_at desc);

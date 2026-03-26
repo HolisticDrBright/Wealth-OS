@@ -19,13 +19,39 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Info } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Info, Camera } from 'lucide-react'
+import { snapshotNetWorth } from '@/lib/actions/networth'
+import { useState, useTransition } from 'react'
 
 interface Props {
   assets: Asset[]
   transactions: Transaction[]
   netWorthHistory: NetWorthEntry[]
   isDemo: boolean
+}
+
+function SnapshotButton({ totalAssets, totalLiabilities }: { totalAssets: number; totalLiabilities: number }) {
+  const [isPending, startTransition] = useTransition()
+  const [done, setDone] = useState(false)
+
+  function handleSnapshot() {
+    startTransition(async () => {
+      await snapshotNetWorth(totalAssets, totalLiabilities)
+      setDone(true)
+      setTimeout(() => setDone(false), 3000)
+    })
+  }
+
+  return (
+    <button
+      onClick={handleSnapshot}
+      disabled={isPending}
+      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+    >
+      <Camera className={`h-3.5 w-3.5 ${isPending ? 'animate-pulse' : ''}`} />
+      {done ? 'Saved!' : isPending ? 'Saving...' : 'Snapshot Net Worth'}
+    </button>
+  )
 }
 
 export function DashboardClient({ assets, transactions, netWorthHistory, isDemo }: Props) {
@@ -167,11 +193,14 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
                 <CardTitle>Net Worth Over Time</CardTitle>
                 <CardDescription>Assets vs. Liabilities</CardDescription>
               </div>
-              {history.length >= 2 && (
-                <Badge variant={netWorthChange >= 0 ? 'success' : 'danger'}>
-                  {formatPercentage(netWorthChangePct)} MoM
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {history.length >= 2 && (
+                  <Badge variant={netWorthChange >= 0 ? 'success' : 'danger'}>
+                    {formatPercentage(netWorthChangePct)} MoM
+                  </Badge>
+                )}
+                <SnapshotButton totalAssets={totalAssets} totalLiabilities={totalLiabilities} />
+              </div>
             </div>
           </CardHeader>
           <CardContent>

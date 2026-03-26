@@ -58,6 +58,74 @@ export interface Goal {
   notes?: string
 }
 
+export interface Trader {
+  id: string
+  name: string
+  handle: string
+  asset_class: 'stock' | 'crypto' | 'forex' | 'polymarket'
+  source: 'unusual_whales' | 'quiver_quant' | 'nansen' | 'arkham' | 'myfxbook' | 'polymarket' | 'manual'
+  avatar_url?: string
+  bio?: string
+  total_return_pct: number
+  ytd_return_pct: number
+  win_rate_pct: number
+  avg_trade_size_usd: number
+  trade_count: number
+  followers_count: number
+  verified: boolean
+  is_active: boolean
+  metadata: Record<string, unknown>
+  last_synced_at?: string
+  // joined from user_followed_traders
+  follow_settings?: UserFollowedTrader | null
+}
+
+export interface TraderTrade {
+  id: string
+  trader_id: string
+  asset_class: string
+  symbol: string
+  action: 'buy' | 'sell' | 'short' | 'cover'
+  quantity?: number
+  price?: number
+  notional_value?: number
+  trade_date: string
+  metadata: Record<string, unknown>
+}
+
+export interface UserFollowedTrader {
+  id: string
+  user_id: string
+  trader_id: string
+  auto_copy_enabled: boolean
+  max_allocation_pct_per_trade: number
+  copy_asset_classes: string[]
+  risk_level: 'conservative' | 'moderate' | 'aggressive'
+  max_daily_copy_usd?: number
+}
+
+export interface UserCopiedPosition {
+  id: string
+  user_id: string
+  trader_id: string
+  symbol: string
+  asset_class: string
+  action: string
+  quantity?: number
+  entry_price?: number
+  current_price?: number
+  notional_value: number
+  pnl_usd: number
+  pnl_pct: number
+  status: 'pending' | 'open' | 'closed' | 'failed'
+  broker?: string
+  error_message?: string
+  opened_at: string
+  closed_at?: string
+  // joined
+  trader?: Pick<Trader, 'name' | 'handle' | 'asset_class'>
+}
+
 export interface TaxStrategy {
   id: string
   title: string
