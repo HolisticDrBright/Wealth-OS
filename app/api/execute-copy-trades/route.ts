@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
+import type { TradeContext } from '@/lib/agents/types'
+
+const cioEngine = new CIODecisionEngine()
 
 // ─── Broker stubs — replace with real SDK calls when keys are configured ──
 
@@ -33,11 +37,51 @@ async function executViaAlpaca(symbol: string, action: string, notional: number)
   }
 }
 
-async function executeViaBinance(symbol: string, action: string, notional: number) {
-  const key = process.env.BINANCE_API_KEY
-  if (!key) return { status: 'skipped', reason: 'BINANCE_API_KEY not configured' }
-  // Binance execution stub — requires HMAC signing
-  return { status: 'skipped', reason: 'Binance execution: add HMAC signing implementation' }
+async function executeViaKraken(symbol: string, action: string, notional: number) {
+  const key = process.env.KRAKEN_API_KEY
+  const secret = process.env.KRAKEN_API_SECRET
+  if (!key || !secret) return { status: 'skipped', reason: 'KRAKEN_API_KEY not configured' }
+
+  try {
+    const { createHmac, createHash } = await import('crypto')
+    const nonce = Date.now().toString()
+    const path = '/0/private/AddOrder'
+    // Map symbol to Kraken pair (e.g. BTC → XXBTZUSD, ETH → XETHZUSD)
+    const krakenSymbol = symbol.includes('/') ? symbol.replace('/', '') :
+      symbol === 'BTC' ? 'XXBTZUSD' :
+      symbol === 'ETH' ? 'XETHZUSD' :
+      symbol === 'SOL' ? 'SOLUSD' : `${symbol}USD`
+
+    const postData = new URLSearchParams({
+      nonce,
+      ordertype: 'market',
+      type: action === 'buy' ? 'buy' : 'sell',
+      pair: krakenSymbol,
+      oflags: 'fciq', // prefer quote currency for fees
+    }).toString()
+
+    const message = nonce + postData
+    const secretBuffer = Buffer.from(secret, 'base64')
+    const hash = createHash('sha256').update(nonce + postData).digest()
+    const hmac = createHmac('sha512', secretBuffer)
+      .update(Buffer.concat([Buffer.from(path), hash]))
+      .digest('base64')
+
+    const res = await fetch(`https://api.kraken.com${path}`, {
+      method: 'POST',
+      headers: {
+        'API-Key': key,
+        'API-Sign': hmac,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: postData,
+    })
+    const data = await res.json()
+    if (data.error?.length) return { status: 'failed', error: data.error.join(', ') }
+    return { status: 'open', broker_order_id: data.result?.txid?.[0] ?? null, broker: 'kraken' }
+  } catch (err) {
+    return { status: 'failed', error: String(err) }
+  }
 }
 
 async function executeViaOanda(symbol: string, action: string, notional: number) {
@@ -58,7 +102,7 @@ async function executeViaPolymarket(symbol: string, action: string, notional: nu
 function routeToBroker(assetClass: string, symbol: string, action: string, notional: number) {
   switch (assetClass) {
     case 'stock': return executViaAlpaca(symbol, action, notional)
-    case 'crypto': return executeViaBinance(symbol, action, notional)
+    case 'crypto': return executeViaKraken(symbol, action, notional)
     case 'forex': return executeViaOanda(symbol, action, notional)
     case 'polymarket': return executeViaPolymarket(symbol, action, notional)
     default: return Promise.resolve({ status: 'skipped', reason: `Unknown asset class: ${assetClass}` })
@@ -137,6 +181,54 @@ export async function POST(req: NextRequest) {
 
       if (copyNotional < 1) continue
 
+      // ── Run 13-agent CIO analysis before executing ──────────────────────
+      let approvedNotional = copyNotional
+      if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your-anthropic-api-key-here') {
+        try {
+          const { data: userAssets } = await supabase
+            .from('assets').select('*').eq('user_id', userId)
+          const { data: traderRow } = await supabase
+            .from('traders').select('*').eq('id', traderId).single()
+
+          const tradeContext: TradeContext = {
+            trade: {
+              id: trade.id,
+              symbol: trade.symbol,
+              action: trade.action as TradeContext['trade']['action'],
+              asset_class: trade.asset_class as TradeContext['trade']['asset_class'],
+              notional_value: copyNotional,
+              trader_name: traderRow?.name ?? 'Unknown',
+              trader_handle: traderRow?.handle ?? '',
+              trader_return_pct: traderRow?.total_return_pct ?? 0,
+              trader_win_rate: traderRow?.win_rate_pct ?? 0,
+            },
+            user: {
+              id: userId,
+              total_net_worth: (userAssets ?? []).reduce((s: number, a: { current_value: number }) => s + a.current_value, 0),
+              portfolio: userAssets ?? [],
+              risk_profile: follow.risk_level as TradeContext['user']['risk_profile'],
+              max_allocation_pct: maxPct,
+            },
+          }
+
+          const cioDecision = await cioEngine.analyze(tradeContext)
+          console.log(`[CIO] ${trade.symbol}: ${cioDecision.decision} (score: ${cioDecision.finalScore.toFixed(1)})`)
+
+          if (cioDecision.decision === 'reject') {
+            errors.push(`${trade.symbol}: rejected by CIO — ${cioDecision.reasoning}`)
+            continue
+          }
+          if (cioDecision.decision === 'defer') continue
+
+          // Adjust size based on CIO recommendation
+          if (cioDecision.decision === 'reduce') {
+            approvedNotional = copyNotional * (cioDecision.positionSizing.recommended_pct / maxPct)
+          }
+        } catch (cioErr) {
+          console.warn('[CIO] analysis failed, proceeding with original size:', cioErr)
+        }
+      }
+
       // Create position record
       const { data: pos, error: posErr } = await supabase
         .from('user_copied_positions')
@@ -147,7 +239,7 @@ export async function POST(req: NextRequest) {
           symbol: trade.symbol,
           asset_class: trade.asset_class,
           action: trade.action,
-          notional_value: copyNotional,
+          notional_value: approvedNotional,
           status: 'pending',
         })
         .select()
@@ -156,7 +248,7 @@ export async function POST(req: NextRequest) {
       if (posErr || !pos) { errors.push(posErr?.message ?? 'insert failed'); continue }
 
       // Route to broker
-      const result = await routeToBroker(trade.asset_class, trade.symbol, trade.action, copyNotional)
+      const result = await routeToBroker(trade.asset_class, trade.symbol, trade.action, approvedNotional)
 
       await supabase
         .from('user_copied_positions')

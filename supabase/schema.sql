@@ -211,6 +211,42 @@ alter table public.user_copied_positions enable row level security;
 drop policy if exists "Users can manage own copied positions" on public.user_copied_positions;
 create policy "Users can manage own copied positions" on public.user_copied_positions for all using (auth.uid() = user_id);
 
+-- ─── Audit Logs ──────────────────────────────────────────────────────────
+create table if not exists public.audit_logs (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete set null,
+  agent_name text not null,
+  trade_context jsonb,
+  output jsonb,
+  duration_ms integer,
+  created_at timestamptz default now()
+);
+alter table public.audit_logs enable row level security;
+drop policy if exists "Users can view own audit logs" on public.audit_logs;
+create policy "Users can view own audit logs" on public.audit_logs for select using (auth.uid() = user_id);
+
+-- ─── CIO Decisions ────────────────────────────────────────────────────────
+create table if not exists public.cio_decisions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade,
+  trader_trade_id uuid references public.trader_trades on delete set null,
+  decision text not null check (decision in ('execute','reduce','defer','reject')),
+  reasoning text,
+  investment_committee_view text,
+  portfolio_impact text,
+  recommended_pct numeric,
+  confidence text,
+  plain_english_summary text,
+  agent_scores jsonb,
+  mirofish_score numeric,
+  final_score numeric,
+  full_output jsonb,
+  created_at timestamptz default now()
+);
+alter table public.cio_decisions enable row level security;
+drop policy if exists "Users can view own CIO decisions" on public.cio_decisions;
+create policy "Users can view own CIO decisions" on public.cio_decisions for select using (auth.uid() = user_id);
+
 -- ─── Copy Trading Indexes ─────────────────────────────────────
 create index if not exists traders_asset_class_idx on public.traders(asset_class);
 create index if not exists traders_source_idx on public.traders(source);
