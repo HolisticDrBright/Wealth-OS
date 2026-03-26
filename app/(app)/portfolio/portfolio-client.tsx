@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,7 +23,7 @@ import {
 } from 'recharts'
 import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, Info, RefreshCw } from 'lucide-react'
 import { refreshAssetPrices } from '@/lib/actions/prices'
-import type { PriceResult } from '@/app/api/prices/route'
+import type { PriceResult } from '@/lib/prices'
 
 const categoryColors: Record<string, string> = {
   stock: '#6366f1',
@@ -56,6 +57,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [priceData, setPriceData] = useState<PriceResult[]>([])
   const [refreshMsg, setRefreshMsg] = useState('')
+  const router = useRouter()
 
   function handleRefreshPrices() {
     setIsRefreshing(true)
@@ -64,13 +66,12 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
       const result = await refreshAssetPrices()
       setIsRefreshing(false)
       if (result.error) {
-        setRefreshMsg(`Error: ${result.error}`)
+        setRefreshMsg(`⚠ ${result.error}`)
       } else {
         setLastUpdated(new Date().toLocaleTimeString())
         setPriceData(result.prices ?? [])
-        setRefreshMsg(`Updated ${result.updated} position${result.updated !== 1 ? 's' : ''}`)
-        // Refresh page data
-        window.location.reload()
+        setRefreshMsg(`✓ Updated ${result.updated} position${result.updated !== 1 ? 's' : ''}`)
+        router.refresh() // re-fetches server data without wiping client state
       }
     })
   }
