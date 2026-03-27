@@ -30,6 +30,28 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'copy', result: data })
     }
 
+    if (task === 'simulate') {
+      // Find pending jobs and kick them off
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { data: pendingJobs } = await supabase
+        .from('simulation_jobs')
+        .select('id')
+        .eq('status', 'pending')
+        .limit(5)
+
+      const results = await Promise.allSettled(
+        (pendingJobs ?? []).map(job =>
+          fetch(`${baseUrl}/api/simulations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id: job.id }),
+          }).then(r => r.json())
+        )
+      )
+      return NextResponse.json({ task: 'simulate', dispatched: pendingJobs?.length ?? 0, results })
+    }
+
     return NextResponse.json({ error: `Unknown task: ${task}` }, { status: 400 })
   } catch (err) {
     return NextResponse.json(

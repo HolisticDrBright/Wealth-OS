@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
@@ -185,11 +186,38 @@ function UnfollowButton({ traderId, onDone }: { traderId: string; onDone: () => 
   )
 }
 
-export function AutopilotClient({ followedTraders, positions }: Props) {
+export function AutopilotClient({ followedTraders, positions: initialPositions }: Props) {
   const router = useRouter()
   const [executing, setExecuting] = useState(false)
   const [execMsg, setExecMsg] = useState<string | null>(null)
   const [cioModal, setCioModal] = useState<{ open: boolean; context: TradeContext | null }>({ open: false, context: null })
+  const [positions, setPositions] = useState(initialPositions)
+
+  // ─── Realtime: portfolio-updates ─────────────────────────────────────────
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('portfolio-updates')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'user_copied_positions' },
+        (payload) => {
+          const updated = payload.new as UserCopiedPosition
+          setPositions(prev => prev.map(p => p.id === updated.id ? { ...p, ...updated } : p))
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'user_copied_positions' },
+        (payload) => {
+          const newPos = payload.new as UserCopiedPosition
+          setPositions(prev => [newPos, ...prev])
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   function openCIOAnalysis(position: UserCopiedPosition) {
     const context: TradeContext = {

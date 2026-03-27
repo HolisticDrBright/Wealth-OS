@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Wealth OS",
+    "slug": "wealth-os",
+    "version": "1.0.0",
+    "scheme": "wealthos",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0b0f"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.wealthos.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0b0f"
+      },
+      "package": "com.wealthos.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        { "backgroundColor": "#0a0b0f" }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

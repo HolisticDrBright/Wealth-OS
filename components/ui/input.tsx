@@ -32,10 +32,10 @@ export function Input({ label, error, className, id, ...props }: InputProps) {
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   error?: string
-  options: { value: string; label: string }[]
+  options?: { value: string; label: string }[]
 }
 
-export function Select({ label, error, className, id, options, ...props }: SelectProps) {
+export function Select({ label, error, className, id, options, children, ...props }: SelectProps) {
   const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
   return (
     <div className="space-y-1.5">
@@ -54,9 +54,11 @@ export function Select({ label, error, className, id, options, ...props }: Selec
         )}
         {...props}
       >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
+        {options
+          ? options.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))
+          : children}
       </select>
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>

@@ -254,6 +254,136 @@ create index if not exists trader_trades_trader_id_idx on public.trader_trades(t
 create index if not exists user_followed_traders_user_id_idx on public.user_followed_traders(user_id);
 create index if not exists user_copied_positions_user_id_idx on public.user_copied_positions(user_id, opened_at desc);
 
+-- ─── Risk Controls ────────────────────────────────────────────────────────
+create table if not exists public.risk_controls (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade unique not null,
+  max_portfolio_risk_pct numeric default 20,
+  max_single_position_pct numeric default 10,
+  max_drawdown_pct numeric default 15,
+  stop_loss_enabled boolean default false,
+  daily_loss_limit_usd numeric,
+  volatility_threshold text default 'medium' check (volatility_threshold in ('low','medium','high')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.risk_controls enable row level security;
+drop policy if exists "Users can manage own risk controls" on public.risk_controls;
+create policy "Users can manage own risk controls" on public.risk_controls for all using (auth.uid() = user_id);
+
+-- ─── Simulation Jobs ──────────────────────────────────────────────────────
+create table if not exists public.simulation_jobs (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade,
+  title text not null,
+  description text,
+  asset_class text,
+  symbols text[],
+  scenario text not null check (scenario in ('bull','bear','base','stress','montecarlo')),
+  horizon_days integer default 30,
+  num_simulations integer default 1000,
+  status text default 'pending' check (status in ('pending','running','completed','failed')),
+  started_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz default now()
+);
+alter table public.simulation_jobs enable row level security;
+drop policy if exists "Users can manage own simulation jobs" on public.simulation_jobs;
+create policy "Users can manage own simulation jobs" on public.simulation_jobs for all using (auth.uid() = user_id);
+
+-- ─── Simulation Reports ───────────────────────────────────────────────────
+create table if not exists public.simulation_reports (
+  id uuid default gen_random_uuid() primary key,
+  job_id uuid references public.simulation_jobs on delete cascade,
+  user_id uuid references auth.users on delete cascade,
+  bull_probability numeric,
+  bear_probability numeric,
+  consensus_direction text check (consensus_direction in ('bullish','bearish','neutral')),
+  tail_risk_score numeric,
+  confidence_level text check (confidence_level in ('high','medium','low')),
+  agent_consensus numeric,
+  key_findings text[],
+  scenario_summary text,
+  raw_output jsonb,
+  created_at timestamptz default now()
+);
+alter table public.simulation_reports enable row level security;
+drop policy if exists "Users can view own simulation reports" on public.simulation_reports;
+create policy "Users can view own simulation reports" on public.simulation_reports for all using (auth.uid() = user_id);
+
+-- ─── Opportunities ────────────────────────────────────────────────────────
+create table if not exists public.opportunities (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade,
+  source text not null check (source in ('cio','screener','trader_signal','manual')),
+  symbol text,
+  asset_class text,
+  title text not null,
+  description text,
+  action text check (action in ('buy','sell','watch')),
+  confidence text check (confidence in ('high','medium','low')),
+  score numeric,
+  expires_at timestamptz,
+  is_read boolean default false,
+  metadata jsonb default '{}',
+  created_at timestamptz default now()
+);
+alter table public.opportunities enable row level security;
+drop policy if exists "Users can view own opportunities" on public.opportunities;
+drop policy if exists "Users can update own opportunities" on public.opportunities;
+create policy "Users can view own opportunities" on public.opportunities for select using (auth.uid() = user_id or user_id is null);
+create policy "Users can update own opportunities" on public.opportunities for update using (auth.uid() = user_id);
+
+-- ─── Alerts ───────────────────────────────────────────────────────────────
+create table if not exists public.alerts (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade,
+  type text not null check (type in ('trade_executed','risk_breach','price_alert','simulation_done','opportunity','system')),
+  title text not null,
+  body text,
+  severity text default 'info' check (severity in ('info','warning','critical')),
+  is_read boolean default false,
+  action_url text,
+  metadata jsonb default '{}',
+  created_at timestamptz default now()
+);
+alter table public.alerts enable row level security;
+drop policy if exists "Users can manage own alerts" on public.alerts;
+create policy "Users can manage own alerts" on public.alerts for all using (auth.uid() = user_id);
+
+-- ─── Linked Accounts ──────────────────────────────────────────────────────
+create table if not exists public.linked_accounts (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade,
+  provider text not null check (provider in ('alpaca','kraken','oanda','polymarket','plaid','manual')),
+  account_name text,
+  account_id_external text,
+  status text default 'active' check (status in ('active','disconnected','error')),
+  balance_usd numeric,
+  currency text default 'USD',
+  is_paper_trading boolean default false,
+  metadata jsonb default '{}',
+  last_synced_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.linked_accounts enable row level security;
+drop policy if exists "Users can manage own linked accounts" on public.linked_accounts;
+create policy "Users can manage own linked accounts" on public.linked_accounts for all using (auth.uid() = user_id);
+
+-- ─── Indexes for new tables ───────────────────────────────────────────────
+create index if not exists alerts_user_id_created_at_idx on public.alerts(user_id, created_at desc);
+create index if not exists alerts_user_id_is_read_idx on public.alerts(user_id, is_read);
+create index if not exists opportunities_user_id_score_idx on public.opportunities(user_id, score desc);
+create index if not exists simulation_jobs_user_id_status_idx on public.simulation_jobs(user_id, status);
+create index if not exists linked_accounts_user_id_idx on public.linked_accounts(user_id);
+
+-- ─── Realtime publications ────────────────────────────────────────────────
+alter publication supabase_realtime add table public.alerts;
+alter publication supabase_realtime add table public.simulation_jobs;
+alter publication supabase_realtime add table public.trader_trades;
+alter publication supabase_realtime add table public.user_copied_positions;
+
 -- ─── User Settings ────────────────────────────────────────────────────────
 create table if not exists public.user_settings (
   id uuid default gen_random_uuid() primary key,

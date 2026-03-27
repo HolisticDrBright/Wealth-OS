@@ -14,17 +14,25 @@ import {
   DollarSign,
   Users,
   Zap,
+  Activity,
+  Lightbulb,
+  ShieldAlert,
+  Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/feed', label: 'Live Feed', icon: Activity },
   { href: '/portfolio', label: 'Portfolio', icon: TrendingUp },
   { href: '/budget', label: 'Budget', icon: Wallet },
   { href: '/planning', label: 'Wealth Planning', icon: Target },
   { href: '/tax', label: 'Tax Advisor', icon: FileText },
   { href: '/traders', label: 'Top Traders', icon: Users },
   { href: '/autopilot', label: 'Autopilot', icon: Zap },
+  { href: '/opportunities', label: 'Opportunities', icon: Lightbulb },
+  { href: '/risk', label: 'Risk', icon: ShieldAlert },
+  { href: '/alerts', label: 'Alerts', icon: Bell },
 ]
 
 export function Sidebar() {

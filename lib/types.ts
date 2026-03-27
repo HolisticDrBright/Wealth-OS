@@ -126,6 +126,97 @@ export interface UserCopiedPosition {
   trader?: Pick<Trader, 'name' | 'handle' | 'asset_class'>
 }
 
+export interface RiskControl {
+  id: string
+  user_id: string
+  max_portfolio_risk_pct: number
+  max_single_position_pct: number
+  max_drawdown_pct: number
+  stop_loss_enabled: boolean
+  daily_loss_limit_usd?: number
+  volatility_threshold: 'low' | 'medium' | 'high'
+  created_at: string
+  updated_at: string
+}
+
+export interface SimulationJob {
+  id: string
+  user_id: string
+  title: string
+  description?: string
+  asset_class?: string
+  symbols?: string[]
+  scenario: 'bull' | 'bear' | 'base' | 'stress' | 'montecarlo'
+  horizon_days: number
+  num_simulations: number
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  started_at?: string
+  completed_at?: string
+  created_at: string
+}
+
+export interface SimulationReport {
+  id: string
+  job_id: string
+  user_id: string
+  bull_probability?: number
+  bear_probability?: number
+  consensus_direction?: 'bullish' | 'bearish' | 'neutral'
+  tail_risk_score?: number
+  confidence_level?: 'high' | 'medium' | 'low'
+  agent_consensus?: number
+  key_findings?: string[]
+  scenario_summary?: string
+  raw_output?: Record<string, unknown>
+  created_at: string
+}
+
+export interface Opportunity {
+  id: string
+  user_id?: string
+  source: 'cio' | 'screener' | 'trader_signal' | 'manual'
+  symbol?: string
+  asset_class?: string
+  title: string
+  description?: string
+  action?: 'buy' | 'sell' | 'watch'
+  confidence?: 'high' | 'medium' | 'low'
+  score?: number
+  expires_at?: string
+  is_read: boolean
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface Alert {
+  id: string
+  user_id: string
+  type: 'trade_executed' | 'risk_breach' | 'price_alert' | 'simulation_done' | 'opportunity' | 'system'
+  title: string
+  body?: string
+  severity: 'info' | 'warning' | 'critical'
+  is_read: boolean
+  action_url?: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface LinkedAccount {
+  id: string
+  user_id: string
+  provider: 'alpaca' | 'kraken' | 'oanda' | 'polymarket' | 'plaid' | 'manual'
+  account_name?: string
+  account_id_external?: string
+  status: 'active' | 'disconnected' | 'error'
+  balance_usd?: number
+  currency: string
+  is_paper_trading: boolean
+  metadata: Record<string, unknown>
+  last_synced_at?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface TaxStrategy {
   id: string
   title: string
