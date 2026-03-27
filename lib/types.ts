@@ -217,6 +217,211 @@ export interface LinkedAccount {
   updated_at: string
 }
 
+export interface Order {
+  id: string
+  user_id: string
+  symbol: string
+  asset_class: string
+  side: 'buy' | 'sell'
+  order_type: 'market' | 'limit' | 'stop' | 'stop_limit' | 'trailing_stop'
+  status: 'pending' | 'submitted' | 'open' | 'partially_filled' | 'filled' | 'cancelled' | 'rejected' | 'expired'
+  quantity?: number
+  notional_usd?: number
+  limit_price?: number
+  stop_price?: number
+  trail_amount?: number
+  trail_percent?: number
+  time_in_force: 'day' | 'gtc' | 'ioc' | 'fok'
+  broker?: string
+  broker_order_id?: string
+  filled_qty: number
+  filled_avg_price?: number
+  source?: 'manual' | 'copy_trade' | 'rebalance' | 'harvest' | 'rule'
+  source_ref_id?: string
+  error_message?: string
+  submitted_at?: string
+  filled_at?: string
+  cancelled_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PortfolioTarget {
+  id: string
+  user_id: string
+  asset_class: string
+  target_pct: number
+  created_at: string
+  updated_at: string
+}
+
+export interface RebalanceSuggestion {
+  id: string
+  user_id: string
+  symbol?: string
+  asset_class: string
+  action: 'buy' | 'sell'
+  current_pct?: number
+  target_pct?: number
+  drift_pct?: number
+  suggested_notional?: number
+  status: 'pending' | 'approved' | 'executed' | 'dismissed'
+  executed_at?: string
+  created_at: string
+}
+
+export interface HarvestCandidate {
+  id: string
+  user_id: string
+  symbol: string
+  asset_class: string
+  position_id?: string
+  unrealized_loss_usd: number
+  unrealized_loss_pct: number
+  purchase_date?: string
+  wash_sale_risk: boolean
+  replacement_symbol?: string
+  status: 'pending' | 'harvested' | 'dismissed' | 'expired'
+  expires_at?: string
+  harvested_at?: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface Strategy {
+  id: string
+  user_id: string
+  name: string
+  description?: string
+  asset_class?: string
+  type?: 'momentum' | 'value' | 'copy_trade' | 'manual' | 'rebalance' | 'harvest'
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface StrategyPosition {
+  id: string
+  strategy_id: string
+  user_id: string
+  copied_position_id?: string
+  symbol: string
+  action: string
+  entry_price?: number
+  exit_price?: number
+  quantity?: number
+  notional_value?: number
+  pnl_usd: number
+  pnl_pct: number
+  opened_at: string
+  closed_at?: string
+  status: 'open' | 'closed'
+}
+
+export interface AutopilotRule {
+  id: string
+  user_id: string
+  name: string
+  is_active: boolean
+  priority: number
+  condition_symbols?: string[]
+  condition_asset_classes?: string[]
+  condition_actions?: string[]
+  condition_min_notional?: number
+  condition_max_notional?: number
+  condition_trader_ids?: string[]
+  condition_min_trader_return_pct?: number
+  condition_min_cio_score?: number
+  condition_time_window_start?: string
+  condition_time_window_end?: string
+  action_type: 'copy' | 'skip' | 'reduce' | 'alert_only'
+  action_sizing_pct?: number
+  action_sizing_mode?: 'fixed_pct' | 'fixed_usd' | 'proportional'
+  action_fixed_usd?: number
+  action_max_daily_usd?: number
+  action_broker_override?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RetirementPlan {
+  id: string
+  user_id: string
+  current_age?: number
+  target_retirement_age: number
+  current_savings_usd: number
+  annual_contribution_usd: number
+  expected_return_pct: number
+  inflation_rate_pct: number
+  target_monthly_income_usd?: number
+  social_security_monthly_usd: number
+  pension_monthly_usd: number
+  ira_balance_usd: number
+  roth_ira_balance_usd: number
+  k401_balance_usd: number
+  taxable_balance_usd: number
+  projected_retirement_balance_usd?: number
+  income_gap_monthly_usd?: number
+  on_track?: boolean
+  last_computed_at?: string
+  claude_advice?: string
+  claude_advice_generated_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CryptoPrice {
+  id: string
+  symbol: string
+  pair: string
+  price_usd: number
+  bid?: number
+  ask?: number
+  volume_24h?: number
+  change_pct_24h?: number
+  high_24h?: number
+  low_24h?: number
+  source: string
+  fetched_at: string
+}
+
+export interface CryptoPortfolioPosition {
+  id: string
+  user_id: string
+  symbol: string
+  balance: number
+  balance_usd: number
+  avg_cost_usd?: number
+  unrealized_pnl_usd: number
+  last_synced_at?: string
+}
+
+export interface ForexRate {
+  id: string
+  instrument: string
+  bid: number
+  ask: number
+  spread_pips?: number
+  source: string
+  fetched_at: string
+}
+
+export interface ForexPosition {
+  id: string
+  user_id: string
+  instrument: string
+  side: 'long' | 'short'
+  units: number
+  avg_price?: number
+  current_price?: number
+  unrealized_pnl: number
+  unrealized_pnl_usd: number
+  oanda_trade_id?: string
+  last_synced_at?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface TaxStrategy {
   id: string
   title: string

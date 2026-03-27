@@ -52,6 +52,44 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'simulate', dispatched: pendingJobs?.length ?? 0, results })
     }
 
+    if (task === 'score') {
+      const { runAutoScoring } = await import('@/lib/auto-scorer')
+      const result = await runAutoScoring(10)
+      return NextResponse.json({ task: 'score', ...result })
+    }
+
+    if (task === 'rebalance') {
+      const res = await fetch(`${baseUrl}/api/rebalance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ execute: false }),
+      })
+      const data = await res.json()
+      return NextResponse.json({ task: 'rebalance', result: data })
+    }
+
+    if (task === 'harvest-scan') {
+      const res = await fetch(`${baseUrl}/api/tax-harvest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      return NextResponse.json({ task: 'harvest-scan', result: data })
+    }
+
+    if (task === 'sync-crypto') {
+      const res = await fetch(`${baseUrl}/api/kraken?action=prices`)
+      const data = await res.json()
+      return NextResponse.json({ task: 'sync-crypto', result: data })
+    }
+
+    if (task === 'sync-forex') {
+      const res = await fetch(`${baseUrl}/api/oanda?action=rates`)
+      const data = await res.json()
+      return NextResponse.json({ task: 'sync-forex', result: data })
+    }
+
     return NextResponse.json({ error: `Unknown task: ${task}` }, { status: 400 })
   } catch (err) {
     return NextResponse.json(

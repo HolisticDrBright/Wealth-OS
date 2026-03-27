@@ -1,113 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
+import { submitOrder } from '@/lib/broker-router'
+import { evaluateRules, applySizing } from '@/lib/rules-engine'
 import type { TradeContext } from '@/lib/agents/types'
+import type { AutopilotRule } from '@/lib/types'
 
 const cioEngine = new CIODecisionEngine()
-
-// ─── Broker stubs — replace with real SDK calls when keys are configured ──
-
-async function executViaAlpaca(symbol: string, action: string, notional: number) {
-  const key = process.env.ALPACA_API_KEY
-  const secret = process.env.ALPACA_SECRET_KEY
-  if (!key || !secret) return { status: 'skipped', reason: 'ALPACA_API_KEY not configured' }
-
-  try {
-    const baseUrl = 'https://paper-api.alpaca.markets' // paper trading — change to live for real
-    const res = await fetch(`${baseUrl}/v2/orders`, {
-      method: 'POST',
-      headers: {
-        'APCA-API-KEY-ID': key,
-        'APCA-API-SECRET-KEY': secret,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        symbol,
-        notional: notional.toFixed(2),
-        side: action === 'buy' ? 'buy' : 'sell',
-        type: 'market',
-        time_in_force: 'day',
-      }),
-    })
-    const data = await res.json()
-    if (!res.ok) return { status: 'failed', error: data.message ?? 'Alpaca error' }
-    return { status: 'open', broker_order_id: data.id, broker: 'alpaca' }
-  } catch (err) {
-    return { status: 'failed', error: String(err) }
-  }
-}
-
-async function executeViaKraken(symbol: string, action: string, notional: number) {
-  const key = process.env.KRAKEN_API_KEY
-  const secret = process.env.KRAKEN_API_SECRET
-  if (!key || !secret) return { status: 'skipped', reason: 'KRAKEN_API_KEY not configured' }
-
-  try {
-    const { createHmac, createHash } = await import('crypto')
-    const nonce = Date.now().toString()
-    const path = '/0/private/AddOrder'
-    // Map symbol to Kraken pair (e.g. BTC → XXBTZUSD, ETH → XETHZUSD)
-    const krakenSymbol = symbol.includes('/') ? symbol.replace('/', '') :
-      symbol === 'BTC' ? 'XXBTZUSD' :
-      symbol === 'ETH' ? 'XETHZUSD' :
-      symbol === 'SOL' ? 'SOLUSD' : `${symbol}USD`
-
-    const postData = new URLSearchParams({
-      nonce,
-      ordertype: 'market',
-      type: action === 'buy' ? 'buy' : 'sell',
-      pair: krakenSymbol,
-      oflags: 'fciq', // prefer quote currency for fees
-    }).toString()
-
-    const message = nonce + postData
-    const secretBuffer = Buffer.from(secret, 'base64')
-    const hash = createHash('sha256').update(nonce + postData).digest()
-    const hmac = createHmac('sha512', secretBuffer)
-      .update(Buffer.concat([Buffer.from(path), hash]))
-      .digest('base64')
-
-    const res = await fetch(`https://api.kraken.com${path}`, {
-      method: 'POST',
-      headers: {
-        'API-Key': key,
-        'API-Sign': hmac,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: postData,
-    })
-    const data = await res.json()
-    if (data.error?.length) return { status: 'failed', error: data.error.join(', ') }
-    return { status: 'open', broker_order_id: data.result?.txid?.[0] ?? null, broker: 'kraken' }
-  } catch (err) {
-    return { status: 'failed', error: String(err) }
-  }
-}
-
-async function executeViaOanda(symbol: string, action: string, notional: number) {
-  const key = process.env.OANDA_API_KEY
-  const account = process.env.OANDA_ACCOUNT_ID
-  if (!key || !account) return { status: 'skipped', reason: 'OANDA_API_KEY not configured' }
-  // OANDA execution stub
-  return { status: 'skipped', reason: 'OANDA execution: add fxTrade implementation' }
-}
-
-async function executeViaPolymarket(symbol: string, action: string, notional: number) {
-  const key = process.env.POLYMARKET_PRIVATE_KEY
-  if (!key) return { status: 'skipped', reason: 'POLYMARKET_PRIVATE_KEY not configured' }
-  // Polymarket CLOB stub
-  return { status: 'skipped', reason: 'Polymarket CLOB: add CLOB client implementation' }
-}
-
-function routeToBroker(assetClass: string, symbol: string, action: string, notional: number) {
-  switch (assetClass) {
-    case 'stock': return executViaAlpaca(symbol, action, notional)
-    case 'crypto': return executeViaKraken(symbol, action, notional)
-    case 'forex': return executeViaOanda(symbol, action, notional)
-    case 'polymarket': return executeViaPolymarket(symbol, action, notional)
-    default: return Promise.resolve({ status: 'skipped', reason: `Unknown asset class: ${assetClass}` })
-  }
-}
 
 export async function POST(req: NextRequest) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -137,6 +36,15 @@ export async function POST(req: NextRequest) {
     const maxPct = follow.max_allocation_pct_per_trade ?? 5
     const maxDaily = follow.max_daily_copy_usd
     const allowedClasses: string[] = follow.copy_asset_classes ?? ['stock', 'crypto', 'forex', 'polymarket']
+
+    // Load user's autopilot rules
+    const { data: rulesRows } = await supabase
+      .from('autopilot_rules')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('priority', { ascending: true })
+    const rules: AutopilotRule[] = rulesRows ?? []
 
     // Get recent trades not yet copied by this user
     const { data: recentTrades } = await supabase
@@ -172,23 +80,60 @@ export async function POST(req: NextRequest) {
       if (copiedIds.has(trade.id)) continue
       if (!allowedClasses.includes(trade.asset_class)) continue
 
-      // Compute copy size (% of trade notional, capped by daily limit)
+      // Compute copy size
       const copyNotional = Math.min(
         (trade.notional_value ?? 1000) * (maxPct / 100),
         maxDaily ? Math.max(0, maxDaily - todaySpend) : Infinity,
-        50000 // hard cap $50k per position
+        50000
       )
 
       if (copyNotional < 1) continue
 
-      // ── Run 13-agent CIO analysis before executing ──────────────────────
+      // ── Evaluate autopilot rules (first-match wins) ──────────────────────
+      const { data: traderRow } = await supabase
+        .from('traders').select('*').eq('id', traderId).single()
+
+      if (rules.length > 0) {
+        const ruleCtx = {
+          symbol: trade.symbol,
+          asset_class: trade.asset_class,
+          action: trade.action,
+          notional_value: copyNotional,
+          trader_id: traderId,
+          trader_return_pct: traderRow?.total_return_pct ?? 0,
+          cio_score: 0,
+        }
+
+        const ruleResult = evaluateRules(rules, ruleCtx)
+        if (ruleResult) {
+          if (ruleResult.action_type === 'skip') {
+            errors.push(`${trade.symbol}: skipped by rule`)
+            continue
+          }
+          if (ruleResult.action_type === 'alert_only') {
+            // Insert alert and continue without copying
+            await supabase.from('alerts').insert({
+              user_id: userId,
+              type: 'trade_executed',
+              title: `Rule alert: ${trade.symbol} ${trade.action}`,
+              body: `Autopilot rule triggered for ${trade.symbol} — alert only mode`,
+              severity: 'info',
+              is_read: false,
+              metadata: { trade_id: trade.id, rule_name: ruleResult.matched_rule_name },
+            })
+            continue
+          }
+        }
+      }
+
+      // ── Run 13-agent CIO analysis ────────────────────────────────────────
       let approvedNotional = copyNotional
+      let cioDecisionId: string | undefined
+
       if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your-anthropic-api-key-here') {
         try {
           const { data: userAssets } = await supabase
             .from('assets').select('*').eq('user_id', userId)
-          const { data: traderRow } = await supabase
-            .from('traders').select('*').eq('id', traderId).single()
 
           const tradeContext: TradeContext = {
             trade: {
@@ -216,14 +161,27 @@ export async function POST(req: NextRequest) {
 
           if (cioDecision.decision === 'reject') {
             errors.push(`${trade.symbol}: rejected by CIO — ${cioDecision.reasoning}`)
+            // Mark trade as scored
+            await supabase.from('trader_trades').update({ cio_scored: true }).eq('id', trade.id)
             continue
           }
           if (cioDecision.decision === 'defer') continue
 
-          // Adjust size based on CIO recommendation
           if (cioDecision.decision === 'reduce') {
-            approvedNotional = copyNotional * (cioDecision.positionSizing.recommended_pct / maxPct)
+            approvedNotional = applySizing(
+              {
+                action_type: 'reduce',
+                sizing_pct: cioDecision.positionSizing.recommended_pct,
+                matched_rule_id: 'cio',
+                matched_rule_name: 'CIO Decision Engine',
+              },
+              copyNotional,
+              maxPct
+            )
           }
+
+          // Mark trade as scored
+          await supabase.from('trader_trades').update({ cio_scored: true }).eq('id', trade.id)
         } catch (cioErr) {
           console.warn('[CIO] analysis failed, proceeding with original size:', cioErr)
         }
@@ -241,24 +199,69 @@ export async function POST(req: NextRequest) {
           action: trade.action,
           notional_value: approvedNotional,
           status: 'pending',
+          cio_decision_id: cioDecisionId ?? null,
         })
         .select()
         .single()
 
       if (posErr || !pos) { errors.push(posErr?.message ?? 'insert failed'); continue }
 
-      // Route to broker
-      const result = await routeToBroker(trade.asset_class, trade.symbol, trade.action, approvedNotional)
+      // Create order record
+      const { data: orderRow } = await supabase
+        .from('orders')
+        .insert({
+          user_id: userId,
+          symbol: trade.symbol,
+          asset_class: trade.asset_class,
+          side: trade.action === 'buy' || trade.action === 'cover' ? 'buy' : 'sell',
+          order_type: 'market',
+          notional_usd: approvedNotional,
+          time_in_force: 'day',
+          status: 'pending',
+          source: 'copy_trade',
+          source_ref_id: pos.id,
+          submitted_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
 
+      // Route to broker via unified submitOrder
+      const result = await submitOrder({
+        symbol: trade.symbol,
+        asset_class: trade.asset_class,
+        side: trade.action === 'buy' || trade.action === 'cover' ? 'buy' : 'sell',
+        order_type: 'market',
+        notional_usd: approvedNotional,
+      })
+
+      const finalStatus = result.status === 'open' || result.status === 'submitted' ? 'open'
+        : result.status === 'skipped' ? 'open'
+        : 'failed'
+
+      // Update position
       await supabase
         .from('user_copied_positions')
         .update({
-          status: result.status === 'open' ? 'open' : result.status === 'skipped' ? 'open' : 'failed',
-          broker: (result as { broker?: string }).broker ?? trade.asset_class,
-          broker_order_id: (result as { broker_order_id?: string }).broker_order_id ?? null,
-          error_message: (result as { error?: string; reason?: string }).error ?? (result as { reason?: string }).reason ?? null,
+          status: finalStatus,
+          broker: result.broker ?? trade.asset_class,
+          broker_order_id: result.broker_order_id ?? null,
+          error_message: result.error ?? result.reason ?? null,
+          order_id: orderRow?.id ?? null,
         })
         .eq('id', pos.id)
+
+      // Update order
+      if (orderRow) {
+        await supabase
+          .from('orders')
+          .update({
+            status: result.status === 'failed' ? 'rejected' : result.status,
+            broker: result.broker ?? trade.asset_class,
+            broker_order_id: result.broker_order_id ?? null,
+            error_message: result.error ?? result.reason ?? null,
+          })
+          .eq('id', orderRow.id)
+      }
 
       executed++
     }

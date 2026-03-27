@@ -18,20 +18,43 @@ import {
   Lightbulb,
   ShieldAlert,
   Bell,
+  RefreshCw,
+  PiggyBank,
+  ShoppingCart,
+  BarChart2,
+  Bitcoin,
+  Globe,
+  ListChecks,
+  Leaf,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
+  // Core
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/feed', label: 'Live Feed', icon: Activity },
   { href: '/portfolio', label: 'Portfolio', icon: TrendingUp },
   { href: '/budget', label: 'Budget', icon: Wallet },
   { href: '/planning', label: 'Wealth Planning', icon: Target },
-  { href: '/tax', label: 'Tax Advisor', icon: FileText },
+  // Trading
   { href: '/traders', label: 'Top Traders', icon: Users },
-  { href: '/autopilot', label: 'Autopilot', icon: Zap },
   { href: '/opportunities', label: 'Opportunities', icon: Lightbulb },
+  { href: '/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/strategies', label: 'Strategies', icon: BarChart2 },
+  // Automation
+  { href: '/autopilot', label: 'Autopilot', icon: Zap },
+  { href: '/autopilot/rules', label: 'Rules', icon: ListChecks },
+  // Markets
+  { href: '/crypto', label: 'Crypto', icon: Bitcoin },
+  { href: '/forex', label: 'Forex', icon: Globe },
+  // Risk & Tax
   { href: '/risk', label: 'Risk', icon: ShieldAlert },
+  { href: '/tax', label: 'Tax Advisor', icon: FileText },
+  { href: '/tax/harvest', label: 'Tax Harvest', icon: Leaf },
+  // Planning
+  { href: '/rebalance', label: 'Rebalance', icon: RefreshCw },
+  { href: '/retirement', label: 'Retirement', icon: PiggyBank },
+  // Alerts
   { href: '/alerts', label: 'Alerts', icon: Bell },
 ]
 

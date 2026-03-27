@@ -406,3 +406,283 @@ drop policy if exists "Users can insert own settings" on public.user_settings;
 create policy "Users can view own settings" on public.user_settings for select using (auth.uid() = user_id);
 create policy "Users can update own settings" on public.user_settings for update using (auth.uid() = user_id);
 create policy "Users can insert own settings" on public.user_settings for insert with check (auth.uid() = user_id);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- PHASE 2 TABLES
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ─── Orders (Full Execution Engine) ──────────────────────────────────────
+create table if not exists public.orders (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  symbol text not null,
+  asset_class text not null,
+  side text not null check (side in ('buy','sell')),
+  order_type text not null check (order_type in ('market','limit','stop','stop_limit','trailing_stop')),
+  status text default 'pending' check (status in ('pending','submitted','open','partially_filled','filled','cancelled','rejected','expired')),
+  quantity numeric,
+  notional_usd numeric,
+  limit_price numeric,
+  stop_price numeric,
+  trail_amount numeric,
+  trail_percent numeric,
+  time_in_force text default 'day' check (time_in_force in ('day','gtc','ioc','fok')),
+  broker text,
+  broker_order_id text,
+  filled_qty numeric default 0,
+  filled_avg_price numeric,
+  source text check (source in ('manual','copy_trade','rebalance','harvest','rule')),
+  source_ref_id uuid,
+  error_message text,
+  submitted_at timestamptz,
+  filled_at timestamptz,
+  cancelled_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.orders enable row level security;
+drop policy if exists "Users can manage own orders" on public.orders;
+create policy "Users can manage own orders" on public.orders for all using (auth.uid() = user_id);
+create index if not exists orders_user_id_status_idx on public.orders(user_id, status, created_at desc);
+create index if not exists orders_broker_order_id_idx on public.orders(broker_order_id) where broker_order_id is not null;
+alter publication supabase_realtime add table public.orders;
+
+-- ─── Portfolio Targets (Rebalancing Engine) ───────────────────────────────
+create table if not exists public.portfolio_targets (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  asset_class text not null,
+  target_pct numeric not null check (target_pct between 0 and 100),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id, asset_class)
+);
+alter table public.portfolio_targets enable row level security;
+drop policy if exists "Users can manage own targets" on public.portfolio_targets;
+create policy "Users can manage own targets" on public.portfolio_targets for all using (auth.uid() = user_id);
+
+-- ─── Rebalance Suggestions ────────────────────────────────────────────────
+create table if not exists public.rebalance_suggestions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  symbol text,
+  asset_class text not null,
+  action text not null check (action in ('buy','sell')),
+  current_pct numeric,
+  target_pct numeric,
+  drift_pct numeric,
+  suggested_notional numeric,
+  status text default 'pending' check (status in ('pending','approved','executed','dismissed')),
+  executed_at timestamptz,
+  created_at timestamptz default now()
+);
+alter table public.rebalance_suggestions enable row level security;
+drop policy if exists "Users can manage own rebalance suggestions" on public.rebalance_suggestions;
+create policy "Users can manage own rebalance suggestions" on public.rebalance_suggestions for all using (auth.uid() = user_id);
+create index if not exists rebalance_suggestions_user_id_idx on public.rebalance_suggestions(user_id, created_at desc);
+
+-- ─── Harvest Candidates (Tax-Loss Harvesting) ─────────────────────────────
+create table if not exists public.harvest_candidates (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  symbol text not null,
+  asset_class text not null,
+  position_id uuid references public.user_copied_positions on delete set null,
+  unrealized_loss_usd numeric not null,
+  unrealized_loss_pct numeric not null,
+  purchase_date date,
+  wash_sale_risk boolean default false,
+  replacement_symbol text,
+  status text default 'pending' check (status in ('pending','harvested','dismissed','expired')),
+  expires_at timestamptz,
+  harvested_at timestamptz,
+  metadata jsonb default '{}',
+  created_at timestamptz default now()
+);
+alter table public.harvest_candidates enable row level security;
+drop policy if exists "Users can manage own harvest candidates" on public.harvest_candidates;
+create policy "Users can manage own harvest candidates" on public.harvest_candidates for all using (auth.uid() = user_id);
+create index if not exists harvest_candidates_user_id_idx on public.harvest_candidates(user_id, created_at desc);
+
+-- ─── Strategies ───────────────────────────────────────────────────────────
+create table if not exists public.strategies (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  description text,
+  asset_class text,
+  type text check (type in ('momentum','value','copy_trade','manual','rebalance','harvest')),
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.strategies enable row level security;
+drop policy if exists "Users can manage own strategies" on public.strategies;
+create policy "Users can manage own strategies" on public.strategies for all using (auth.uid() = user_id);
+
+create table if not exists public.strategy_positions (
+  id uuid default gen_random_uuid() primary key,
+  strategy_id uuid references public.strategies on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  copied_position_id uuid references public.user_copied_positions on delete set null,
+  symbol text not null,
+  action text not null,
+  entry_price numeric,
+  exit_price numeric,
+  quantity numeric,
+  notional_value numeric,
+  pnl_usd numeric default 0,
+  pnl_pct numeric default 0,
+  opened_at timestamptz default now(),
+  closed_at timestamptz,
+  status text default 'open' check (status in ('open','closed'))
+);
+alter table public.strategy_positions enable row level security;
+drop policy if exists "Users can manage own strategy positions" on public.strategy_positions;
+create policy "Users can manage own strategy positions" on public.strategy_positions for all using (auth.uid() = user_id);
+create index if not exists strategy_positions_strategy_id_idx on public.strategy_positions(strategy_id, opened_at desc);
+create index if not exists strategy_positions_user_id_idx on public.strategy_positions(user_id);
+
+-- ─── Autopilot Rules Engine ───────────────────────────────────────────────
+create table if not exists public.autopilot_rules (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  is_active boolean default true,
+  priority integer default 0,
+  condition_symbols text[],
+  condition_asset_classes text[],
+  condition_actions text[],
+  condition_min_notional numeric,
+  condition_max_notional numeric,
+  condition_trader_ids uuid[],
+  condition_min_trader_return_pct numeric,
+  condition_min_cio_score numeric,
+  condition_time_window_start time,
+  condition_time_window_end time,
+  action_type text not null check (action_type in ('copy','skip','reduce','alert_only')),
+  action_sizing_pct numeric,
+  action_sizing_mode text check (action_sizing_mode in ('fixed_pct','fixed_usd','proportional')),
+  action_fixed_usd numeric,
+  action_max_daily_usd numeric,
+  action_broker_override text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.autopilot_rules enable row level security;
+drop policy if exists "Users can manage own autopilot rules" on public.autopilot_rules;
+create policy "Users can manage own autopilot rules" on public.autopilot_rules for all using (auth.uid() = user_id);
+create index if not exists autopilot_rules_user_id_active_idx on public.autopilot_rules(user_id, is_active, priority);
+
+-- ─── Retirement Plans ─────────────────────────────────────────────────────
+create table if not exists public.retirement_plans (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade unique not null,
+  current_age integer,
+  target_retirement_age integer default 65,
+  current_savings_usd numeric default 0,
+  annual_contribution_usd numeric default 0,
+  expected_return_pct numeric default 7.0,
+  inflation_rate_pct numeric default 2.5,
+  target_monthly_income_usd numeric,
+  social_security_monthly_usd numeric default 0,
+  pension_monthly_usd numeric default 0,
+  ira_balance_usd numeric default 0,
+  roth_ira_balance_usd numeric default 0,
+  k401_balance_usd numeric default 0,
+  taxable_balance_usd numeric default 0,
+  projected_retirement_balance_usd numeric,
+  income_gap_monthly_usd numeric,
+  on_track boolean,
+  last_computed_at timestamptz,
+  claude_advice text,
+  claude_advice_generated_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.retirement_plans enable row level security;
+drop policy if exists "Users can manage own retirement plan" on public.retirement_plans;
+create policy "Users can manage own retirement plan" on public.retirement_plans for all using (auth.uid() = user_id);
+
+-- ─── Crypto Prices & Portfolio ────────────────────────────────────────────
+create table if not exists public.crypto_prices (
+  id uuid default gen_random_uuid() primary key,
+  symbol text not null,
+  pair text not null,
+  price_usd numeric not null,
+  bid numeric,
+  ask numeric,
+  volume_24h numeric,
+  change_pct_24h numeric,
+  high_24h numeric,
+  low_24h numeric,
+  source text default 'kraken',
+  fetched_at timestamptz default now(),
+  unique(symbol, source)
+);
+
+create table if not exists public.crypto_portfolio (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  symbol text not null,
+  balance numeric not null default 0,
+  balance_usd numeric not null default 0,
+  avg_cost_usd numeric,
+  unrealized_pnl_usd numeric default 0,
+  linked_account_id uuid references public.linked_accounts on delete set null,
+  last_synced_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(user_id, symbol)
+);
+alter table public.crypto_portfolio enable row level security;
+drop policy if exists "Users can manage own crypto portfolio" on public.crypto_portfolio;
+create policy "Users can manage own crypto portfolio" on public.crypto_portfolio for all using (auth.uid() = user_id);
+
+-- ─── Forex Rates & Positions ──────────────────────────────────────────────
+create table if not exists public.forex_rates (
+  id uuid default gen_random_uuid() primary key,
+  instrument text not null,
+  bid numeric not null,
+  ask numeric not null,
+  spread_pips numeric,
+  source text default 'oanda',
+  fetched_at timestamptz default now(),
+  unique(instrument, source)
+);
+
+create table if not exists public.forex_positions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  instrument text not null,
+  side text not null check (side in ('long','short')),
+  units numeric not null,
+  avg_price numeric,
+  current_price numeric,
+  unrealized_pnl numeric default 0,
+  unrealized_pnl_usd numeric default 0,
+  linked_account_id uuid references public.linked_accounts on delete set null,
+  oanda_trade_id text,
+  last_synced_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.forex_positions enable row level security;
+drop policy if exists "Users can manage own forex positions" on public.forex_positions;
+create policy "Users can manage own forex positions" on public.forex_positions for all using (auth.uid() = user_id);
+
+-- ─── Alter existing tables for Phase 2 ───────────────────────────────────
+alter table public.trader_trades
+  add column if not exists cio_scored boolean default false,
+  add column if not exists cio_decision_id uuid references public.cio_decisions on delete set null;
+create index if not exists trader_trades_unscored_idx
+  on public.trader_trades(cio_scored, trade_date desc) where cio_scored = false;
+
+alter table public.user_copied_positions
+  add column if not exists order_id uuid references public.orders on delete set null,
+  add column if not exists strategy_id uuid references public.strategies on delete set null;
+
+alter table public.user_settings
+  add column if not exists rebalance_threshold_pct numeric default 5,
+  add column if not exists harvest_threshold_usd numeric default 250,
+  add column if not exists harvest_threshold_pct numeric default 3;

@@ -1,12 +1,12 @@
 {
   "crons": [
-    {
-      "path": "/api/cron?task=sync",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron?task=copy",
-      "schedule": "*/30 9-16 * * 1-5"
-    }
+    { "path": "/api/cron?task=sync",         "schedule": "0 */6 * * *" },
+    { "path": "/api/cron?task=copy",         "schedule": "*/30 9-16 * * 1-5" },
+    { "path": "/api/cron?task=score",        "schedule": "*/15 * * * *" },
+    { "path": "/api/cron?task=simulate",     "schedule": "*/10 * * * *" },
+    { "path": "/api/cron?task=rebalance",    "schedule": "0 9 * * 1-5" },
+    { "path": "/api/cron?task=harvest-scan", "schedule": "0 20 * * *" },
+    { "path": "/api/cron?task=sync-crypto",  "schedule": "*/5 * * * *" },
+    { "path": "/api/cron?task=sync-forex",   "schedule": "*/1 * * * *" }
   ]
 }
