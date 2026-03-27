@@ -431,3 +431,245 @@ export interface TaxStrategy {
   priority: 'high' | 'medium' | 'low'
   action_items: string[]
 }
+
+// ─── Phase 3 Types ────────────────────────────────────────
+
+export interface MarketplaceListing {
+  id: string
+  publisher_user_id: string
+  trader_id?: string
+  title: string
+  description?: string
+  strategy_type?: string
+  asset_classes: string[]
+  price_monthly_usd: number
+  is_free: boolean
+  is_published: boolean
+  is_verified: boolean
+  subscriber_count: number
+  avg_rating?: number
+  review_count: number
+  total_return_pct?: number
+  ytd_return_pct?: number
+  sharpe_ratio?: number
+  max_drawdown_pct?: number
+  win_rate_pct?: number
+  trade_count: number
+  inception_date?: string
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface MarketplaceSubscription {
+  id: string
+  user_id: string
+  listing_id: string
+  status: 'active' | 'paused' | 'cancelled'
+  auto_copy_enabled: boolean
+  max_allocation_pct: number
+  risk_level: 'conservative' | 'moderate' | 'aggressive'
+  subscribed_at: string
+  cancelled_at?: string
+  listing?: MarketplaceListing
+}
+
+export interface MarketplaceReview {
+  id: string
+  listing_id: string
+  reviewer_user_id: string
+  rating: number
+  title?: string
+  body?: string
+  is_verified_subscriber: boolean
+  helpful_votes: number
+  created_at: string
+}
+
+export interface BacktestJob {
+  id: string
+  user_id: string
+  strategy_id?: string
+  listing_id?: string
+  name: string
+  description?: string
+  symbols: string[]
+  asset_class: string
+  start_date: string
+  end_date: string
+  initial_capital_usd: number
+  rebalance_frequency: 'none' | 'daily' | 'weekly' | 'monthly'
+  benchmark_symbol: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  started_at?: string
+  completed_at?: string
+  error_message?: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface BacktestResult {
+  id: string
+  job_id: string
+  user_id: string
+  total_return_pct?: number
+  annualized_return_pct?: number
+  benchmark_return_pct?: number
+  alpha?: number
+  beta?: number
+  sharpe_ratio?: number
+  sortino_ratio?: number
+  max_drawdown_pct?: number
+  max_drawdown_duration_days?: number
+  win_rate_pct?: number
+  profit_factor?: number
+  total_trades: number
+  winning_trades: number
+  losing_trades: number
+  avg_win_usd?: number
+  avg_loss_usd?: number
+  final_portfolio_value_usd?: number
+  equity_curve: Array<{ date: string; value: number; benchmark?: number }>
+  monthly_returns: Record<string, number>
+  trade_log: BacktestTrade[]
+  created_at: string
+}
+
+export interface BacktestTrade {
+  date: string
+  symbol: string
+  action: 'buy' | 'sell'
+  quantity: number
+  price: number
+  notional: number
+  pnl?: number
+}
+
+export interface Household {
+  id: string
+  name: string
+  owner_user_id: string
+  household_type: 'family' | 'couple' | 'individual' | 'trust' | 'foundation' | 'advisory'
+  total_net_worth_usd: number
+  advisor_user_id?: string
+  estate_plan_notes?: string
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  members?: HouseholdMember[]
+  goals?: HouseholdGoal[]
+}
+
+export interface HouseholdMember {
+  id: string
+  household_id: string
+  user_id?: string
+  name: string
+  role: 'owner' | 'spouse' | 'dependent' | 'trustee' | 'beneficiary' | 'advisor'
+  email?: string
+  birth_year?: number
+  net_worth_usd: number
+  income_usd: number
+  is_invited: boolean
+  joined_at?: string
+  created_at: string
+}
+
+export interface HouseholdGoal {
+  id: string
+  household_id: string
+  name: string
+  goal_type: 'retirement' | 'education' | 'home' | 'estate' | 'trust' | 'charitable' | 'emergency' | 'other' | 'general'
+  target_amount_usd: number
+  current_amount_usd: number
+  target_date?: string
+  assigned_sleeve_id?: string
+  status: 'active' | 'achieved' | 'paused' | 'cancelled'
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdvisorClient {
+  id: string
+  advisor_user_id: string
+  client_user_id?: string
+  household_id?: string
+  client_name: string
+  client_email?: string
+  aum_usd: number
+  fee_type: 'percentage' | 'flat' | 'hybrid'
+  fee_pct?: number
+  fee_flat_annual_usd?: number
+  status: 'active' | 'prospect' | 'inactive'
+  notes?: string
+  onboarded_at?: string
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface PortfolioSleeve {
+  id: string
+  user_id: string
+  household_id?: string
+  name: string
+  description?: string
+  sleeve_type: 'autonomous' | 'manual' | 'advisor_managed' | 'trust'
+  target_allocation_pct?: number
+  current_value_usd: number
+  inception_date?: string
+  benchmark_symbol?: string
+  is_active: boolean
+  approval_required: boolean
+  approval_threshold_usd: number
+  approved_strategies: string[]
+  approved_asset_classes: string[]
+  max_position_pct: number
+  max_drawdown_pct: number
+  halt_on_breach: boolean
+  halted: boolean
+  halted_reason?: string
+  performance_ytd_pct?: number
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  positions?: SleevePosition[]
+  pending_approvals?: SleeveApprovalRequest[]
+}
+
+export interface SleeveApprovalRequest {
+  id: string
+  sleeve_id: string
+  user_id: string
+  request_type: 'trade' | 'rebalance' | 'parameter_change' | 'halt' | 'resume'
+  symbol?: string
+  action?: string
+  notional_usd?: number
+  order_type?: string
+  reason?: string
+  status: 'pending' | 'approved' | 'rejected' | 'expired'
+  reviewed_by?: string
+  reviewed_at?: string
+  review_notes?: string
+  expires_at: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface SleevePosition {
+  id: string
+  sleeve_id: string
+  user_id: string
+  symbol: string
+  asset_class: string
+  quantity: number
+  avg_cost_usd?: number
+  current_price_usd?: number
+  market_value_usd: number
+  unrealized_pnl_usd: number
+  unrealized_pnl_pct: number
+  weight_pct?: number
+  last_updated_at: string
+  created_at: string
+}

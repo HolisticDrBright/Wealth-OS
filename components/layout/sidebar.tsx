@@ -26,6 +26,11 @@ import {
   Globe,
   ListChecks,
   Leaf,
+  Store,
+  FlaskConical,
+  Home,
+  Briefcase,
+  Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -54,6 +59,13 @@ const navItems = [
   // Planning
   { href: '/rebalance', label: 'Rebalance', icon: RefreshCw },
   { href: '/retirement', label: 'Retirement', icon: PiggyBank },
+  // Marketplace & Research
+  { href: '/marketplace', label: 'Marketplace', icon: Store },
+  { href: '/backtests', label: 'Backtests', icon: FlaskConical },
+  // Family Office
+  { href: '/household', label: 'Family Office', icon: Home },
+  { href: '/advisor', label: 'Advisor', icon: Briefcase },
+  { href: '/sleeves', label: 'Sleeves', icon: Layers },
   // Alerts
   { href: '/alerts', label: 'Alerts', icon: Bell },
 ]

@@ -1,0 +1,99 @@
+import { NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { apiSuccess, apiError } from '@/lib/api'
+import { submitOrder } from '@/lib/broker-router'
+
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return apiError('Unauthorized', 401)
+
+  const { request_id, action, review_notes } = await req.json()
+  if (!request_id) return apiError('request_id is required')
+  if (!['approved', 'rejected'].includes(action)) return apiError('action must be approved or rejected')
+
+  // Fetch the approval request
+  const { data: request } = await supabase
+    .from('sleeve_approval_requests')
+    .select('*, sleeve:portfolio_sleeves(*)')
+    .eq('id', request_id)
+    .eq('user_id', user.id)
+    .eq('status', 'pending')
+    .single()
+
+  if (!request) return apiError('Approval request not found or already resolved', 404)
+
+  if (new Date(request.expires_at) < new Date()) {
+    await supabase.from('sleeve_approval_requests')
+      .update({ status: 'expired' }).eq('id', request_id)
+    return apiError('Approval request has expired', 410)
+  }
+
+  // Update status
+  await supabase.from('sleeve_approval_requests').update({
+    status: action,
+    reviewed_by: user.id,
+    reviewed_at: new Date().toISOString(),
+    review_notes: review_notes ?? null,
+  }).eq('id', request_id)
+
+  // If approved and it's a trade request, execute via broker
+  let brokerResult = null
+  if (action === 'approved' && request.request_type === 'trade') {
+    const sleeve = request.sleeve
+    if (sleeve?.halted) {
+      return apiError('Sleeve is halted — resume before executing trades', 409)
+    }
+
+    if (request.symbol && request.action && request.notional_usd) {
+      brokerResult = await submitOrder({
+        symbol: request.symbol,
+        asset_class: sleeve?.approved_asset_classes?.[0] ?? 'stock',
+        side: request.action === 'buy' ? 'buy' : 'sell',
+        order_type: (request.order_type ?? 'market') as 'market' | 'limit',
+        notional_usd: request.notional_usd,
+      })
+
+      // Write order record
+      await supabase.from('orders').insert({
+        user_id: user.id,
+        symbol: request.symbol,
+        asset_class: sleeve?.approved_asset_classes?.[0] ?? 'stock',
+        side: request.action === 'buy' ? 'buy' : 'sell',
+        order_type: 'market',
+        notional_usd: request.notional_usd,
+        time_in_force: 'day',
+        status: brokerResult.status === 'failed' ? 'rejected' : brokerResult.status,
+        broker: brokerResult.broker,
+        broker_order_id: brokerResult.broker_order_id,
+        source: 'rule',
+        source_ref_id: request_id,
+        submitted_at: new Date().toISOString(),
+        filled_qty: 0,
+        metadata: { sleeve_id: sleeve?.id },
+      })
+
+      // Check drawdown breach — halt sleeve if exceeded
+      if (sleeve?.halt_on_breach && sleeve?.max_drawdown_pct) {
+        if (sleeve.performance_ytd_pct && Math.abs(sleeve.performance_ytd_pct) > sleeve.max_drawdown_pct) {
+          await supabase.from('portfolio_sleeves').update({
+            halted: true,
+            halted_reason: `Max drawdown ${sleeve.max_drawdown_pct}% breached`,
+          }).eq('id', sleeve.id)
+
+          await supabase.from('alerts').insert({
+            user_id: user.id,
+            type: 'risk_breach',
+            title: `Sleeve "${sleeve.name}" halted`,
+            body: `Max drawdown threshold breached. All future trades require manual review.`,
+            severity: 'critical',
+            is_read: false,
+            metadata: { sleeve_id: sleeve.id },
+          })
+        }
+      }
+    }
+  }
+
+  return apiSuccess({ status: action, broker: brokerResult })
+}

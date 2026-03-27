@@ -686,3 +686,299 @@ alter table public.user_settings
   add column if not exists rebalance_threshold_pct numeric default 5,
   add column if not exists harvest_threshold_usd numeric default 250,
   add column if not exists harvest_threshold_pct numeric default 3;
+
+-- ============================================================
+-- Phase 3: Marketplace, Backtesting, Household, Sleeves
+-- ============================================================
+
+-- ─── Marketplace Listings ─────────────────────────────────
+create table if not exists public.marketplace_listings (
+  id uuid primary key default gen_random_uuid(),
+  publisher_user_id uuid references auth.users on delete cascade not null,
+  trader_id uuid references public.traders(id) on delete cascade,
+  title text not null,
+  description text,
+  strategy_type text default 'copy_trade',
+  asset_classes text[] default '{}'::text[],
+  price_monthly_usd numeric(12,2) default 0,
+  is_free boolean generated always as (price_monthly_usd = 0) stored,
+  is_published boolean default false,
+  is_verified boolean default false,
+  subscriber_count int default 0,
+  avg_rating numeric(3,2),
+  review_count int default 0,
+  total_return_pct numeric(10,4),
+  ytd_return_pct numeric(10,4),
+  sharpe_ratio numeric(8,4),
+  max_drawdown_pct numeric(8,4),
+  win_rate_pct numeric(8,4),
+  trade_count int default 0,
+  inception_date date,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.marketplace_listings enable row level security;
+drop policy if exists "Listings are publicly readable" on public.marketplace_listings;
+drop policy if exists "Publishers manage own listings" on public.marketplace_listings;
+create policy "Listings are publicly readable" on public.marketplace_listings for select using (is_published = true or publisher_user_id = auth.uid());
+create policy "Publishers manage own listings" on public.marketplace_listings for all using (publisher_user_id = auth.uid());
+
+-- ─── Marketplace Subscriptions ────────────────────────────
+create table if not exists public.marketplace_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users on delete cascade not null,
+  listing_id uuid references public.marketplace_listings(id) on delete cascade not null,
+  status text default 'active' check (status in ('active','paused','cancelled')),
+  auto_copy_enabled boolean default true,
+  max_allocation_pct numeric(5,2) default 5,
+  risk_level text default 'moderate' check (risk_level in ('conservative','moderate','aggressive')),
+  subscribed_at timestamptz default now(),
+  cancelled_at timestamptz,
+  metadata jsonb default '{}'::jsonb,
+  unique (user_id, listing_id)
+);
+alter table public.marketplace_subscriptions enable row level security;
+drop policy if exists "Users manage own subscriptions" on public.marketplace_subscriptions;
+create policy "Users manage own subscriptions" on public.marketplace_subscriptions for all using (user_id = auth.uid());
+
+-- ─── Marketplace Reviews ──────────────────────────────────
+create table if not exists public.marketplace_reviews (
+  id uuid primary key default gen_random_uuid(),
+  listing_id uuid references public.marketplace_listings(id) on delete cascade not null,
+  reviewer_user_id uuid references auth.users on delete cascade not null,
+  rating int check (rating between 1 and 5) not null,
+  title text,
+  body text,
+  is_verified_subscriber boolean default false,
+  helpful_votes int default 0,
+  created_at timestamptz default now(),
+  unique (listing_id, reviewer_user_id)
+);
+alter table public.marketplace_reviews enable row level security;
+drop policy if exists "Reviews are publicly readable" on public.marketplace_reviews;
+drop policy if exists "Users manage own reviews" on public.marketplace_reviews;
+create policy "Reviews are publicly readable" on public.marketplace_reviews for select using (true);
+create policy "Users manage own reviews" on public.marketplace_reviews for all using (reviewer_user_id = auth.uid());
+
+-- ─── Backtest Jobs ────────────────────────────────────────
+create table if not exists public.backtest_jobs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users on delete cascade not null,
+  strategy_id uuid references public.strategies(id) on delete set null,
+  listing_id uuid references public.marketplace_listings(id) on delete set null,
+  name text not null,
+  description text,
+  symbols text[] not null default '{}'::text[],
+  asset_class text default 'stock',
+  start_date date not null,
+  end_date date not null,
+  initial_capital_usd numeric(15,2) default 100000,
+  rebalance_frequency text default 'none' check (rebalance_frequency in ('none','daily','weekly','monthly')),
+  benchmark_symbol text default 'SPY',
+  status text default 'pending' check (status in ('pending','running','completed','failed')),
+  started_at timestamptz,
+  completed_at timestamptz,
+  error_message text,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+alter table public.backtest_jobs enable row level security;
+drop policy if exists "Users manage own backtests" on public.backtest_jobs;
+create policy "Users manage own backtests" on public.backtest_jobs for all using (user_id = auth.uid());
+
+-- ─── Backtest Results ─────────────────────────────────────
+create table if not exists public.backtest_results (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid references public.backtest_jobs(id) on delete cascade not null unique,
+  user_id uuid references auth.users on delete cascade not null,
+  total_return_pct numeric(12,4),
+  annualized_return_pct numeric(12,4),
+  benchmark_return_pct numeric(12,4),
+  alpha numeric(10,4),
+  beta numeric(10,4),
+  sharpe_ratio numeric(10,4),
+  sortino_ratio numeric(10,4),
+  max_drawdown_pct numeric(10,4),
+  max_drawdown_duration_days int,
+  win_rate_pct numeric(10,4),
+  profit_factor numeric(10,4),
+  total_trades int default 0,
+  winning_trades int default 0,
+  losing_trades int default 0,
+  avg_win_usd numeric(12,2),
+  avg_loss_usd numeric(12,2),
+  final_portfolio_value_usd numeric(15,2),
+  equity_curve jsonb default '[]'::jsonb,
+  monthly_returns jsonb default '{}'::jsonb,
+  trade_log jsonb default '[]'::jsonb,
+  created_at timestamptz default now()
+);
+alter table public.backtest_results enable row level security;
+drop policy if exists "Users view own backtest results" on public.backtest_results;
+create policy "Users view own backtest results" on public.backtest_results for all using (user_id = auth.uid());
+
+-- ─── Households ───────────────────────────────────────────
+create table if not exists public.households (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  owner_user_id uuid references auth.users on delete cascade not null,
+  household_type text default 'family' check (household_type in ('family','couple','individual','trust','foundation','advisory')),
+  total_net_worth_usd numeric(15,2) default 0,
+  advisor_user_id uuid references auth.users on delete set null,
+  estate_plan_notes text,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.households enable row level security;
+drop policy if exists "Household members can view" on public.households;
+drop policy if exists "Household owner manages" on public.households;
+create policy "Household owner manages" on public.households for all using (owner_user_id = auth.uid());
+create policy "Household advisor can view" on public.households for select using (advisor_user_id = auth.uid());
+
+-- ─── Household Members ────────────────────────────────────
+create table if not exists public.household_members (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid references public.households(id) on delete cascade not null,
+  user_id uuid references auth.users on delete cascade,
+  name text not null,
+  role text default 'member' check (role in ('owner','spouse','dependent','trustee','beneficiary','advisor')),
+  email text,
+  birth_year int,
+  net_worth_usd numeric(15,2) default 0,
+  income_usd numeric(15,2) default 0,
+  is_invited boolean default false,
+  invited_at timestamptz,
+  joined_at timestamptz,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+alter table public.household_members enable row level security;
+drop policy if exists "Household owner manages members" on public.household_members;
+create policy "Household owner manages members" on public.household_members for all using (
+  household_id in (select id from public.households where owner_user_id = auth.uid())
+);
+
+-- ─── Advisor Clients ──────────────────────────────────────
+create table if not exists public.advisor_clients (
+  id uuid primary key default gen_random_uuid(),
+  advisor_user_id uuid references auth.users on delete cascade not null,
+  client_user_id uuid references auth.users on delete cascade,
+  household_id uuid references public.households(id) on delete set null,
+  client_name text not null,
+  client_email text,
+  aum_usd numeric(15,2) default 0,
+  fee_type text default 'percentage' check (fee_type in ('percentage','flat','hybrid')),
+  fee_pct numeric(6,4),
+  fee_flat_annual_usd numeric(12,2),
+  status text default 'active' check (status in ('active','prospect','inactive')),
+  notes text,
+  onboarded_at timestamptz,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.advisor_clients enable row level security;
+drop policy if exists "Advisors manage own clients" on public.advisor_clients;
+create policy "Advisors manage own clients" on public.advisor_clients for all using (advisor_user_id = auth.uid());
+
+-- ─── Portfolio Sleeves ────────────────────────────────────
+create table if not exists public.portfolio_sleeves (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users on delete cascade not null,
+  household_id uuid references public.households(id) on delete set null,
+  name text not null,
+  description text,
+  sleeve_type text default 'autonomous' check (sleeve_type in ('autonomous','manual','advisor_managed','trust')),
+  target_allocation_pct numeric(6,3),
+  current_value_usd numeric(15,2) default 0,
+  inception_date date,
+  benchmark_symbol text,
+  is_active boolean default true,
+  approval_required boolean default true,
+  approval_threshold_usd numeric(12,2) default 1000,
+  approved_strategies text[] default '{}'::text[],
+  approved_asset_classes text[] default '{}'::text[],
+  max_position_pct numeric(6,3) default 10,
+  max_drawdown_pct numeric(6,3) default 20,
+  halt_on_breach boolean default true,
+  halted boolean default false,
+  halted_reason text,
+  performance_ytd_pct numeric(10,4),
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.portfolio_sleeves enable row level security;
+drop policy if exists "Users manage own sleeves" on public.portfolio_sleeves;
+create policy "Users manage own sleeves" on public.portfolio_sleeves for all using (user_id = auth.uid());
+
+-- ─── Sleeve Approval Requests ─────────────────────────────
+create table if not exists public.sleeve_approval_requests (
+  id uuid primary key default gen_random_uuid(),
+  sleeve_id uuid references public.portfolio_sleeves(id) on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  request_type text default 'trade' check (request_type in ('trade','rebalance','parameter_change','halt','resume')),
+  symbol text,
+  action text,
+  notional_usd numeric(12,2),
+  order_type text default 'market',
+  reason text,
+  status text default 'pending' check (status in ('pending','approved','rejected','expired')),
+  reviewed_by uuid references auth.users on delete set null,
+  reviewed_at timestamptz,
+  review_notes text,
+  expires_at timestamptz default (now() + interval '24 hours'),
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+alter table public.sleeve_approval_requests enable row level security;
+drop policy if exists "Users manage own approval requests" on public.sleeve_approval_requests;
+create policy "Users manage own approval requests" on public.sleeve_approval_requests for all using (user_id = auth.uid());
+
+-- ─── Sleeve Positions ─────────────────────────────────────
+create table if not exists public.sleeve_positions (
+  id uuid primary key default gen_random_uuid(),
+  sleeve_id uuid references public.portfolio_sleeves(id) on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
+  symbol text not null,
+  asset_class text not null,
+  quantity numeric(20,8) default 0,
+  avg_cost_usd numeric(12,4),
+  current_price_usd numeric(12,4),
+  market_value_usd numeric(15,2) default 0,
+  unrealized_pnl_usd numeric(15,2) default 0,
+  unrealized_pnl_pct numeric(10,4) default 0,
+  weight_pct numeric(8,4),
+  last_updated_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+alter table public.sleeve_positions enable row level security;
+drop policy if exists "Users manage own sleeve positions" on public.sleeve_positions;
+create policy "Users manage own sleeve positions" on public.sleeve_positions for all using (user_id = auth.uid());
+
+-- ─── Household Goals ──────────────────────────────────────
+create table if not exists public.household_goals (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid references public.households(id) on delete cascade not null,
+  name text not null,
+  goal_type text default 'general' check (goal_type in ('retirement','education','home','estate','trust','charitable','emergency','other','general')),
+  target_amount_usd numeric(15,2) not null,
+  current_amount_usd numeric(15,2) default 0,
+  target_date date,
+  assigned_sleeve_id uuid references public.portfolio_sleeves(id) on delete set null,
+  status text default 'active' check (status in ('active','achieved','paused','cancelled')),
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.household_goals enable row level security;
+drop policy if exists "Household owner manages goals" on public.household_goals;
+create policy "Household owner manages goals" on public.household_goals for all using (
+  household_id in (select id from public.households where owner_user_id = auth.uid())
+);
+
+-- ─── Realtime ─────────────────────────────────────────────
+alter publication supabase_realtime add table public.sleeve_approval_requests;
+alter publication supabase_realtime add table public.marketplace_listings;
