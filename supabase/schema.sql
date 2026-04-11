@@ -982,3 +982,74 @@ create policy "Household owner manages goals" on public.household_goals for all 
 -- ─── Realtime ─────────────────────────────────────────────
 alter publication supabase_realtime add table public.sleeve_approval_requests;
 alter publication supabase_realtime add table public.marketplace_listings;
+
+-- ─── Phase 4 additions ─────────────────────────────────────────────────────
+
+-- Audit log (append-only, no UPDATE/DELETE allowed via RLS)
+CREATE TABLE IF NOT EXISTS audit_log (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at   timestamptz DEFAULT now() NOT NULL,
+  user_id      uuid REFERENCES auth.users(id),
+  action       text NOT NULL,
+  resource     text NOT NULL,
+  resource_id  text,
+  metadata     jsonb DEFAULT '{}',
+  ip_address   text,
+  user_agent   text
+);
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users read own audit" ON audit_log FOR SELECT USING (auth.uid() = user_id);
+
+-- Tax lots
+CREATE TABLE IF NOT EXISTS tax_lots (
+  id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at    timestamptz DEFAULT now(),
+  user_id       uuid REFERENCES auth.users(id) NOT NULL,
+  symbol        text NOT NULL,
+  quantity      numeric NOT NULL,
+  cost_basis    numeric NOT NULL,   -- per-unit
+  acquired_date date NOT NULL,
+  is_long_term  boolean GENERATED ALWAYS AS (acquired_date <= CURRENT_DATE - INTERVAL '1 year') STORED,
+  order_id      uuid REFERENCES orders(id),
+  closed_at     timestamptz,
+  remaining_qty numeric
+);
+ALTER TABLE tax_lots ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own lots" ON tax_lots FOR ALL USING (auth.uid() = user_id);
+
+-- Options positions
+CREATE TABLE IF NOT EXISTS option_positions (
+  id                uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at        timestamptz DEFAULT now(),
+  user_id           uuid REFERENCES auth.users(id) NOT NULL,
+  symbol            text NOT NULL,
+  option_type       text CHECK (option_type IN ('call','put')) NOT NULL,
+  strategy          text NOT NULL,
+  strike            numeric NOT NULL,
+  expiration        date NOT NULL,
+  contracts         integer NOT NULL DEFAULT 1,
+  premium_paid      numeric NOT NULL,
+  current_price     numeric,
+  underlying_price  numeric,
+  is_short          boolean DEFAULT false,
+  opened_at         timestamptz DEFAULT now(),
+  closed_at         timestamptz,
+  broker_order_id   text
+);
+ALTER TABLE option_positions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own options" ON option_positions FOR ALL USING (auth.uid() = user_id);
+
+-- Price alerts
+CREATE TABLE IF NOT EXISTS price_alerts (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at   timestamptz DEFAULT now(),
+  user_id      uuid REFERENCES auth.users(id) NOT NULL,
+  symbol       text NOT NULL,
+  condition    text CHECK (condition IN ('above','below','pct_change')) NOT NULL,
+  target_price numeric NOT NULL,
+  triggered_at timestamptz,
+  is_active    boolean DEFAULT true,
+  notify_email boolean DEFAULT true
+);
+ALTER TABLE price_alerts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own alerts" ON price_alerts FOR ALL USING (auth.uid() = user_id);

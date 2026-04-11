@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError } from '@/lib/api'
-import { runBacktest, generateSyntheticBars } from '@/lib/backtester'
+import { runBacktest } from '@/lib/backtester'
+import { getBarsForSymbols } from '@/lib/market-data'
 import type { BacktestJob } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
@@ -87,9 +88,9 @@ export async function POST(req: NextRequest) {
 
   // Run backtest synchronously (in production move to background worker)
   try {
-    // Generate synthetic bars for all symbols + benchmark
+    // Fetch real OHLCV bars (Alpaca → Yahoo → synthetic fallback)
     const allSymbols = [...new Set([...symbols, benchmark_symbol])]
-    const bars = allSymbols.flatMap(sym => generateSyntheticBars(sym, start_date, end_date))
+    const bars = await getBarsForSymbols(allSymbols, start_date, end_date)
 
     const typedJob: BacktestJob = {
       ...job,
