@@ -31,6 +31,7 @@ import {
   Home,
   Briefcase,
   Layers,
+  Sigma,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -46,6 +47,7 @@ const navItems = [
   { href: '/opportunities', label: 'Opportunities', icon: Lightbulb },
   { href: '/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/strategies', label: 'Strategies', icon: BarChart2 },
+  { href: '/options', label: 'Options', icon: Sigma },
   // Automation
   { href: '/autopilot', label: 'Autopilot', icon: Zap },
   { href: '/autopilot/rules', label: 'Rules', icon: ListChecks },

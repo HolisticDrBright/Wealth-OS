@@ -10,6 +10,7 @@ import { createSimulationJob } from '@/lib/actions/simulations'
 import { formatCurrency } from '@/lib/utils'
 import type { RiskControl, SimulationJob } from '@/lib/types'
 import type { RiskSummary } from '@/lib/actions/risk'
+import type { RiskMetrics } from '@/lib/risk-engine'
 import {
   ShieldAlert, Activity, Plus, Clock, CheckCircle2,
   XCircle, RefreshCw, AlertCircle, BarChart2,
@@ -19,6 +20,7 @@ interface Props {
   initialControls: RiskControl | null
   summary: RiskSummary
   initialJobs: SimulationJob[]
+  realMetrics?: RiskMetrics | null
 }
 
 const JOB_STATUS_CONFIG = {
@@ -28,7 +30,7 @@ const JOB_STATUS_CONFIG = {
   failed:    { icon: XCircle,       color: 'text-red-400' },
 }
 
-export function RiskClient({ initialControls, summary, initialJobs }: Props) {
+export function RiskClient({ initialControls, summary, initialJobs, realMetrics }: Props) {
   const [controls, setControls] = useState(initialControls)
   const [jobs, setJobs] = useState(initialJobs)
   const [isSaving, startSave] = useTransition()
@@ -207,6 +209,93 @@ export function RiskClient({ initialControls, summary, initialJobs }: Props) {
           </div>
         </Card>
       </div>
+
+      {/* Risk Analytics */}
+      {realMetrics && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Risk Analytics</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
+            {[
+              { label: '95% VaR (1d)', value: formatCurrency(realMetrics.var95_1d), color: 'text-amber-400' },
+              { label: '99% VaR (1d)', value: formatCurrency(realMetrics.var99_1d), color: 'text-red-400' },
+              { label: 'CVaR 95% (1d)', value: formatCurrency(realMetrics.cvar95_1d), color: 'text-red-400' },
+              { label: '10d VaR (95%)', value: formatCurrency(realMetrics.var95_10d), color: 'text-amber-400' },
+            ].map(({ label, value, color }) => (
+              <Card key={label}>
+                <div className="p-4">
+                  <p className="text-xs text-gray-500">{label}</p>
+                  <p className={`text-lg font-bold mt-0.5 ${color}`}>{value}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
+            {[
+              { label: 'Annual Vol', value: `${realMetrics.portfolioVol_annual.toFixed(1)}%`, color: 'text-white' },
+              { label: 'Portfolio Beta', value: realMetrics.portfolioBeta.toFixed(2), color: 'text-white' },
+              { label: 'Max Drawdown', value: `${realMetrics.maxDrawdown.toFixed(1)}%`, color: 'text-red-400' },
+              { label: 'Current Drawdown', value: `${realMetrics.currentDrawdown.toFixed(1)}%`, color: realMetrics.currentDrawdown > 5 ? 'text-red-400' : 'text-emerald-400' },
+            ].map(({ label, value, color }) => (
+              <Card key={label}>
+                <div className="p-4">
+                  <p className="text-xs text-gray-500">{label}</p>
+                  <p className={`text-lg font-bold mt-0.5 ${color}`}>{value}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 mb-4">
+            <Card>
+              <div className="p-4">
+                <p className="text-xs text-gray-500">Avg Correlation</p>
+                <p className={`text-lg font-bold mt-0.5 ${realMetrics.avgCorrelation > 0.7 ? 'text-red-400' : realMetrics.avgCorrelation > 0.4 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {realMetrics.avgCorrelation.toFixed(2)}
+                </p>
+              </div>
+            </Card>
+            <Card>
+              <div className="p-4">
+                <p className="text-xs text-gray-500">Concentration (HHI)</p>
+                <p className={`text-lg font-bold mt-0.5 ${realMetrics.hhi > 0.25 ? 'text-red-400' : realMetrics.hhi > 0.15 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {(realMetrics.hhi * 100).toFixed(1)}%
+                </p>
+              </div>
+            </Card>
+            <Card>
+              <div className="p-4">
+                <p className="text-xs text-gray-500">Top Holding</p>
+                <p className="text-lg font-bold mt-0.5 text-white">{(realMetrics.topHolding * 100).toFixed(1)}%</p>
+              </div>
+            </Card>
+          </div>
+
+          {realMetrics.contributions.length > 0 && (
+            <Card>
+              <div className="p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Per-Position Risk Contribution</p>
+                <div className="space-y-2">
+                  {realMetrics.contributions.map(c => (
+                    <div key={c.symbol} className="flex items-center gap-3 text-sm">
+                      <span className="font-medium text-white w-16 shrink-0">{c.symbol}</span>
+                      <div className="flex-1 h-1.5 rounded-full bg-white/10">
+                        <div
+                          className="h-1.5 rounded-full bg-indigo-500"
+                          style={{ width: `${Math.min(100, c.weight * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-gray-400 text-xs w-14 text-right">{(c.weight * 100).toFixed(1)}% wt</span>
+                      <span className="text-amber-400 text-xs w-16 text-right">{(c.vol * 100).toFixed(1)}% vol</span>
+                      <span className="text-gray-500 text-xs w-14 text-right">β{c.beta.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Simulations */}
       <div>

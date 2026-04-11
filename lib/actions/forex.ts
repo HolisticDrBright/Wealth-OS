@@ -3,12 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { ForexRate, ForexPosition } from '@/lib/types'
-
-export const MAJOR_PAIRS = [
-  'EUR_USD', 'GBP_USD', 'USD_JPY', 'USD_CHF',
-  'AUD_USD', 'USD_CAD', 'NZD_USD', 'EUR_GBP',
-  'EUR_JPY', 'GBP_JPY',
-]
+import { MAJOR_PAIRS } from '@/lib/constants/forex'
 
 export async function getForexRates(): Promise<ForexRate[]> {
   const supabase = await createClient()

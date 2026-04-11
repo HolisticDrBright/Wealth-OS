@@ -3,12 +3,21 @@
 import { useState, useTransition } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, Select } from '@/components/ui/input'
 import { upsertTarget, updateSuggestionStatus } from '@/lib/actions/rebalance'
 import { computeRebalanceTrades, DEFAULT_TARGETS } from '@/lib/rebalance-engine'
 import { formatCurrency } from '@/lib/utils'
 import type { Asset, PortfolioTarget, RebalanceSuggestion } from '@/lib/types'
-import { RefreshCw, TrendingUp, TrendingDown, CheckCircle2, XCircle, Play } from 'lucide-react'
+import { RefreshCw, TrendingUp, TrendingDown, CheckCircle2, XCircle, Play, Sparkles } from 'lucide-react'
+import type { OptimizationStrategy } from '@/lib/optimizer'
+
+interface OptimizeResult {
+  weights: Record<string, number>
+  expectedReturn: number
+  expectedVol: number
+  sharpe: number
+  strategy: OptimizationStrategy
+}
 
 interface Props {
   assets: Asset[]
@@ -31,6 +40,10 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
   const [isRunning, setIsRunning] = useState(false)
   const [runMsg, setRunMsg] = useState<string | null>(null)
   const [isSaving, startSave] = useTransition()
+  const [optimizeStrategy, setOptimizeStrategy] = useState<OptimizationStrategy>('mean_variance')
+  const [isOptimizing, setIsOptimizing] = useState(false)
+  const [optimizeResult, setOptimizeResult] = useState<OptimizeResult | null>(null)
+  const [optimizeError, setOptimizeError] = useState<string | null>(null)
 
   const totalValue = assets.reduce((s, a) => s + a.current_value, 0)
   const totalTargetPct = Object.values(targets).reduce((s, v) => s + v, 0)
@@ -67,6 +80,39 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
       setRunMsg('Error running rebalance analysis')
     } finally {
       setIsRunning(false)
+    }
+  }
+
+  async function runOptimizer() {
+    const symbols = assets
+      .filter(a => a.symbol && a.current_value > 0)
+      .map(a => a.symbol!)
+      .filter(Boolean)
+
+    if (symbols.length < 2) {
+      setOptimizeError('Need at least 2 symbols with price history to optimize')
+      return
+    }
+
+    setIsOptimizing(true)
+    setOptimizeError(null)
+    setOptimizeResult(null)
+    try {
+      const res = await fetch('/api/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbols, strategy: optimizeStrategy }),
+      })
+      const envelope = await res.json()
+      if (!res.ok) {
+        setOptimizeError(envelope.error ?? 'Optimization failed')
+      } else {
+        setOptimizeResult(envelope.data)
+      }
+    } catch {
+      setOptimizeError('Error running optimizer')
+    } finally {
+      setIsOptimizing(false)
     }
   }
 
@@ -156,6 +202,70 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
             </Button>
           </div>
           {runMsg && <p className="text-xs text-emerald-400 mt-2">{runMsg}</p>}
+        </div>
+      </Card>
+
+      {/* Portfolio Optimizer */}
+      <Card>
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-4 w-4 text-indigo-400" />
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Portfolio Optimizer</p>
+          </div>
+          <div className="flex gap-3 items-end mb-4">
+            <div className="flex-1">
+              <Select
+                label="Strategy"
+                value={optimizeStrategy}
+                onChange={e => setOptimizeStrategy(e.target.value as OptimizationStrategy)}
+              >
+                <option value="mean_variance">Mean-Variance (Max Sharpe)</option>
+                <option value="risk_parity">Risk Parity</option>
+                <option value="min_variance">Min Variance</option>
+                <option value="equal_weight">Equal Weight</option>
+              </Select>
+            </div>
+            <Button onClick={runOptimizer} disabled={isOptimizing}>
+              <Sparkles className={`h-3.5 w-3.5 mr-1.5 ${isOptimizing ? 'animate-pulse' : ''}`} />
+              {isOptimizing ? 'Optimizing...' : 'Optimize'}
+            </Button>
+          </div>
+          {optimizeError && <p className="text-xs text-red-400 mb-3">{optimizeError}</p>}
+          {optimizeResult && (
+            <div>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="rounded-lg bg-white/5 p-3">
+                  <p className="text-xs text-gray-500">Expected Return</p>
+                  <p className="text-sm font-bold text-emerald-400">{(optimizeResult.expectedReturn * 100).toFixed(1)}%</p>
+                </div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <p className="text-xs text-gray-500">Expected Vol</p>
+                  <p className="text-sm font-bold text-amber-400">{(optimizeResult.expectedVol * 100).toFixed(1)}%</p>
+                </div>
+                <div className="rounded-lg bg-white/5 p-3">
+                  <p className="text-xs text-gray-500">Sharpe Ratio</p>
+                  <p className="text-sm font-bold text-white">{optimizeResult.sharpe.toFixed(2)}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mb-2">Recommended weights:</p>
+              <div className="space-y-1.5">
+                {Object.entries(optimizeResult.weights)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([symbol, weight]) => (
+                    <div key={symbol} className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-white w-16 shrink-0">{symbol}</span>
+                      <div className="flex-1 h-1.5 rounded-full bg-white/10">
+                        <div
+                          className="h-1.5 rounded-full bg-indigo-500"
+                          style={{ width: `${Math.min(100, weight * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-400 w-12 text-right">{(weight * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 

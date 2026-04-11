@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError } from '@/lib/api'
 import { runBacktest } from '@/lib/backtester'
+import { runWalkForward, runMonteCarlo, type WalkForwardConfig } from '@/lib/backtester-advanced'
+import { computePortfolioReturns } from '@/lib/risk-engine'
 import { getBarsForSymbols } from '@/lib/market-data'
+import { logAudit } from '@/lib/audit-log'
 import type { BacktestJob } from '@/lib/types'
 
 export async function GET(req: NextRequest) {
@@ -54,6 +57,8 @@ export async function POST(req: NextRequest) {
     start_date, end_date, initial_capital_usd = 100000,
     rebalance_frequency = 'monthly', benchmark_symbol = 'SPY',
     strategy_id,
+    run_walk_forward = false,
+    run_monte_carlo = false,
   } = body
 
   if (!name?.trim()) return apiError('name is required')
@@ -120,7 +125,42 @@ export async function POST(req: NextRequest) {
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', job.id)
 
-    return apiSuccess({ job: { ...job, status: 'completed' }, result: savedResult })
+    // Optional: walk-forward analysis
+    let walkForwardOutput = null
+    if (run_walk_forward) {
+      const wfConfig: WalkForwardConfig = { job: typedJob, bars }
+      walkForwardOutput = await runWalkForward(wfConfig).catch(() => null)
+    }
+
+    // Optional: Monte Carlo simulation
+    let monteCarloOutput = null
+    if (run_monte_carlo && result.equity_curve?.length > 20) {
+      const weightMap = new Map<string, number>(symbols.map((s: string) => [s, 1 / symbols.length]))
+      const portReturns = computePortfolioReturns(bars, weightMap)
+      if (portReturns.length > 20) {
+        monteCarloOutput = runMonteCarlo({
+          portfolioReturns: portReturns,
+          initialValue: initial_capital_usd,
+          horizonDays: 252,
+          simulations: 1000,
+        })
+      }
+    }
+
+    await logAudit({
+      user_id: user.id,
+      action: 'strategy.created',
+      resource: 'backtest_job',
+      resource_id: job.id,
+      metadata: { symbols, start_date, end_date, strategy: rebalance_frequency },
+    })
+
+    return apiSuccess({
+      job: { ...job, status: 'completed' },
+      result: savedResult,
+      walkForward: walkForwardOutput,
+      monteCarlo: monteCarloOutput,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     await admin.from('backtest_jobs')

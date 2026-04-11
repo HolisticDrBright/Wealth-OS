@@ -5,6 +5,14 @@ import { dismissCandidate, markHarvested } from '@/lib/actions/harvest'
 import type { HarvestCandidate } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Leaf, AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
+import type { LotMethod } from '@/lib/tax-lots'
+
+const LOT_METHOD_LABELS: Record<LotMethod, string> = {
+  hifo: 'HIFO — Highest Cost First (minimize gains)',
+  lifo: 'LIFO — Last In, First Out',
+  fifo: 'FIFO — First In, First Out',
+  specific: 'Specific ID — Choose exact lots',
+}
 
 interface Props {
   initialCandidates: HarvestCandidate[]
@@ -15,6 +23,7 @@ export function HarvestClient({ initialCandidates }: Props) {
   const [pending, startTransition] = useTransition()
   const [scanning, setScanning] = useState(false)
   const [scanMsg, setScanMsg] = useState<string | null>(null)
+  const [lotMethod, setLotMethod] = useState<LotMethod>('hifo')
 
   const totalLoss = candidates.reduce((s, c) => s + c.unrealized_loss_usd, 0)
   const washSaleRisks = candidates.filter(c => c.wash_sale_risk).length
@@ -28,7 +37,7 @@ export function HarvestClient({ initialCandidates }: Props) {
 
   function handleHarvest(id: string) {
     startTransition(async () => {
-      await markHarvested(id)
+      await markHarvested(id, lotMethod)
       setCandidates(prev => prev.filter(c => c.id !== id))
     })
   }
@@ -93,6 +102,26 @@ export function HarvestClient({ initialCandidates }: Props) {
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <p className="text-xs text-gray-400 uppercase tracking-wider">Wash Sale Risk</p>
           <p className="text-2xl font-bold text-yellow-400 mt-1">{washSaleRisks}</p>
+        </div>
+      </div>
+
+      {/* Lot selection method */}
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tax Lot Selection Method</p>
+        <div className="flex flex-col gap-2">
+          {(Object.entries(LOT_METHOD_LABELS) as [LotMethod, string][]).map(([method, label]) => (
+            <label key={method} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="lotMethod"
+                value={method}
+                checked={lotMethod === method}
+                onChange={() => setLotMethod(method)}
+                className="w-4 h-4"
+              />
+              <span className={`text-sm ${lotMethod === method ? 'text-white' : 'text-gray-400'}`}>{label}</span>
+            </label>
+          ))}
         </div>
       </div>
 

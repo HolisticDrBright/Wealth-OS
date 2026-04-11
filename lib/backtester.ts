@@ -306,7 +306,27 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
   const sharpe = computeSharpe(dailyReturns)
   const sortino = computeSortino(dailyReturns)
   const alpha = annualizedReturn - benchmarkReturnPct
-  const beta = dailyReturns.length > 0 ? Math.max(0.1, Math.min(2.5, 0.8 + Math.random() * 0.4)) : 1 // placeholder — real beta needs benchmark daily returns
+
+  // Real beta: covariance(portfolio, benchmark) / variance(benchmark)
+  const benchmarkDailyReturns: number[] = []
+  for (let i = 1; i < allDates.length; i++) {
+    const prev = benchmarkMap.get(allDates[i - 1])
+    const curr = benchmarkMap.get(allDates[i])
+    if (prev && curr && prev > 0) benchmarkDailyReturns.push((curr - prev) / prev)
+  }
+  let beta = 1
+  if (dailyReturns.length > 20 && benchmarkDailyReturns.length > 20) {
+    const minLen = Math.min(dailyReturns.length, benchmarkDailyReturns.length)
+    const pRets = dailyReturns.slice(-minLen)
+    const bRets = benchmarkDailyReturns.slice(-minLen)
+    const mb = bRets.reduce((s, v) => s + v, 0) / minLen
+    const varB = bRets.reduce((s, v) => s + (v - mb) ** 2, 0) / (minLen - 1)
+    if (varB > 0) {
+      const mp = pRets.reduce((s, v) => s + v, 0) / minLen
+      const cov = pRets.reduce((s, v, i) => s + (v - mp) * (bRets[i] - mb), 0) / (minLen - 1)
+      beta = Math.max(0.05, Math.min(3, cov / varB))
+    }
+  }
 
   return {
     result: {

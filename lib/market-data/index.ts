@@ -88,12 +88,15 @@ export async function getQuotes(symbols: string[]): Promise<Map<string, UnifiedQ
   const map = new Map<string, UnifiedQuote>()
   if (!symbols.length) return map
 
+  // Normalize all symbols to uppercase at the boundary
+  const normalized = symbols.map(s => s.toUpperCase())
+
   // Batch Alpaca
   const [alpacaQuotes, alpacaBars] = await Promise.all([
-    fetchAlpacaQuotes(symbols),
-    fetchAlpacaLatestBars(symbols),
+    fetchAlpacaQuotes(normalized),
+    fetchAlpacaLatestBars(normalized),
   ])
-  for (const sym of symbols) {
+  for (const sym of normalized) {
     const q = alpacaQuotes.get(sym)
     const b = alpacaBars.get(sym)
     if (q && b) {
@@ -111,7 +114,7 @@ export async function getQuotes(symbols: string[]): Promise<Map<string, UnifiedQ
     }
   }
 
-  const missing = symbols.filter(s => !map.has(s))
+  const missing = normalized.filter(s => !map.has(s))
   if (!missing.length) return map
 
   // Batch Finnhub for missing

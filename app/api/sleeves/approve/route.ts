@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiSuccess, apiError } from '@/lib/api'
 import { submitOrder } from '@/lib/broker-router'
+import { sendDrawdownAlert } from '@/lib/notifications'
+import { logAudit, extractRequestMeta } from '@/lib/audit-log'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -90,10 +92,31 @@ export async function POST(req: NextRequest) {
             is_read: false,
             metadata: { sleeve_id: sleeve.id },
           })
+
+          // Email notification
+          const { data: profile } = await supabase.from('profiles').select('email').eq('id', user.id).single()
+          if (profile?.email) {
+            await sendDrawdownAlert(profile.email, {
+              sleeveName: sleeve.name,
+              drawdownPct: Math.abs(sleeve.performance_ytd_pct ?? 0),
+              thresholdPct: sleeve.max_drawdown_pct,
+              currentValue: sleeve.current_value_usd ?? 0,
+            })
+          }
         }
       }
     }
   }
+
+  // Audit log
+  await logAudit({
+    user_id: user.id,
+    action: action === 'approved' ? 'approval.approved' : 'approval.rejected',
+    resource: 'sleeve_approval_request',
+    resource_id: request_id,
+    metadata: { sleeve_id: request.sleeve?.id, symbol: request.symbol, notional: request.notional_usd },
+    ...extractRequestMeta(req),
+  })
 
   return apiSuccess({ status: action, broker: brokerResult })
 }

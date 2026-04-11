@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError } from '@/lib/api'
 import { getPricing, getAccount, getOpenTrades } from '@/lib/oanda-client'
-import { MAJOR_PAIRS } from '@/lib/actions/forex'
+import { MAJOR_PAIRS } from '@/lib/constants/forex'
 
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action') ?? 'rates'

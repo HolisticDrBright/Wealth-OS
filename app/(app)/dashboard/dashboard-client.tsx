@@ -19,9 +19,128 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Info, Camera } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Info, Camera, MessageCircle, X, Send, Bot } from 'lucide-react'
 import { snapshotNetWorth } from '@/lib/actions/networth'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+function PortfolioChat() {
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [streaming, setStreaming] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, open])
+
+  async function send() {
+    const msg = input.trim()
+    if (!msg || streaming) return
+    setInput('')
+    const newHistory: ChatMessage[] = [...messages, { role: 'user', content: msg }]
+    setMessages(newHistory)
+    setStreaming(true)
+    setMessages(h => [...h, { role: 'assistant', content: '' }])
+
+    try {
+      const res = await fetch('/api/portfolio-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: msg,
+          conversationHistory: messages.slice(-10),
+        }),
+      })
+
+      if (!res.ok || !res.body) {
+        setMessages(h => h.map((m, i) => i === h.length - 1 ? { ...m, content: 'Error: could not get response.' } : m))
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let full = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        full += decoder.decode(value, { stream: true })
+        setMessages(h => h.map((m, i) => i === h.length - 1 ? { ...m, content: full } : m))
+      }
+    } catch {
+      setMessages(h => h.map((m, i) => i === h.length - 1 ? { ...m, content: 'Error: connection failed.' } : m))
+    } finally {
+      setStreaming(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Floating button */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 shadow-lg hover:bg-indigo-500 transition-colors"
+      >
+        {open ? <X className="h-6 w-6 text-white" /> : <MessageCircle className="h-6 w-6 text-white" />}
+      </button>
+
+      {/* Chat panel */}
+      {open && (
+        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-[#0f1117] shadow-2xl flex flex-col overflow-hidden" style={{ height: '28rem' }}>
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/5 shrink-0">
+            <Bot className="h-5 w-5 text-indigo-400" />
+            <p className="text-sm font-semibold text-white">Portfolio Assistant</p>
+            <p className="text-xs text-gray-500 ml-auto">Ask about your portfolio</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && (
+              <div className="text-center text-xs text-gray-500 py-8">
+                <Bot className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                <p>Ask me anything about your portfolio.</p>
+                <p className="mt-1">Try: "What's my biggest position?" or "How diversified am I?"</p>
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} className={`flex gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${
+                  m.role === 'user'
+                    ? 'bg-indigo-600 text-white rounded-br-sm'
+                    : 'bg-white/10 text-gray-200 rounded-bl-sm'
+                }`}>
+                  {m.content || (streaming && i === messages.length - 1 ? <span className="animate-pulse">▋</span> : '')}
+                </div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+          <div className="flex gap-2 p-3 border-t border-white/10 shrink-0">
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+              placeholder="Ask about your portfolio..."
+              disabled={streaming}
+              className="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            />
+            <button
+              onClick={send}
+              disabled={streaming || !input.trim()}
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 transition-colors"
+            >
+              <Send className="h-4 w-4 text-white" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 
 interface Props {
   assets: Asset[]
@@ -315,6 +434,8 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
           )}
         </CardContent>
       </Card>
+
+      <PortfolioChat />
     </div>
   )
 }
