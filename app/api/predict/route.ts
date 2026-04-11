@@ -14,6 +14,7 @@ import { getBars } from '@/lib/market-data'
 import { fetchCompanyNews, fetchSentiment } from '@/lib/market-data/finnhub'
 import { getCombinedSignal } from '@/lib/predictors'
 import type { MiroFishInput } from '@/lib/predictors'
+import { logDecision } from '@/lib/learning/log-decision'
 
 async function buildMiroInput(symbol: string, horizonDays: number): Promise<Omit<MiroFishInput, 'symbol'> | undefined> {
   const today = new Date().toISOString().slice(0, 10)
@@ -55,6 +56,21 @@ export async function GET(req: NextRequest) {
   ])
 
   const signal = await getCombinedSignal(symbol, bars, miroInput, horizon)
+
+  // Log decision for the learning loop — fire-and-forget
+  const confidence = Math.max(0, Math.min(1, (signal.score + 1) / 2))
+  logDecision({
+    user_id: user.id,
+    strategy: 'combined',
+    symbol,
+    confidence,
+    predicted_direction: signal.score >= 0 ? 1 : 0,
+    predicted_return: signal.kronos_expected_return,
+    horizon_days: horizon,
+    signal_weights: { kronos: 0.70, mirofish: 0.30 },
+    metadata: { sources: signal.sources, miro_outlook: signal.miro_outlook },
+  }).catch(() => {/* never block the response */})
+
   return apiSuccess(signal)
 }
 
@@ -81,5 +97,19 @@ export async function POST(req: NextRequest) {
   }
 
   const signal = await getCombinedSignal(symbol.toUpperCase(), bars, miroInput, horizon)
+
+  const confidence = Math.max(0, Math.min(1, (signal.score + 1) / 2))
+  logDecision({
+    user_id: user.id,
+    strategy: 'combined',
+    symbol: symbol.toUpperCase(),
+    confidence,
+    predicted_direction: signal.score >= 0 ? 1 : 0,
+    predicted_return: signal.kronos_expected_return,
+    horizon_days: horizon,
+    signal_weights: { kronos: 0.70, mirofish: 0.30 },
+    metadata: { sources: signal.sources, miro_outlook: signal.miro_outlook },
+  }).catch(() => {/* never block the response */})
+
   return apiSuccess(signal)
 }

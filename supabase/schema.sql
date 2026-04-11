@@ -1053,3 +1053,51 @@ CREATE TABLE IF NOT EXISTS price_alerts (
 );
 ALTER TABLE price_alerts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "users manage own alerts" ON price_alerts FOR ALL USING (auth.uid() = user_id);
+
+-- ─── Learning Loop ────────────────────────────────────────────────────────────
+
+-- Every prediction/signal logged at decision time
+CREATE TABLE IF NOT EXISTS decision_log (
+  id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at          timestamptz DEFAULT now(),
+  user_id             uuid REFERENCES auth.users(id) NOT NULL,
+  strategy            text NOT NULL,
+  symbol              text NOT NULL,
+  confidence          numeric NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+  predicted_direction smallint NOT NULL CHECK (predicted_direction IN (0, 1)),
+  predicted_return    numeric,
+  signal_weights      jsonb,
+  horizon_days        integer NOT NULL DEFAULT 7,
+  resolution_due_at   timestamptz NOT NULL,
+  outcome_graded      boolean NOT NULL DEFAULT false,
+  metadata            jsonb
+);
+ALTER TABLE decision_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own decisions" ON decision_log FOR ALL USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS decision_log_user_ungraded_idx ON decision_log(user_id, outcome_graded, resolution_due_at);
+
+-- Graded outcome linked to a decision
+CREATE TABLE IF NOT EXISTS outcome_log (
+  id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  resolved_at         timestamptz DEFAULT now(),
+  decision_id         uuid REFERENCES decision_log(id) ON DELETE CASCADE NOT NULL,
+  user_id             uuid REFERENCES auth.users(id) NOT NULL,
+  actual_direction    smallint NOT NULL CHECK (actual_direction IN (0, 1)),
+  actual_return       numeric NOT NULL,
+  alpha_vs_benchmark  numeric NOT NULL,
+  brier_score         numeric NOT NULL,
+  metadata            jsonb
+);
+ALTER TABLE outcome_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own outcomes" ON outcome_log FOR ALL USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS outcome_log_user_idx ON outcome_log(user_id, resolved_at DESC);
+
+-- Active strategy weights (one row per user — upserted by the learning loop)
+CREATE TABLE IF NOT EXISTS strategy_weights (
+  id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    uuid REFERENCES auth.users(id) NOT NULL UNIQUE,
+  weights    jsonb NOT NULL DEFAULT '{}',
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE strategy_weights ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own weights" ON strategy_weights FOR ALL USING (auth.uid() = user_id);
