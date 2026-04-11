@@ -1,9 +1,13 @@
 /**
  * Pure in-process backtesting engine.
- * Uses simple momentum / equal-weight signals on provided historical price data.
- * For real usage wire in a market-data provider (Polygon, Alpha Vantage, etc.).
+ * Default signal: simple 20-day momentum.
+ * When KRONOS_API_URL or KRONOS_HF_MODEL is set, uses Kronos forecast scores
+ * instead — replacing momentum with model-predicted expected returns.
+ * For real OHLCV data wire in a market-data provider (Polygon, Alpha Vantage, etc.).
  */
 import type { BacktestJob, BacktestResult, BacktestTrade } from './types'
+import { kronosPredictBatch } from './predictors/kronos'
+import type { KronosPrediction } from './predictors/kronos'
 
 export interface PriceBar {
   date: string        // YYYY-MM-DD
@@ -104,7 +108,7 @@ function computeMonthlyReturns(equity: Array<{ date: string; value: number }>): 
   return monthly
 }
 
-// ─── Simple momentum signal ──────────────────────────────
+// ─── Signal layer ────────────────────────────────────────
 
 function computeMomentumScore(bars: PriceBar[], symbol: string, asOfIdx: number, lookback = 20): number {
   const symbolBars = bars.filter(b => b.symbol === symbol).slice(0, asOfIdx + 1)
@@ -114,9 +118,17 @@ function computeMomentumScore(bars: PriceBar[], symbol: string, asOfIdx: number,
   return (recent - old) / old
 }
 
+/**
+ * Whether Kronos is configured in the current environment.
+ * Used to decide whether to call Kronos during a backtest rebalance step.
+ */
+function kronosEnabled(): boolean {
+  return !!(process.env.KRONOS_API_URL || (process.env.KRONOS_HF_MODEL && process.env.HF_API_TOKEN))
+}
+
 // ─── Main backtester ─────────────────────────────────────
 
-export function runBacktest(config: BacktestConfig): BacktestOutput {
+export async function runBacktest(config: BacktestConfig): Promise<BacktestOutput> {
   const { job, bars } = config
 
   if (!bars.length) {
@@ -170,11 +182,25 @@ export function runBacktest(config: BacktestConfig): BacktestOutput {
       const isFirstDay = di === 21
 
       if (shouldRebalance || isFirstDay) {
-        // Score symbols by momentum
-        const scored = symbols.map(sym => ({
-          sym,
-          score: computeMomentumScore(bars, sym, di),
-        })).filter(s => dayBars.has(s.sym))
+        // Score symbols: use Kronos predictions if available, else momentum fallback
+        let kronosPredictions: Map<string, KronosPrediction> | null = null
+        if (kronosEnabled()) {
+          const symbolBarMap = new Map(
+            symbols.map(sym => [
+              sym,
+              bars.filter(b => b.symbol === sym).slice(0, di + 1),
+            ])
+          )
+          kronosPredictions = await kronosPredictBatch(symbolBarMap, 5).catch(() => null)
+        }
+
+        const scored = symbols.map(sym => {
+          const kronosPred = kronosPredictions?.get(sym)
+          const score = kronosPred
+            ? kronosPred.expected_return                  // Kronos expected return
+            : computeMomentumScore(bars, sym, di)         // momentum fallback
+          return { sym, score }
+        }).filter(s => dayBars.has(s.sym))
           .sort((a, b) => b.score - a.score)
 
         // Take top half with positive momentum (equal-weight)

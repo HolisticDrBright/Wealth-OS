@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       metadata: {},
     }
 
-    const { result, error: btError } = runBacktest({ job: typedJob, bars })
+    const { result, error: btError } = await runBacktest({ job: typedJob, bars })
 
     if (btError) {
       await admin.from('backtest_jobs')

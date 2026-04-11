@@ -1,6 +1,7 @@
 import { createAdminClient } from './supabase/admin'
 import { CIODecisionEngine } from './agents/cio-decision-engine'
 import type { TradeContext } from './agents/types'
+import { miroFishPredict } from './predictors/mirofish'
 
 const cioEngine = new CIODecisionEngine()
 
@@ -69,7 +70,15 @@ export async function runAutoScoring(limit = 10): Promise<{ scored: number; erro
         },
       }
 
-      const decision = await cioEngine.analyze(context)
+      // Run MiroFish qualitative scenario in parallel with CIO analysis
+      const [decision, miroScenario] = await Promise.all([
+        cioEngine.analyze(context),
+        miroFishPredict({
+          symbol: trade.symbol,
+          news_items: [`${trader?.name ?? 'Trader'} is ${trade.action}ing ${trade.symbol}`],
+          forecast_days: 14,
+        }),
+      ])
 
       // Mark trade as scored
       await supabase
@@ -77,8 +86,22 @@ export async function runAutoScoring(limit = 10): Promise<{ scored: number; erro
         .update({ cio_scored: true })
         .eq('id', trade.id)
 
+      // Bump score slightly if MiroFish agrees with the trade direction
+      let adjustedScore = decision.finalScore
+      if (miroScenario) {
+        const tradeIsBuy = trade.action !== 'sell'
+        const miroAgrees =
+          (tradeIsBuy && miroScenario.outlook === 'bullish') ||
+          (!tradeIsBuy && miroScenario.outlook === 'bearish')
+        const miroDisagrees =
+          (tradeIsBuy && miroScenario.outlook === 'bearish') ||
+          (!tradeIsBuy && miroScenario.outlook === 'bullish')
+        if (miroAgrees) adjustedScore = Math.min(100, adjustedScore + miroScenario.confidence * 5)
+        if (miroDisagrees) adjustedScore = Math.max(0, adjustedScore - miroScenario.confidence * 5)
+      }
+
       // Create opportunity for high-scoring execute decisions
-      if (decision.decision === 'execute' && decision.finalScore >= 68) {
+      if (decision.decision === 'execute' && adjustedScore >= 68) {
         await supabase.from('opportunities').insert({
           source: 'cio',
           symbol: trade.symbol,
@@ -86,14 +109,16 @@ export async function runAutoScoring(limit = 10): Promise<{ scored: number; erro
           title: `${trader?.name ?? 'Trader'} → ${trade.action.toUpperCase()} ${trade.symbol}`,
           description: decision.plainEnglishSummary,
           action: trade.action === 'sell' ? 'sell' : 'buy',
-          confidence: decision.finalScore >= 80 ? 'high' : 'medium',
-          score: decision.finalScore,
+          confidence: adjustedScore >= 80 ? 'high' : 'medium',
+          score: adjustedScore,
           is_read: false,
           metadata: {
             trade_id: trade.id,
             trader_id: trade.trader_id,
             cio_decision: decision.decision,
-            final_score: decision.finalScore,
+            final_score: adjustedScore,
+            mirofish_outlook: miroScenario?.outlook ?? null,
+            mirofish_confidence: miroScenario?.confidence ?? null,
           },
         })
       }
