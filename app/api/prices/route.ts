@@ -3,7 +3,7 @@ import { fetchStockPrices, fetchCryptoPrices } from '@/lib/prices'
 export type { PriceResult } from '@/lib/prices'
 
 export async function POST(req: NextRequest) {
-  const { stockSymbols = [], cryptoSymbols = [] } = await req.json()
+  const { stockSymbols = [], cryptoSymbols = [] } = await req.json().catch(() => ({}))
   const finnhubKey = process.env.FINNHUB_API_KEY ?? ''
 
   const [stockPrices, cryptoPrices] = await Promise.all([

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return new Response('ANTHROPIC_API_KEY not configured', { status: 500 })
   }
 
-  const plan: RetirementPlan = await req.json()
+  const plan: RetirementPlan = await req.json().catch(() => ({} as RetirementPlan))
 
   const yearsToRetirement = (plan.target_retirement_age ?? 65) - (plan.current_age ?? 35)
   const totalSavings =

@@ -9,8 +9,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
   }
 
-  const body = await req.json()
-  const { assets, transactions, goals, income } = body
+  const body = await req.json().catch(() => ({}))
+  const { assets, transactions, goals = [], income } = body
+
+  if (!Array.isArray(assets) || !Array.isArray(transactions)) {
+    return NextResponse.json({ error: 'assets and transactions arrays are required' }, { status: 400 })
+  }
 
   const totalAssetValue = assets.reduce((s: number, a: { current_value: number }) => s + (a.current_value ?? 0), 0)
   const totalIncome = transactions

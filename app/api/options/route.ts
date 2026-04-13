@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const {
     symbol, option_type, strategy, strike, expiration,
     contracts = 1, premium_paid, is_short = false
@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest) {
   const id = searchParams.get('id')
   if (!id) return apiError('id required')
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const { current_price, underlying_price } = body
 
   const { data, error } = await supabase

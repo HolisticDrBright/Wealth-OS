@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const { symbol, horizon = 5, news_items, analyst_notes, macro_context } = body
   if (!symbol) return apiError('symbol is required')
 

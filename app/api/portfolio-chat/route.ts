@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     return new Response('ANTHROPIC_API_KEY not configured', { status: 503 })
   }
 
-  const { message, conversationHistory = [] } = await req.json()
+  const { message, conversationHistory = [] } = await req.json().catch(() => ({}))
   if (!message?.trim()) return new Response('message required', { status: 400 })
 
   // Fetch portfolio context in parallel

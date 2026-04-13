@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const { name, household_type = 'family' } = body
   if (!name?.trim()) return apiError('name is required')
 
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const { id, ...updates } = body
   if (!id) return apiError('id is required')
 

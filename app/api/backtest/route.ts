@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const {
     name, description, symbols, asset_class = 'stock',
     start_date, end_date, initial_capital_usd = 100000,

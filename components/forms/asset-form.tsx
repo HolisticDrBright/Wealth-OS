@@ -50,7 +50,7 @@ export function AssetForm({ open, onClose, asset }: AssetFormProps) {
       open={open}
       onClose={onClose}
       title={isEdit ? 'Edit Asset' : 'Add Asset'}
-      description={isEdit ? `Editing ${asset.name}` : 'Track a new investment or asset'}
+      description={isEdit ? `Editing ${asset?.name}` : 'Track a new investment or asset'}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (

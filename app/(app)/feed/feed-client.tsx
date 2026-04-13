@@ -78,7 +78,8 @@ export function FeedClient({ initialTrades, followedTraderIds, userId, hasFollow
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [hasFollows, followedTraderIds])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFollows, followedTraderIds.join(',')])
 
   if (!hasFollows) {
     return (

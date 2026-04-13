@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const { title, description, strategy_type, asset_classes, price_monthly_usd, trader_id } = body
 
   if (!title?.trim()) return apiError('title is required')

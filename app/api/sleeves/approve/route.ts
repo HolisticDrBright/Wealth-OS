@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const { request_id, action, review_notes } = await req.json()
+  const { request_id, action, review_notes } = await req.json().catch(() => ({}))
   if (!request_id) return apiError('request_id is required')
   if (!['approved', 'rejected'].includes(action)) return apiError('action must be approved or rejected')
 
