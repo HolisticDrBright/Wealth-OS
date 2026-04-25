@@ -1,0 +1,39 @@
+version: '3.9'
+
+# ─── Wealth OS — Docker Compose ──────────────────────────────────────────────
+#
+# Services:
+#   camofox  — Anti-detection headless browser for scraping fallback paths
+#              Used when paid data APIs are off or budget-exhausted.
+#
+# Usage:
+#   docker compose up -d              # start all services
+#   docker compose logs -f camofox    # stream logs
+#   docker compose down               # stop all services
+#
+# Add CAMOFOX_URL=http://localhost:9377 to .env.local
+#
+
+services:
+  camofox:
+    image: joincamofox/camofox-browser:latest
+    container_name: wealth-os-camofox
+    ports:
+      - '9377:9377'
+    restart: unless-stopped
+    environment:
+      - MAX_CONCURRENT_SESSIONS=4
+      - SESSION_TIMEOUT_MS=60000
+      - PROXY_URL=${CAMOFOX_PROXY_URL:-}
+    volumes:
+      - camofox-data:/app/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9377/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  camofox-data:
+    driver: local

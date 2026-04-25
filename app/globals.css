@@ -1,34 +1,93 @@
 @import "tailwindcss";
 
+/* ─── Raw CSS custom properties ─────────────────────────────────────────────
+   Available for color-mix(), filter drop-shadow, and inline styles.
+   Mirror every token that is also in @theme below.
+   ─────────────────────────────────────────────────────────────────────────── */
 :root {
   --background: #07080c;
   --foreground: #f1f5f9;
+
+  /* Accents */
+  --color-accent-cyan:   oklch(0.78 0.14 210);
+  --color-accent-amber:  oklch(0.82 0.14 75);
+  --color-accent-violet: oklch(0.72 0.17 290);
+  --color-accent-lime:   oklch(0.86 0.17 130);
+
+  /* P&L / signal */
+  --color-signal-pos:  oklch(0.75 0.14 155);
+  --color-signal-neg:  oklch(0.68 0.19 25);
+  --color-signal-warn: oklch(0.80 0.13 75);
+
+  /* Surfaces */
+  --color-bg-0: oklch(0.11 0.008 260);   /* sidebar, deepest */
+  --color-bg-1: oklch(0.15 0.010 260);   /* main canvas */
+  --color-bg-2: oklch(0.185 0.012 260);  /* card */
+  --color-bg-3: oklch(0.22 0.014 260);   /* raised card */
+
+  /* Lines */
+  --color-line:        oklch(1 0 0 / 0.07);
+  --color-line-strong: oklch(1 0 0 / 0.12);
+
+  /* Text ramp */
+  --color-text-0: oklch(0.97 0.005 260);  /* primary */
+  --color-text-1: oklch(0.78 0.01 260);   /* secondary */
+  --color-text-2: oklch(0.60 0.01 260);   /* muted */
+  --color-text-3: oklch(0.42 0.01 260);   /* dimmest */
 }
 
+/* ─── Tailwind v4 design tokens ──────────────────────────────────────────────
+   Generates utility classes: bg-bg-2, text-text-0, border-line,
+   bg-accent-cyan, text-signal-pos, etc.
+   ─────────────────────────────────────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* Fonts — injected by next/font via CSS custom properties on <body> */
+  --font-sans:  var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono:  var(--font-jetbrains-mono), ui-monospace, 'Cascadia Code', monospace;
+  --font-serif: var(--font-source-serif), ui-serif, Georgia, serif;
+
+  /* Accents */
+  --color-accent-cyan:   oklch(0.78 0.14 210);
+  --color-accent-amber:  oklch(0.82 0.14 75);
+  --color-accent-violet: oklch(0.72 0.17 290);
+  --color-accent-lime:   oklch(0.86 0.17 130);
+
+  /* P&L / signal */
+  --color-signal-pos:  oklch(0.75 0.14 155);
+  --color-signal-neg:  oklch(0.68 0.19 25);
+  --color-signal-warn: oklch(0.80 0.13 75);
+
+  /* Surfaces */
+  --color-bg-0: oklch(0.11 0.008 260);
+  --color-bg-1: oklch(0.15 0.010 260);
+  --color-bg-2: oklch(0.185 0.012 260);
+  --color-bg-3: oklch(0.22 0.014 260);
+
+  /* Lines */
+  --color-line:        oklch(1 0 0 / 0.07);
+  --color-line-strong: oklch(1 0 0 / 0.12);
+
+  /* Text ramp */
+  --color-text-0: oklch(0.97 0.005 260);
+  --color-text-1: oklch(0.78 0.01 260);
+  --color-text-2: oklch(0.60 0.01 260);
+  --color-text-3: oklch(0.42 0.01 260);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }

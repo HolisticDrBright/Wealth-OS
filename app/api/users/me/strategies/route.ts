@@ -1,0 +1,111 @@
+/**
+ * GET  /api/users/me/strategies
+ *   Returns all 38 strategies with per-user enabled state, allocation_pct,
+ *   and AI configuration (mirofish tier, kronos tier, edge type).
+ *
+ * PUT  /api/users/me/strategies
+ *   Body: { strategy_key, is_enabled, allocation_pct? }
+ *   Upserts a row in user_enabled_strategies.
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { resolveFeatureFlags } from '@/lib/feature-flags/middleware'
+import { isStrategyKey, STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
+import type { StrategyKey } from '@/lib/strategies/strategy-registry'
+
+// ─── GET ──────────────────────────────────────────────────────────────────────
+
+export async function GET(req: NextRequest) {
+  const ctx = await resolveFeatureFlags(req)
+  if (ctx.error) return ctx.error
+
+  const { supabase, userId } = ctx
+
+  const { data: userRows } = await supabase
+    .from('user_enabled_strategies')
+    .select('strategy_key, is_enabled, allocation_pct')
+    .eq('user_id', userId)
+
+  const enabledMap = new Map(
+    (userRows ?? []).map(r => [r.strategy_key as StrategyKey, { is_enabled: r.is_enabled, allocation_pct: r.allocation_pct }])
+  )
+
+  const strategies = (Object.entries(STRATEGY_REGISTRY_CONFIG) as [StrategyKey, typeof STRATEGY_REGISTRY_CONFIG[StrategyKey]][])
+    .map(([key, cfg]) => ({
+      strategyKey: key,
+      displayName: toDisplayName(key),
+      assetClass: cfg.assetClass,
+      edgeType: cfg.edgeType,
+      mirofish: cfg.mirofish,
+      kronos: cfg.kronos,
+      defaultBroker: cfg.defaultBroker,
+      isEnabled: enabledMap.get(key)?.is_enabled ?? false,
+      allocationPct: enabledMap.get(key)?.allocation_pct ?? null,
+    }))
+
+  return NextResponse.json({ strategies })
+}
+
+// ─── PUT ──────────────────────────────────────────────────────────────────────
+
+export async function PUT(req: NextRequest) {
+  const ctx = await resolveFeatureFlags(req)
+  if (ctx.error) return ctx.error
+
+  const { supabase, userId } = ctx
+
+  const body = await req.json().catch(() => ({})) as {
+    strategy_key?: string
+    is_enabled?: boolean
+    allocation_pct?: number
+  }
+
+  if (!body.strategy_key || !isStrategyKey(body.strategy_key)) {
+    return NextResponse.json(
+      { error: `Unknown strategy_key: "${body.strategy_key}"` },
+      { status: 400 }
+    )
+  }
+
+  if (typeof body.is_enabled !== 'boolean') {
+    return NextResponse.json({ error: 'is_enabled (boolean) is required' }, { status: 400 })
+  }
+
+  if (body.allocation_pct !== undefined) {
+    if (body.allocation_pct < 0 || body.allocation_pct > 100) {
+      return NextResponse.json({ error: 'allocation_pct must be 0–100' }, { status: 400 })
+    }
+  }
+
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('user_enabled_strategies')
+    .upsert(
+      {
+        user_id: userId,
+        strategy_key: body.strategy_key,
+        is_enabled: body.is_enabled,
+        allocation_pct: body.allocation_pct ?? null,
+        updated_at: now,
+      },
+      { onConflict: 'user_id,strategy_key' }
+    )
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({
+    strategyKey: body.strategy_key,
+    isEnabled: body.is_enabled,
+    allocationPct: body.allocation_pct ?? null,
+    updatedAt: now,
+  })
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function toDisplayName(key: StrategyKey): string {
+  return key
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}

@@ -1101,3 +1101,141 @@ CREATE TABLE IF NOT EXISTS strategy_weights (
 );
 ALTER TABLE strategy_weights ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "users manage own weights" ON strategy_weights FOR ALL USING (auth.uid() = user_id);
+
+-- ─── Kronos Forecasts Cache ───────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS kronos_forecasts (
+  id               uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at       timestamptz DEFAULT now(),
+  symbol           text NOT NULL,
+  horizon          integer NOT NULL DEFAULT 5,
+  predicted_closes numeric[] NOT NULL DEFAULT '{}',
+  expected_return  numeric NOT NULL,
+  direction        smallint NOT NULL CHECK (direction IN (-1, 0, 1)),
+  confidence       numeric NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+  source           text NOT NULL DEFAULT 'kronos-api',
+  expires_at       timestamptz NOT NULL DEFAULT now() + interval '1 day'
+);
+CREATE INDEX IF NOT EXISTS kronos_forecasts_symbol_idx ON kronos_forecasts(symbol, created_at DESC);
+-- No RLS — this is a public forecast cache, no user data
+
+-- ─── AI Feature Flags & Cost Tracking ─────────────────────────────────────────
+
+-- Global catalog of available AI/premium features (admin-managed, read-only for users)
+CREATE TABLE IF NOT EXISTS ai_feature_definitions (
+  feature_key         text PRIMARY KEY,
+  display_name        text NOT NULL,
+  description         text NOT NULL,
+  category            text NOT NULL CHECK (category IN ('ai_confluence', 'premium_data')),
+  cost_per_use_usd    numeric(10,6) NOT NULL DEFAULT 0,
+  cost_unit           text NOT NULL DEFAULT 'call',  -- 'call' | 'token' | 'day'
+  default_budget_usd  numeric(10,2) NOT NULL DEFAULT 20.00,
+  is_available        boolean NOT NULL DEFAULT true,
+  created_at          timestamptz DEFAULT now()
+);
+-- Public read so client can render feature catalog
+CREATE POLICY "anyone can read feature definitions" ON ai_feature_definitions FOR SELECT USING (true);
+ALTER TABLE ai_feature_definitions ENABLE ROW LEVEL SECURITY;
+
+-- Per-user opt-in toggles and monthly budget caps
+CREATE TABLE IF NOT EXISTS ai_feature_flags (
+  id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id             uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  feature_key         text REFERENCES ai_feature_definitions(feature_key) ON DELETE CASCADE NOT NULL,
+  enabled             boolean NOT NULL DEFAULT false,
+  monthly_budget_usd  numeric(10,2) NOT NULL DEFAULT 20.00,
+  alert_threshold_pct numeric(5,2) NOT NULL DEFAULT 80.00,  -- alert at this % of budget
+  created_at          timestamptz DEFAULT now(),
+  updated_at          timestamptz DEFAULT now(),
+  UNIQUE (user_id, feature_key)
+);
+ALTER TABLE ai_feature_flags ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own feature flags" ON ai_feature_flags FOR ALL USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS ai_feature_flags_user_idx ON ai_feature_flags(user_id, feature_key);
+
+-- Per-call cost log for audit trail and spend calculations
+CREATE TABLE IF NOT EXISTS ai_usage_logs (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at      timestamptz DEFAULT now(),
+  user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  feature_key     text REFERENCES ai_feature_definitions(feature_key) NOT NULL,
+  cost_usd        numeric(10,6) NOT NULL DEFAULT 0,
+  tokens_used     integer,
+  strategy        text,
+  symbol          text,
+  metadata        jsonb
+);
+ALTER TABLE ai_usage_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users read own usage logs" ON ai_usage_logs FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "service role insert usage logs" ON ai_usage_logs FOR INSERT WITH CHECK (true);
+CREATE INDEX IF NOT EXISTS ai_usage_logs_user_month_idx ON ai_usage_logs(user_id, feature_key, created_at DESC);
+
+-- Monthly spend rollup per user + feature (used by canSpend checks)
+CREATE OR REPLACE FUNCTION get_monthly_spend(p_user_id uuid, p_feature_key text)
+RETURNS numeric
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT COALESCE(SUM(cost_usd), 0)
+  FROM ai_usage_logs
+  WHERE user_id    = p_user_id
+    AND feature_key = p_feature_key
+    AND created_at >= date_trunc('month', now());
+$$;
+
+-- Convenience view: current month spend per feature for the calling user
+CREATE OR REPLACE VIEW ai_monthly_spend AS
+SELECT
+  user_id,
+  feature_key,
+  date_trunc('month', created_at) AS month,
+  SUM(cost_usd)                   AS total_usd,
+  COUNT(*)                        AS call_count
+FROM ai_usage_logs
+GROUP BY user_id, feature_key, date_trunc('month', created_at);
+
+-- RLS on view not supported directly; rely on underlying table policies
+
+-- ─── AI Feature Seed Data ─────────────────────────────────────────────────────
+
+INSERT INTO ai_feature_definitions (feature_key, display_name, description, category, cost_per_use_usd, cost_unit, default_budget_usd) VALUES
+  ('mirofish',        'MiroFish AI',              'Claude-powered trade simulation and edge scoring for each strategy signal', 'ai_confluence',  0.012000, 'call', 20.00),
+  ('kronos',          'Kronos Forecaster',         'Self-hosted time-series ML model on Hetzner for directional forecasts',   'ai_confluence',  0.001000, 'call', 10.00),
+  ('premium_prompt',  'Premium Prompt Model',      'Upgrades CIO decision calls from Claude Haiku to Claude Opus for higher-stakes trades', 'ai_confluence', 0.015000, 'call', 30.00),
+  ('glassnode',       'Glassnode On-Chain',        'Bitcoin and Ethereum on-chain metrics: NUPL, SOPR, exchange flows',       'premium_data',   0.033300, 'day',  10.00),
+  ('nansen',          'Nansen Smart Money',        'Tracks wallet clusters labeled as smart money for inflow/outflow signals', 'premium_data',  0.066600, 'day',  20.00),
+  ('unusual_whales',  'Unusual Whales Flow',       'Real-time options dark pool and congressional trade flow data',            'premium_data',   0.033300, 'day',  10.00),
+  ('quiver',          'Quiver Quant',              'Congressional trades, government contracts, and lobbying signal feeds',    'premium_data',   0.016600, 'day',  5.00),
+  ('polygon',         'Polygon.io Premium',        'Sub-second tick data, full options chain, and Level 2 order book',        'premium_data',   0.083300, 'day',  25.00)
+ON CONFLICT (feature_key) DO UPDATE SET
+  display_name       = EXCLUDED.display_name,
+  description        = EXCLUDED.description,
+  category           = EXCLUDED.category,
+  cost_per_use_usd   = EXCLUDED.cost_per_use_usd,
+  cost_unit          = EXCLUDED.cost_unit,
+  default_budget_usd = EXCLUDED.default_budget_usd;
+
+-- ─── Strategy Paper Trades (Tier gate tracking) ───────────────────────────────
+
+CREATE TABLE IF NOT EXISTS strategy_paper_trades (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at      timestamptz DEFAULT now(),
+  strategy_id     text NOT NULL,
+  symbol          text NOT NULL,
+  side            text NOT NULL CHECK (side IN ('buy', 'sell')),
+  entry_price     numeric NOT NULL,
+  exit_price      numeric,
+  size_usd        numeric NOT NULL DEFAULT 1000,
+  entry_time      timestamptz NOT NULL DEFAULT now(),
+  exit_time       timestamptz,
+  pnl_usd         numeric,
+  pnl_pct         numeric,
+  status          text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  signal_strength numeric NOT NULL DEFAULT 0,
+  signal_score    numeric,
+  metadata        jsonb
+);
+CREATE INDEX IF NOT EXISTS spt_strategy_status_idx ON strategy_paper_trades(strategy_id, status, exit_time DESC);
+CREATE INDEX IF NOT EXISTS spt_entry_time_idx ON strategy_paper_trades(strategy_id, entry_time DESC);
+-- No RLS — paper trades are system-level, not per-user

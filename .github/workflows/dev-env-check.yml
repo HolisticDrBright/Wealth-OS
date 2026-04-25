@@ -1,0 +1,51 @@
+name: Dev Environment Check
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+
+jobs:
+  lint-and-types:
+    name: TypeScript + ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build --if-present
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
+
+  tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx vitest run --reporter=verbose
+        env:
+          NODE_ENV: test
+
+  context-mode-reminder:
+    name: Context-Mode Dev Tooling Check (warn only)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check .claude/settings.json exists
+        run: |
+          if [ -f ".claude/settings.json" ]; then
+            echo "✅ .claude/settings.json present — context-mode hooks configured"
+          else
+            echo "⚠️  .claude/settings.json not found. Run: cp .claude/settings.json.example .claude/settings.json"
+            echo "   See CONTRIBUTING.md § Context-Mode for details."
+          fi

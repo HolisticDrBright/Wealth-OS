@@ -150,7 +150,7 @@ export function computeCorrelationMatrix(bars: PriceBar[]): CorrelationMatrix {
   const matrix = symbols.map(s1 =>
     symbols.map(s2 => {
       if (s1 === s2) return 1
-      return Math.round(correlation(bySymbol.get(s1)!, bySymbol.get(s2)!) * 1000) / 1000
+      return Math.round(correlation(bySymbol.get(s1) ?? [], bySymbol.get(s2) ?? []) * 1000) / 1000
     })
   )
   return { symbols, matrix }
@@ -165,7 +165,7 @@ export function computePortfolioReturns(
   const bySymbol = new Map<string, Map<string, number>>()
   for (const b of bars) {
     if (!bySymbol.has(b.date)) bySymbol.set(b.date, new Map())
-    bySymbol.get(b.date)!.set(b.symbol, b.close)
+    bySymbol.get(b.date)?.set(b.symbol, b.close)
   }
 
   const prevPrices = new Map<string, number>()
@@ -173,7 +173,7 @@ export function computePortfolioReturns(
   const portfolioRets: number[] = []
 
   for (const date of dates) {
-    const prices = bySymbol.get(date)!
+    const prices = bySymbol.get(date) ?? new Map<string, number>()
     if (prevPrices.size > 0) {
       let portRet = 0
       for (const [sym, w] of weights) {

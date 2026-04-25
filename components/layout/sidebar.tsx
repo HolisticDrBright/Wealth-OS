@@ -24,6 +24,7 @@ import {
   BarChart2,
   Bitcoin,
   Globe,
+  Scale,
   ListChecks,
   Leaf,
   Store,
@@ -55,6 +56,7 @@ const navItems = [
   // Markets
   { href: '/crypto', label: 'Crypto', icon: Bitcoin },
   { href: '/forex', label: 'Forex', icon: Globe },
+  { href: '/polymarket', label: 'Polymarket', icon: Scale },
   // Risk & Tax
   { href: '/risk', label: 'Risk', icon: ShieldAlert },
   { href: '/tax', label: 'Tax Advisor', icon: FileText },
@@ -101,13 +103,17 @@ export function Sidebar() {
               className={cn(
                 'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
                 isActive
-                  ? 'bg-indigo-600/20 text-indigo-400'
+                  ? 'text-accent-cyan'
                   : 'text-gray-400 hover:bg-white/5 hover:text-white'
               )}
+              style={isActive ? {
+                background: 'color-mix(in oklch, var(--color-accent-cyan) 8%, transparent)',
+                boxShadow: 'inset 3px 0 0 var(--color-accent-cyan), 0 0 12px color-mix(in oklch, var(--color-accent-cyan) 20%, transparent)',
+              } : undefined}
             >
-              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-indigo-400' : 'text-gray-500 group-hover:text-white')} />
+              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-accent-cyan' : 'text-gray-500 group-hover:text-white')} />
               {label}
-              {isActive && <ChevronRight className="ml-auto h-3 w-3 text-indigo-400" />}
+              {isActive && <ChevronRight className="ml-auto h-3 w-3 text-accent-cyan" />}
             </Link>
           )
         })}
@@ -121,6 +127,13 @@ export function Sidebar() {
         >
           <Settings className="h-4 w-4 text-gray-500" />
           Settings
+        </Link>
+        <Link
+          href="/settings/integrations"
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-all"
+        >
+          <Settings className="h-4 w-4 text-gray-500 opacity-50" />
+          Integrations
         </Link>
         <form action="/auth/signout" method="post">
           <button

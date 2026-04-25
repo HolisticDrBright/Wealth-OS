@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import type { TradeContext } from '@/lib/agents/types'
 
 const engine = new CIODecisionEngine()
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user: sessionUser } } = await supabase.auth.getUser()
+  if (!sessionUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'your-anthropic-api-key-here') {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
   }
@@ -13,18 +20,21 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const { trade, user } = body as TradeContext
 
-  if (!trade?.symbol || !user?.id) {
-    return NextResponse.json({ error: 'trade and user are required' }, { status: 400 })
+  if (!trade?.symbol) {
+    return NextResponse.json({ error: 'trade is required' }, { status: 400 })
   }
 
+  // Always use the authenticated user's ID — never trust the client-supplied one
+  const verifiedUser = { ...user, id: sessionUser.id }
+
   try {
-    const decision = await engine.analyze({ trade, user })
+    const decision = await engine.analyze({ trade, user: verifiedUser })
 
     // Persist CIO decision to DB
     try {
-      const supabase = createAdminClient()
-      await supabase.from('cio_decisions').insert({
-        user_id: user.id,
+      const adminSupabase = createAdminClient()
+      await adminSupabase.from('cio_decisions').insert({
+        user_id: sessionUser.id,
         trader_trade_id: trade.id ?? null,
         decision: decision.decision,
         reasoning: decision.reasoning,

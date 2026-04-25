@@ -1,14 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
-import { submitOrder } from '@/lib/broker-router'
 import { evaluateRules, applySizing } from '@/lib/rules-engine'
 import type { TradeContext } from '@/lib/agents/types'
 import type { AutopilotRule } from '@/lib/types'
+import { runAutoSimulate } from '@/lib/workers/auto-simulate'
+import { isStrategyKey } from '@/lib/strategies/strategy-registry'
+import type { StrategyKey } from '@/lib/strategies/strategy-registry'
+import {
+  selectBroker,
+  normaliseAssetClass,
+  type Broker,
+  type Jurisdiction,
+} from '@/lib/brokers/asset-broker-routing'
+import { getBroker, type BrokerCache } from '@/lib/brokers/BrokerFactory'
+
+/** Map asset class → default strategy key used for simulation dispatch. */
+function inferStrategyKey(assetClass: string): StrategyKey {
+  switch (assetClass) {
+    case 'polymarket': return 'polymarket_wallet_copy'
+    case 'crypto':     return 'onchain_signal'
+    case 'forex':      return 'carry_trade'
+    case 'stock':
+    default:           return 'pead'
+  }
+}
 
 const cioEngine = new CIODecisionEngine()
 
+/** Per-request broker adapter cache — shared across all trades in one POST. */
+let _brokerCache: BrokerCache | null = null
+
 export async function POST(req: NextRequest) {
+  _brokerCache = new Map()
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!serviceKey) {
     return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY not configured' }, { status: 500 })
@@ -225,8 +254,31 @@ export async function POST(req: NextRequest) {
         .select()
         .single()
 
-      // Route to broker via unified submitOrder
-      const result = await submitOrder({
+      // ── Route to broker via jurisdiction-aware selectBroker ─────────────────
+      // Read user's jurisdiction from settings (default: 'us' for now)
+      const { data: userSettingsRow } = await supabase
+        .from('user_settings')
+        .select('jurisdiction')
+        .eq('id', userId)
+        .single()
+      const jurisdiction: Jurisdiction = (userSettingsRow?.jurisdiction as Jurisdiction | undefined) ?? 'us'
+
+      // Read per-strategy broker override if any
+      const { data: stratOverride } = await supabase
+        .from('user_strategy_broker_overrides')
+        .select('broker')
+        .eq('user_id', userId)
+        .eq('strategy_key', inferStrategyKey(trade.asset_class))
+        .single()
+
+      const selectedBroker = selectBroker({
+        assetClass: normaliseAssetClass(trade.asset_class),
+        userOverride: (stratOverride?.broker as Broker | undefined) ?? undefined,
+        userJurisdiction: jurisdiction,
+      })
+
+      const adapter = await getBroker(selectedBroker.broker, userId, supabase, _brokerCache!)
+      const result = await adapter.execute({
         symbol: trade.symbol,
         asset_class: trade.asset_class,
         side: trade.action === 'buy' || trade.action === 'cover' ? 'buy' : 'sell',
@@ -238,12 +290,14 @@ export async function POST(req: NextRequest) {
         : result.status === 'skipped' ? 'open'
         : 'failed'
 
-      // Update position
+      // Update position (include broker_used + override reason)
       await supabase
         .from('user_copied_positions')
         .update({
           status: finalStatus,
-          broker: result.broker ?? trade.asset_class,
+          broker: selectedBroker.broker,
+          broker_used: selectedBroker.broker,
+          broker_override_reason: selectedBroker.reason,
           broker_order_id: result.broker_order_id ?? null,
           error_message: result.error ?? result.reason ?? null,
           order_id: orderRow?.id ?? null,
@@ -256,7 +310,7 @@ export async function POST(req: NextRequest) {
           .from('orders')
           .update({
             status: result.status === 'failed' ? 'rejected' : result.status,
-            broker: result.broker ?? trade.asset_class,
+            broker: selectedBroker.broker,
             broker_order_id: result.broker_order_id ?? null,
             error_message: result.error ?? result.reason ?? null,
           })
@@ -264,6 +318,23 @@ export async function POST(req: NextRequest) {
       }
 
       executed++
+
+      // ── Dispatch auto-simulate (fire-and-forget, never blocks order flow) ──
+      const rawStrategyKey = (trade as Record<string, unknown>).strategy_key as string | undefined
+      const strategyKey: StrategyKey = (rawStrategyKey && isStrategyKey(rawStrategyKey))
+        ? rawStrategyKey
+        : inferStrategyKey(trade.asset_class)
+
+      runAutoSimulate(supabase, {
+        tradeId: pos.id,
+        userId,
+        strategyKey,
+        tradeContext: { symbol: trade.symbol, asset_class: trade.asset_class as TradeContext['trade']['asset_class'] },
+        seedContent: `Copy trade: ${trade.action.toUpperCase()} ${trade.symbol} (${trade.asset_class}) notional $${approvedNotional}`,
+        predictionQuery: `What is the probability this ${trade.symbol} ${trade.action} trade succeeds?`,
+      }).catch(err => {
+        console.warn('[auto-simulate] dispatch error:', err instanceof Error ? err.message : err)
+      })
     }
   }
 

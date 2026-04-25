@@ -91,16 +91,16 @@ function PortfolioChat() {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/10 bg-[#0f1117] shadow-2xl flex flex-col overflow-hidden" style={{ height: '28rem' }}>
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/5 shrink-0">
+        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-line bg-bg-0 shadow-2xl flex flex-col overflow-hidden" style={{ height: '28rem' }}>
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-line bg-bg-3 shrink-0">
             <Bot className="h-5 w-5 text-indigo-400" />
-            <p className="text-sm font-semibold text-white">Portfolio Assistant</p>
-            <p className="text-xs text-gray-500 ml-auto">Ask about your portfolio</p>
+            <p className="text-sm font-semibold text-text-0">Portfolio Assistant</p>
+            <p className="text-xs text-text-2 ml-auto">Ask about your portfolio</p>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
-              <div className="text-center text-xs text-gray-500 py-8">
-                <Bot className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+              <div className="text-center text-xs text-text-2 py-8">
+                <Bot className="h-8 w-8 text-text-3 mx-auto mb-2" />
                 <p>Ask me anything about your portfolio.</p>
                 <p className="mt-1">Try: "What's my biggest position?" or "How diversified am I?"</p>
               </div>
@@ -110,7 +110,7 @@ function PortfolioChat() {
                 <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${
                   m.role === 'user'
                     ? 'bg-indigo-600 text-white rounded-br-sm'
-                    : 'bg-white/10 text-gray-200 rounded-bl-sm'
+                    : 'bg-bg-3 text-text-1 rounded-bl-sm'
                 }`}>
                   {m.content || (streaming && i === messages.length - 1 ? <span className="animate-pulse">▋</span> : '')}
                 </div>
@@ -126,7 +126,7 @@ function PortfolioChat() {
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
               placeholder="Ask about your portfolio..."
               disabled={streaming}
-              className="flex-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              className="flex-1 rounded-lg bg-bg-3 border border-line px-3 py-2 text-sm text-text-0 placeholder-text-3 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
             />
             <button
               onClick={send}
@@ -175,7 +175,8 @@ function SnapshotButton({ totalAssets, totalLiabilities }: { totalAssets: number
 
 export function DashboardClient({ assets, transactions, netWorthHistory, isDemo }: Props) {
   const totalAssets = assets.reduce((s, a) => s + a.current_value, 0)
-  const totalLiabilities = 197000
+  const latestEntry = netWorthHistory.length > 0 ? netWorthHistory[netWorthHistory.length - 1] : null
+  const totalLiabilities = latestEntry?.total_liabilities ?? 0
   const netWorth = totalAssets - totalLiabilities
 
   const history = netWorthHistory
@@ -255,7 +256,7 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
     : spendingByCategory
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-bg-1 min-h-full">
       {isDemo && <OnboardingWizard />}
       {isDemo && (
         <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex items-start gap-3">
@@ -272,9 +273,9 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
           <Card key={label}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-                <p className="mt-2 text-2xl font-bold text-white">{value}</p>
-                <p className="mt-0.5 text-xs text-gray-500">{sub}</p>
+                <p className="text-xs font-medium text-text-2 uppercase tracking-wider">{label}</p>
+                <p className="mt-2 text-2xl font-bold text-text-0">{value}</p>
+                <p className="mt-0.5 text-xs text-text-2">{sub}</p>
               </div>
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg}`}>
                 <Icon className={`h-5 w-5 ${color}`} />
@@ -289,7 +290,7 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
               <span className={`text-xs font-medium ${trend === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
                 {change}
               </span>
-              <span className="text-xs text-gray-600">vs last month</span>
+              <span className="text-xs text-text-3">vs last month</span>
             </div>
           </Card>
         ))}
@@ -336,16 +337,16 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="month" tick={{ fill: 'var(--color-text-2)', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fill: '#6b7280', fontSize: 11 }}
+                  tick={{ fill: 'var(--color-text-2)', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  labelStyle={{ color: '#9ca3af' }}
+                  contentStyle={{ backgroundColor: 'var(--color-bg-0)', border: '1px solid var(--color-line)', borderRadius: '8px' }}
+                  labelStyle={{ color: 'var(--color-text-2)' }}
                   itemStyle={{ color: '#fff' }}
                   formatter={(value) => [formatCurrency(Number(value)), '']}
                 />
@@ -404,13 +405,13 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
         </CardHeader>
         <CardContent>
           {transactions.length === 0 ? (
-            <p className="text-center text-sm text-gray-500 py-8">No transactions yet. Add some in the Budget page.</p>
+            <p className="text-center text-sm text-text-2 py-8">No transactions yet. Add some in the Budget page.</p>
           ) : (
             <div className="space-y-1">
               {transactions.slice(0, 10).map((tx) => (
                 <div
                   key={tx.id}
-                  className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-white/5 transition-colors"
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-bg-3 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tx.type === 'income' ? 'bg-emerald-500/10' : 'bg-white/5'}`}>
@@ -421,8 +422,8 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white">{tx.description}</p>
-                      <p className="text-xs text-gray-500">{tx.category} · {tx.date}</p>
+                      <p className="text-sm font-medium text-text-0">{tx.description}</p>
+                      <p className="text-xs text-text-2">{tx.category} · {tx.date}</p>
                     </div>
                   </div>
                   <span className={`text-sm font-semibold ${tx.type === 'income' ? 'text-emerald-400' : 'text-white'}`}>
@@ -436,6 +437,34 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
       </Card>
 
       <PortfolioChat />
+
+      {/* Research Terminal card — Fincept Terminal */}
+      <Card className="border-border/40 bg-muted/20">
+        <CardContent className="flex items-center justify-between p-4">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium">Research Terminal</p>
+            <p className="text-xs text-muted-foreground">
+              Manual research companion — Fincept Terminal (open source desktop app)
+            </p>
+          </div>
+          <a
+            href="https://github.com/Fincept-Corporation/FinceptTerminal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+            onClick={() => {
+              fetch('/api/telemetry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event: 'fincept_terminal_click', properties: { source: 'dashboard' } }),
+              }).catch(() => {})
+            }}
+          >
+            Open GitHub
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </CardContent>
+      </Card>
     </div>
   )
 }

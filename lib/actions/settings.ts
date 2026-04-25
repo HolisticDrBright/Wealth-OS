@@ -3,6 +3,31 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface AIFeatureDefinition {
+  feature_key: string
+  display_name: string
+  description: string
+  category: 'ai_confluence' | 'premium_data'
+  cost_per_use_usd: number
+  cost_unit: string
+  default_budget_usd: number
+}
+
+export interface AIFeatureFlag {
+  feature_key: string
+  enabled: boolean
+  monthly_budget_usd: number
+  alert_threshold_pct: number
+}
+
+export interface AIUsageSummary {
+  feature_key: string
+  spend_usd: number
+  call_count: number
+}
+
 export async function getUserSettings() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -60,4 +85,81 @@ export async function getBrokerStatus() {
     mirofish: !!process.env.MIROFISH_BASE_URL,
     coinStats: !!process.env.COINSTATS_API_KEY,
   }
+}
+
+// ─── AI Feature Flags ─────────────────────────────────────────────────────────
+
+export async function getAIFeatureData(): Promise<{
+  definitions: AIFeatureDefinition[]
+  flags: AIFeatureFlag[]
+  usage: AIUsageSummary[]
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const [defResult, flagResult, usageResult] = await Promise.all([
+    supabase
+      .from('ai_feature_definitions')
+      .select('feature_key, display_name, description, category, cost_per_use_usd, cost_unit, default_budget_usd')
+      .eq('is_available', true)
+      .order('category')
+      .order('feature_key'),
+
+    user
+      ? supabase
+          .from('ai_feature_flags')
+          .select('feature_key, enabled, monthly_budget_usd, alert_threshold_pct')
+          .eq('user_id', user.id)
+      : Promise.resolve({ data: [] as AIFeatureFlag[] }),
+
+    user
+      ? supabase
+          .from('ai_usage_logs')
+          .select('feature_key, cost_usd')
+          .eq('user_id', user.id)
+          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const usageMap = new Map<string, AIUsageSummary>()
+  for (const row of (usageResult.data ?? [])) {
+    const existing = usageMap.get(row.feature_key)
+    if (existing) {
+      existing.spend_usd += row.cost_usd
+      existing.call_count += 1
+    } else {
+      usageMap.set(row.feature_key, { feature_key: row.feature_key, spend_usd: row.cost_usd, call_count: 1 })
+    }
+  }
+
+  return {
+    definitions: (defResult.data ?? []) as AIFeatureDefinition[],
+    flags: (flagResult.data ?? []) as AIFeatureFlag[],
+    usage: Array.from(usageMap.values()),
+  }
+}
+
+export async function updateAIFeatureFlag(
+  featureKey: string,
+  updates: { enabled?: boolean; monthly_budget_usd?: number; alert_threshold_pct?: number }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase.from('ai_feature_flags').upsert(
+    {
+      user_id: user.id,
+      feature_key: featureKey,
+      enabled: updates.enabled ?? false,
+      monthly_budget_usd: updates.monthly_budget_usd ?? 20,
+      alert_threshold_pct: updates.alert_threshold_pct ?? 80,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,feature_key' }
+  )
+
+  if (error) return { error: error.message }
+  revalidatePath('/settings')
+  return { success: true }
 }

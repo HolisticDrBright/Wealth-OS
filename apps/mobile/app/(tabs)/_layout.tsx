@@ -9,6 +9,7 @@ const TABS: { name: string; title: string; icon: IoniconsName; activeIcon: Ionic
   { name: 'traders',   title: 'Traders',   icon: 'people-outline',     activeIcon: 'people' },
   { name: 'portfolio', title: 'Portfolio', icon: 'bar-chart-outline',  activeIcon: 'bar-chart' },
   { name: 'alerts',    title: 'Alerts',    icon: 'notifications-outline', activeIcon: 'notifications' },
+  { name: 'profile',   title: 'Profile',   icon: 'person-circle-outline', activeIcon: 'person-circle' },
 ]
 
 export default function TabLayout() {

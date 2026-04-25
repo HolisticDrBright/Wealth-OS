@@ -151,7 +151,7 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
   const barsByDateSym: Map<string, Map<string, PriceBar>> = new Map()
   for (const bar of bars) {
     if (!barsByDateSym.has(bar.date)) barsByDateSym.set(bar.date, new Map())
-    barsByDateSym.get(bar.date)!.set(bar.symbol, bar)
+    barsByDateSym.get(bar.date)?.set(bar.symbol, bar)
   }
 
   // Benchmark bars (benchmark symbol treated as first symbol if not in dataset separately)

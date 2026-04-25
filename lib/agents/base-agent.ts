@@ -1,8 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { TradeContext, AgentOutput, AgentRecommendation, ConfidenceLevel } from './types'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { VAULT_TOOLS, dispatchVaultTool, isVaultToolName } from './tools/vault-tools'
 
 const anthropic = new Anthropic()
+
+const MAX_TOOL_ROUNDS = 5
 
 export abstract class BaseAgent {
   abstract readonly name: string
@@ -12,6 +15,11 @@ export abstract class BaseAgent {
   // Override to filter context for this agent (e.g. crypto agent only for crypto trades)
   shouldRun(context: TradeContext): boolean {
     return true
+  }
+
+  // Override to enable vault tool-use for this agent
+  shouldUseVault(): boolean {
+    return false
   }
 
   async run(context: TradeContext): Promise<AgentOutput> {
@@ -31,13 +39,45 @@ export abstract class BaseAgent {
     const userPrompt = this.buildUserPrompt(context)
 
     try {
-      const msg = await anthropic.messages.create({
+      const baseParams = {
         model: this.model,
         max_tokens: 1024,
-        thinking: { type: 'adaptive' },
+        thinking: { type: 'adaptive' as const },
         system: this.buildSystemPrompt(),
-        messages: [{ role: 'user', content: userPrompt }],
-      })
+      }
+
+      let msg: Anthropic.Message
+
+      if (this.shouldUseVault()) {
+        const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }]
+        msg = await anthropic.messages.create({ ...baseParams, tools: VAULT_TOOLS, messages })
+
+        let rounds = 0
+        while (msg.stop_reason === 'tool_use' && rounds < MAX_TOOL_ROUNDS) {
+          rounds++
+          messages.push({ role: 'assistant', content: msg.content })
+
+          const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+            msg.content
+              .filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+              .map(async block => ({
+                type: 'tool_result' as const,
+                tool_use_id: block.id,
+                content: isVaultToolName(block.name)
+                  ? await dispatchVaultTool(block.name, block.input, this.name)
+                  : JSON.stringify({ error: `Unknown tool: ${block.name}` }),
+              }))
+          )
+
+          messages.push({ role: 'user', content: toolResults })
+          msg = await anthropic.messages.create({ ...baseParams, tools: VAULT_TOOLS, messages })
+        }
+      } else {
+        msg = await anthropic.messages.create({
+          ...baseParams,
+          messages: [{ role: 'user', content: userPrompt }],
+        })
+      }
 
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'
       const jsonMatch = text.match(/\{[\s\S]*\}/)

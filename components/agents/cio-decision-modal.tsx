@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { MiroFishScoreBadge } from './mirofish-score-badge'
-import { OpportunityScoreRadar } from './opportunity-score-radar'
+import { AgentRadar, agentsFromDecision } from './agent-radar'
 import { InvestmentCommitteeView } from './investment-committee-view'
 import { SimulationStatusCard } from './simulation-status-card'
 import { MacroRegimeBanner } from './macro-regime-banner'
@@ -127,7 +127,7 @@ export function CIODecisionModal({ open, onClose, tradeContext }: Props) {
             </div>
             <div className="rounded-xl bg-white/5 border border-white/10 p-2">
               <p className="text-xs text-gray-500 text-center mb-1">Opportunity Radar</p>
-              <OpportunityScoreRadar decision={decision} size={200} />
+              <AgentRadar agents={agentsFromDecision(decision)} size={200} />
             </div>
           </div>
 

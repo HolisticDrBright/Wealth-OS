@@ -1,5 +1,10 @@
 import type { TradeContext, AgentOutput, CIODecision, ConfidenceLevel } from './types'
 import { miroFishClient, simulateWithClaude } from './mirofish-client'
+import { renderDecisionNote } from '../vault/templates'
+import { writeFile } from '../vault/client'
+import { DIRECTOR_CIO_PROMPT } from '@/lib/integrations/autohedge-distilled/director-cio-prompt'
+
+const USE_AUTOHEDGE_DISTILLED = process.env.USE_AUTOHEDGE_DISTILLED_PROMPTS === 'true'
 import {
   OrchestratorAgent,
   ClientProfileAgent,
@@ -106,8 +111,8 @@ export class CIODecisionEngine {
     ]
 
     // ── Risk Management veto check ────────────────────────────────────────
-    const riskOutput = tier3Outputs.find(o => o.agent === 'RiskManagementAgent')!
-    if (riskOutput.recommendation === 'reject') {
+    const riskOutput = tier3Outputs.find(o => o.agent === 'RiskManagementAgent')
+    if (riskOutput?.recommendation === 'reject') {
       return this.buildDecision('reject', context, allOutputs, miroFishScore,
         `VETOED by RiskManagementAgent: ${riskOutput.reasoning}`)
     }
@@ -159,9 +164,10 @@ export class CIODecisionEngine {
     for (const o of allOutputs) agentScores[o.agent] = o.score
 
     // ── CIO synthesis via Claude Opus ─────────────────────────────────────
-    const summaryPrompt = `You are the Chief Investment Officer synthesizing an investment committee analysis.
+    const promptVariant = USE_AUTOHEDGE_DISTILLED ? 'autohedge_distilled_v1' : 'native'
+    const systemPrompt = USE_AUTOHEDGE_DISTILLED ? DIRECTOR_CIO_PROMPT : undefined
 
-TRADE: ${trade.action.toUpperCase()} ${trade.symbol} (${trade.asset_class}) — $${trade.notional_value.toLocaleString()}
+    const summaryPrompt = `${USE_AUTOHEDGE_DISTILLED ? '' : 'You are the Chief Investment Officer synthesizing an investment committee analysis.\n\n'}TRADE: ${trade.action.toUpperCase()} ${trade.symbol} (${trade.asset_class}) — $${trade.notional_value.toLocaleString()}
 TRADER: ${trade.trader_name} (${trade.trader_return_pct}% 30d, ${trade.trader_win_rate}% win rate)
 COMMITTEE DECISION: ${decision.toUpperCase()}
 ${vetoReason ? `VETO REASON: ${vetoReason}` : ''}
@@ -185,11 +191,13 @@ Write a CIO synthesis as JSON:
 }`
 
     let synthesis: Partial<CIODecision> = {}
+    const synthStart = Date.now()
     try {
       const msg = await anthropic.messages.create({
         model: 'claude-opus-4-6',
         max_tokens: 1024,
         thinking: { type: 'adaptive' },
+        ...(systemPrompt ? { system: systemPrompt } : {}),
         messages: [{ role: 'user', content: summaryPrompt }],
       })
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'
@@ -198,6 +206,20 @@ Write a CIO synthesis as JSON:
     } catch (err) {
       console.error('[CIO] synthesis failed:', err)
     }
+
+    // Log prompt variant performance for A/B comparison (fire-and-forget)
+    try {
+      const { createClient } = await import('@/lib/supabase/server')
+      const supabase = await createClient()
+      supabase.from('agent_performance_logs').insert({
+        agent_name: 'CIODecisionEngine',
+        prompt_variant: promptVariant,
+        scenario: { trade, agentScores },
+        decision,
+        reasoning: vetoReason ?? `Committee score logged`,
+        latency_ms: Date.now() - synthStart,
+      }).then(() => {}).catch(() => {})
+    } catch { /* non-critical */ }
 
     const scores = Object.values(agentScores)
     const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 50
@@ -209,7 +231,7 @@ Write a CIO synthesis as JSON:
       ? Math.min((synthesis.positionSizing?.recommended_pct ?? 5) * 0.5, 3)
       : 0
 
-    return {
+    const result: CIODecision = {
       decision,
       reasoning: vetoReason ?? `Committee score: ${avgScore.toFixed(1)}/100`,
       investmentCommitteeView: synthesis.investmentCommitteeView ?? '',
@@ -229,6 +251,93 @@ Write a CIO synthesis as JSON:
       miroFishScore,
       finalScore: avgScore,
     }
+
+    // Persist decision note to vault (best-effort — never fails the decision)
+    try {
+      const { path, content } = renderDecisionNote(result, context)
+      await writeFile(
+        path,
+        content,
+        `feat: CIO decision ${decision.toUpperCase()} ${context.trade.symbol} (score ${avgScore.toFixed(0)})`,
+        'CIODecisionEngine',
+      )
+      console.log(`[CIO] Vault note written: ${path}`)
+    } catch (err) {
+      console.warn('[CIO] Vault write skipped:', err instanceof Error ? err.message : err)
+    }
+
+    return result
+  }
+
+  /**
+   * Pipeline orchestrator — runs all 9 stages for a single Opportunity and
+   * returns a typed Decision. Designed to be called from the strategy executor
+   * or the copy-trade worker.
+   *
+   * Blocking rules (in priority order):
+   *   1. risk.veto → block
+   *   2. mirofish scenario=bear AND opp.direction=long → reduce_size
+   *   3. kronos.skew=bearish AND opp.direction=long AND kronos.pass=false → block
+   *   4. redTeam.passed=false → reduce_size
+   *   5. otherwise → execute
+   */
+  async decide(
+    opp: import('@/lib/strategies/pipeline-types').Opportunity,
+    userId: string,
+    supabase: import('@supabase/supabase-js').SupabaseClient,
+    cache?: import('@/lib/brokers/BrokerFactory').BrokerCache
+  ): Promise<import('@/lib/strategies/pipeline-types').Decision> {
+    const { strategyRegistry } = await import('@/lib/strategies/all-pipeline-strategies')
+    const strat = strategyRegistry.get(opp.strategyKey)
+
+    const edge     = await strat.classifyEdge(opp)
+    const mirofish = await strat.runMiroFishConfluence(opp, userId, supabase)
+    const kronos   = await strat.runKronosConfluence(opp, userId, supabase)
+    const redTeam  = await strat.runRedTeam(opp)
+    const risk     = await strat.runRiskCheck(opp, userId, supabase)
+
+    const verdicts: import('@/lib/strategies/pipeline-types').AllVerdicts = { mirofish, kronos, redTeam, risk }
+
+    // Gate 1 — risk veto
+    if (risk.veto) {
+      const decision = { action: 'block' as const, reason: risk.reason ?? 'risk veto' }
+      await strat.logAudit(opp, decision, verdicts, supabase)
+      return decision
+    }
+
+    // Gate 2 — MiroFish bear opposes long
+    if (mirofish?.scenario === 'bear' && opp.direction === 'long') {
+      const size = await strat.sizePosition(opp, verdicts, userId)
+      const decision = { action: 'reduce_size' as const, reason: 'mirofish bear scenario', size }
+      await strat.logAudit(opp, decision, verdicts, supabase)
+      return decision
+    }
+
+    // Gate 3 — Kronos blocks
+    if (kronos && !kronos.pass && opp.direction === 'long') {
+      const decision = { action: 'block' as const, reason: `kronos contradicts: ${kronos.reason}` }
+      await strat.logAudit(opp, decision, verdicts, supabase)
+      return decision
+    }
+
+    // Gate 4 — red team
+    if (!redTeam.passed) {
+      const size = await strat.sizePosition(opp, verdicts, userId)
+      const decision = { action: 'reduce_size' as const, reason: redTeam.reason ?? 'red team score low', size }
+      await strat.logAudit(opp, decision, verdicts, supabase)
+      return decision
+    }
+
+    // Execute
+    const size = await strat.sizePosition(opp, verdicts, userId)
+    const decision = { action: 'execute' as const, size }
+    await strat.logAudit(opp, decision, verdicts, supabase)
+    strat.execute(opp, size, userId, supabase, cache).catch(err =>
+      console.error(`[CIO] execute failed for ${opp.symbol}:`, err)
+    )
+    return decision
+
+    void edge  // referenced for audit trail completeness
   }
 }
 

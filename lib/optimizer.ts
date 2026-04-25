@@ -51,7 +51,7 @@ function computeReturns(bars: PriceBar[]): Map<string, number[]> {
   const bySymbol = new Map<string, PriceBar[]>()
   for (const bar of bars) {
     if (!bySymbol.has(bar.symbol)) bySymbol.set(bar.symbol, [])
-    bySymbol.get(bar.symbol)!.push(bar)
+    bySymbol.get(bar.symbol)?.push(bar)
   }
 
   const returns = new Map<string, number[]>()
@@ -69,8 +69,8 @@ function computeReturns(bars: PriceBar[]): Map<string, number[]> {
 /** Align returns to common date count (min across symbols). */
 function alignReturns(returns: Map<string, number[]>): { symbols: string[]; matrix: number[][] } {
   const symbols = Array.from(returns.keys())
-  const minLen = Math.min(...symbols.map(s => returns.get(s)!.length))
-  const matrix = symbols.map(s => returns.get(s)!.slice(-minLen))
+  const minLen = Math.min(...symbols.map(s => returns.get(s)?.length ?? 0))
+  const matrix = symbols.map(s => returns.get(s)?.slice(-minLen) ?? [])
   return { symbols, matrix }
 }
 

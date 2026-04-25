@@ -1,29 +1,35 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { apiSuccess, apiError } from '@/lib/api'
 import { simulateWithClaude } from '@/lib/agents/mirofish-client'
 import type { TradeContext } from '@/lib/agents/types'
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return apiError('Unauthorized', 401)
+
   const body = await req.json().catch(() => ({}))
   const { job_id } = body
 
   if (!job_id) return apiError('job_id required', 400)
 
-  const supabase = createAdminClient()
+  const adminSupabase = createAdminClient()
 
-  // Fetch job
-  const { data: job, error: jobErr } = await supabase
+  // Fetch job and verify ownership
+  const { data: job, error: jobErr } = await adminSupabase
     .from('simulation_jobs')
     .select('*')
     .eq('id', job_id)
+    .eq('user_id', user.id)
     .single()
 
   if (jobErr || !job) return apiError('Job not found', 404)
   if (job.status === 'completed') return apiSuccess({ message: 'Already completed' })
 
   // Mark as running
-  await supabase
+  await adminSupabase
     .from('simulation_jobs')
     .update({ status: 'running', started_at: new Date().toISOString() })
     .eq('id', job_id)
@@ -55,7 +61,7 @@ export async function POST(req: NextRequest) {
     const report = await simulateWithClaude(context)
 
     // Persist report
-    const { data: savedReport, error: reportErr } = await supabase
+    const { data: savedReport, error: reportErr } = await adminSupabase
       .from('simulation_reports')
       .insert({
         job_id,
@@ -76,13 +82,13 @@ export async function POST(req: NextRequest) {
     if (reportErr) throw new Error(reportErr.message)
 
     // Mark job completed
-    await supabase
+    await adminSupabase
       .from('simulation_jobs')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', job_id)
 
     // Fire alert
-    await supabase.from('alerts').insert({
+    await adminSupabase.from('alerts').insert({
       user_id: job.user_id,
       type: 'simulation_done',
       title: `Simulation complete: ${job.title}`,
@@ -94,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     return apiSuccess({ job_id, report_id: savedReport.id, report })
   } catch (err) {
-    await supabase
+    await adminSupabase
       .from('simulation_jobs')
       .update({ status: 'failed' })
       .eq('id', job_id)
