@@ -71,8 +71,7 @@ CREATE TABLE IF NOT EXISTS public.dexter_research_cache (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS dexter_cache_query_key_idx
-  ON public.dexter_research_cache(ticker, research_type, query_key)
-  WHERE expires_at > now();
+  ON public.dexter_research_cache(ticker, research_type, query_key);
 
 CREATE INDEX IF NOT EXISTS dexter_cache_expires_idx
   ON public.dexter_research_cache(expires_at);
