@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Play, RefreshCw, TrendingUp, TrendingDown, Clock, FlaskConical, Zap } from 'lucide-react'
-import type { StrategyKey, AssetClass } from '@/lib/strategies/strategy-registry'
+import { Play, RefreshCw, TrendingUp, TrendingDown, Clock, FlaskConical, Zap, Fish, Atom } from 'lucide-react'
+import type { StrategyKey, AssetClass, MiroFishTier, KronosTier } from '@/lib/strategies/strategy-registry'
 import type { PaperSummary } from '@/lib/paper-trading/types'
 
 interface StrategyRow {
@@ -12,6 +12,8 @@ interface StrategyRow {
   displayName: string
   assetClass: AssetClass
   edgeType: string
+  mirofish: MiroFishTier
+  kronos: KronosTier
   paperEnabled: boolean
 }
 
@@ -55,6 +57,19 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 3600)}h ago`
 }
 
+function AiTierBadge({ tier, label, icon }: { tier: MiroFishTier | KronosTier; label: string; icon: React.ReactNode }) {
+  if (tier === 'skip') return null
+  const cls = tier === 'high'
+    ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
+    : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+  return (
+    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 ${cls}`}>
+      {icon}
+      {label}
+    </span>
+  )
+}
+
 function PaperToggle({ enabled, onChange, disabled }: { enabled: boolean; onChange: () => void; disabled?: boolean }) {
   return (
     <button
@@ -92,7 +107,7 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
   useEffect(() => {
     fetch('/api/users/me/strategies')
       .then(r => r.json())
-      .then((data: { strategies: StrategyRow[] }) => {
+      .then((data: { strategies: (StrategyRow & { mirofish: MiroFishTier; kronos: KronosTier })[] }) => {
         setStrategies((data.strategies ?? []).filter(s => assetClasses.includes(s.assetClass)))
       })
     void loadPositions()
@@ -184,9 +199,14 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
           {/* Strategy toggles */}
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs text-gray-500">
-                {enabledCount > 0 ? `${enabledCount} strategy${enabledCount !== 1 ? 'ies' : 'y'} in paper mode` : 'Toggle strategies to simulate'}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-gray-500">
+                  {enabledCount > 0 ? `${enabledCount} strategy${enabledCount !== 1 ? 'ies' : 'y'} in paper mode` : 'Toggle strategies to simulate'}
+                </p>
+                <span className="text-[10px] text-gray-600 hidden sm:inline">
+                  <span className="text-indigo-400">MF</span>=MiroFish · <span className="text-indigo-400">KR</span>=Kronos
+                </span>
+              </div>
               <Button
                 size="sm"
                 disabled={running || enabledCount === 0}
@@ -203,9 +223,11 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
                   key={s.strategyKey}
                   className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${s.paperEnabled ? 'bg-accent-cyan/5 border border-accent-cyan/20' : 'bg-white/5 border border-transparent'}`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     <span className="text-xs font-medium text-foreground truncate">{s.displayName}</span>
                     <Badge variant="outline" className="text-[10px] shrink-0 text-gray-500 border-gray-600/50">{s.edgeType}</Badge>
+                    <AiTierBadge tier={s.mirofish} label="MF" icon={<Fish className="h-2.5 w-2.5" />} />
+                    <AiTierBadge tier={s.kronos} label="KR" icon={<Atom className="h-2.5 w-2.5" />} />
                   </div>
                   <PaperToggle
                     enabled={s.paperEnabled}

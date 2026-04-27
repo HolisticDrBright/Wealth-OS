@@ -94,3 +94,63 @@ export async function getOpenTrades(): Promise<OandaTrade[]> {
     unrealized_pl: parseFloat(t.unrealizedPL),
   }))
 }
+
+// ─── Candles ──────────────────────────────────────────────────────────────────
+
+export interface OandaCandle {
+  time: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+  complete: boolean
+}
+
+/**
+ * Fetch OANDA candlestick data.
+ * @param instrument  e.g. 'EUR_USD'
+ * @param granularity 'M1' | 'M5' | 'M15' | 'H1' | 'H4' | 'D'
+ * @param count       Number of candles to fetch (max 5000)
+ */
+export async function getCandles(
+  instrument: string,
+  granularity: 'M1' | 'M5' | 'M15' | 'H1' | 'H4' | 'D',
+  count: number
+): Promise<OandaCandle[]> {
+  try {
+    const data = await oandaFetch(
+      `/v3/instruments/${instrument}/candles?granularity=${granularity}&count=${count}&price=M`
+    ) as { candles: Array<{ time: string; mid: { o: string; h: string; l: string; c: string }; volume: number; complete: boolean }> }
+    return (data.candles ?? []).map(c => ({
+      time: c.time,
+      open:  parseFloat(c.mid.o),
+      high:  parseFloat(c.mid.h),
+      low:   parseFloat(c.mid.l),
+      close: parseFloat(c.mid.c),
+      volume: c.volume,
+      complete: c.complete,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/** True if OANDA is configured (API key + account ID present). */
+export function oandaEnabled(): boolean {
+  return !!(process.env.OANDA_API_KEY && process.env.OANDA_ACCOUNT_ID)
+}
+
+/** Fetch current bid/ask for a single instrument. Returns null if unavailable. */
+export async function getBidAsk(
+  instrument: string
+): Promise<{ bid: number; ask: number } | null> {
+  try {
+    const prices = await getPricing([instrument])
+    const p = prices[0]
+    if (!p) return null
+    return { bid: p.bid, ask: p.ask }
+  } catch {
+    return null
+  }
+}
