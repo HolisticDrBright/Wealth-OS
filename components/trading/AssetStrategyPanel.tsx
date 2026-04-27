@@ -75,6 +75,7 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
   const [summary, setSummary] = useState<PaperSummary | null>(null)
   const [running, setRunning] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
+  const [runMsg, setRunMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const primaryClass = assetClasses[0]
 
@@ -113,8 +114,21 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
 
   async function runPaper() {
     setRunning(true)
+    setRunMsg(null)
     try {
-      await fetch('/api/paper-trading/run', { method: 'POST' })
+      const res = await fetch('/api/paper-trading/run', { method: 'POST' })
+      const result = await res.json() as {
+        strategiesRun: number; opportunitiesFound: number
+        positionsOpened: number; positionsClosed: number; errors: string[]
+      }
+      if (result.errors?.[0] && result.strategiesRun === 0) {
+        setRunMsg({ text: result.errors[0], ok: false })
+      } else {
+        setRunMsg({
+          text: `Ran ${result.strategiesRun} strategies · ${result.opportunitiesFound} opportunities · ${result.positionsOpened} opened · ${result.positionsClosed} closed${result.errors.length > 0 ? ` · ⚠ ${result.errors[0]}` : ''}`,
+          ok: true,
+        })
+      }
       await loadPositions()
     } finally {
       setRunning(false)
@@ -195,6 +209,13 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
               )}
             </div>
           </div>
+
+          {/* Run result banner */}
+          {runMsg && (
+            <div className={`rounded-lg px-3 py-2 text-xs ${runMsg.ok ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-400'}`}>
+              {runMsg.text}
+            </div>
+          )}
 
           {/* P&L summary */}
           {(openPos.length > 0 || (summary?.closedTrades ?? 0) > 0) && (

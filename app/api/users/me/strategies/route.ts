@@ -84,21 +84,39 @@ export async function PUT(req: NextRequest) {
   }
 
   const now = new Date().toISOString()
-  const { error } = await supabase
+
+  // Build only the fields being updated — avoids overwriting unrelated columns on conflict
+  const updateFields: Record<string, unknown> = { updated_at: now }
+  if (typeof body.is_enabled === 'boolean')   updateFields.is_enabled   = body.is_enabled
+  if (typeof body.paper_enabled === 'boolean') updateFields.paper_enabled = body.paper_enabled
+  if (body.allocation_pct !== undefined)       updateFields.allocation_pct = body.allocation_pct ?? null
+
+  // Try update first; if no row exists yet, insert with safe defaults
+  const { data: updated, error: updateError } = await supabase
     .from('user_enabled_strategies')
-    .upsert(
-      {
+    .update(updateFields)
+    .eq('user_id', userId)
+    .eq('strategy_key', body.strategy_key as string)
+    .select('strategy_key')
+
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+
+  if (!updated || updated.length === 0) {
+    const { error: insertError } = await supabase
+      .from('user_enabled_strategies')
+      .insert({
         user_id: userId,
         strategy_key: body.strategy_key,
-        is_enabled: body.is_enabled,
+        is_enabled: body.is_enabled ?? false,
+        paper_enabled: body.paper_enabled ?? false,
         allocation_pct: body.allocation_pct ?? null,
-        paper_enabled: body.paper_enabled ?? null,
         updated_at: now,
-      },
-      { onConflict: 'user_id,strategy_key' }
-    )
+      })
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const error = null  // kept for shape compatibility below
+  if (error) return NextResponse.json({ error }, { status: 500 })
 
   return NextResponse.json({
     strategyKey: body.strategy_key,
