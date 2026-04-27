@@ -100,13 +100,23 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
 
   async function togglePaper(key: StrategyKey, current: boolean) {
     setToggling(key)
+    // Optimistic update
+    setStrategies(prev => prev.map(s => s.strategyKey === key ? { ...s, paperEnabled: !current } : s))
     try {
-      await fetch('/api/users/me/strategies', {
+      const res = await fetch('/api/users/me/strategies', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ strategy_key: key, paper_enabled: !current }),
       })
-      setStrategies(prev => prev.map(s => s.strategyKey === key ? { ...s, paperEnabled: !current } : s))
+      if (!res.ok) {
+        // Revert on failure
+        setStrategies(prev => prev.map(s => s.strategyKey === key ? { ...s, paperEnabled: current } : s))
+        const body = await res.json().catch(() => ({})) as { error?: string }
+        setRunMsg({ text: `Failed to save: ${body.error ?? res.statusText}`, ok: false })
+      }
+    } catch {
+      setStrategies(prev => prev.map(s => s.strategyKey === key ? { ...s, paperEnabled: current } : s))
+      setRunMsg({ text: 'Network error — toggle not saved', ok: false })
     } finally {
       setToggling(null)
     }

@@ -25,7 +25,7 @@ export async function POST() {
         decisionsBlock: 0,
         positionsOpened: 0,
         positionsClosed: 0,
-        errors: ['No strategies have paper trading enabled. Toggle strategies on in the Paper Trading page.'],
+        errors: ['No strategies have paper trading enabled. Toggle strategies on using the Paper switches on the Crypto, Forex, or Options page.'],
       })
     }
 

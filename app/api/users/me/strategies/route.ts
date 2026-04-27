@@ -85,38 +85,28 @@ export async function PUT(req: NextRequest) {
 
   const now = new Date().toISOString()
 
-  // Build only the fields being updated — avoids overwriting unrelated columns on conflict
+  // Step 1: ensure the row exists (insert with defaults if new, ignore if already exists)
+  const { error: ensureError } = await supabase
+    .from('user_enabled_strategies')
+    .upsert(
+      { user_id: userId, strategy_key: body.strategy_key, is_enabled: false, paper_enabled: false, updated_at: now },
+      { onConflict: 'user_id,strategy_key', ignoreDuplicates: true }
+    )
+  if (ensureError) return NextResponse.json({ error: ensureError.message }, { status: 500 })
+
+  // Step 2: update only the specific fields being changed
   const updateFields: Record<string, unknown> = { updated_at: now }
-  if (typeof body.is_enabled === 'boolean')   updateFields.is_enabled   = body.is_enabled
+  if (typeof body.is_enabled === 'boolean')    updateFields.is_enabled    = body.is_enabled
   if (typeof body.paper_enabled === 'boolean') updateFields.paper_enabled = body.paper_enabled
   if (body.allocation_pct !== undefined)       updateFields.allocation_pct = body.allocation_pct ?? null
 
-  // Try update first; if no row exists yet, insert with safe defaults
-  const { data: updated, error: updateError } = await supabase
+  const { error } = await supabase
     .from('user_enabled_strategies')
     .update(updateFields)
     .eq('user_id', userId)
     .eq('strategy_key', body.strategy_key as string)
-    .select('strategy_key')
 
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
-
-  if (!updated || updated.length === 0) {
-    const { error: insertError } = await supabase
-      .from('user_enabled_strategies')
-      .insert({
-        user_id: userId,
-        strategy_key: body.strategy_key,
-        is_enabled: body.is_enabled ?? false,
-        paper_enabled: body.paper_enabled ?? false,
-        allocation_pct: body.allocation_pct ?? null,
-        updated_at: now,
-      })
-    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
-  }
-
-  const error = null  // kept for shape compatibility below
-  if (error) return NextResponse.json({ error }, { status: 500 })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({
     strategyKey: body.strategy_key,
