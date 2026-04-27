@@ -25,6 +25,7 @@ import {
   type AssetClass,
   type StrategyAIConfig,
 } from './strategy-registry'
+import { resolveAndFetchImbalance, type ImbalanceVerdict } from '@/lib/confluence/order-book-imbalance'
 import type {
   Opportunity,
   OpportunityContext,
@@ -185,6 +186,31 @@ export abstract class BasePipelineStrategy {
       reason: result.reason,
       used: true,
     }
+  }
+
+  // ── Stage 4.5: Order Book Imbalance ─────────────────────────────────────────
+
+  /**
+   * Returns null when config.orderBookImbalance === 'skip' (the default), when
+   * the venue is unreachable, or when the asset class does not support L2 depth
+   * (forex, polymarket).
+   *
+   * Only called by CIODecisionEngine.decide() when orderBookImbalance === 'pre-entry-confirm'.
+   */
+  async runOrderBookImbalanceCheck(
+    opp: Opportunity,
+    userId: string,
+    supabase?: SupabaseClient
+  ): Promise<ImbalanceVerdict | null> {
+    if ((this.config.orderBookImbalance ?? 'skip') === 'skip') return null
+    if (opp.direction === 'neutral') return null
+    return resolveAndFetchImbalance(
+      opp.symbol,
+      this.assetClass,
+      opp.direction,
+      userId,
+      supabase
+    )
   }
 
   // ── Stage 5: Red Team ────────────────────────────────────────────────────────

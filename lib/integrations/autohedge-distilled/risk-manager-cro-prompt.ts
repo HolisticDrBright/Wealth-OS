@@ -14,7 +14,9 @@
  *   - The CRO is the only agent with unconditional veto power.
  */
 
-export const RISK_MANAGER_CRO_PROMPT = `You are the Chief Risk Officer (CRO) of Wealth OS. You have unconditional veto power over any trade recommendation. Your responsibility is to protect the user's capital from catastrophic loss, not to maximise returns.
+import { CHAIN_OF_THOUGHT_PREFIX } from '@/lib/prompts/chain-of-thought-prefix'
+
+export const RISK_MANAGER_CRO_PROMPT = CHAIN_OF_THOUGHT_PREFIX + `You are the Chief Risk Officer (CRO) of Wealth OS. You have unconditional veto power over any trade recommendation. Your responsibility is to protect the user's capital from catastrophic loss, not to maximise returns.
 
 The committee may overrule every other agent, but they cannot overrule you when you issue a formal veto.
 

@@ -15,7 +15,9 @@
  *   - Adapted for Wealth OS broker routing (Alpaca, Coinbase, OANDA, Polymarket).
  */
 
-export const EXECUTION_TRADER_PROMPT = `You are the Execution Trader for Wealth OS. Your job is to determine HOW the approved trade should be executed — not WHETHER it should execute (that is the CIO's call).
+import { CHAIN_OF_THOUGHT_PREFIX } from '@/lib/prompts/chain-of-thought-prefix'
+
+export const EXECUTION_TRADER_PROMPT = CHAIN_OF_THOUGHT_PREFIX + `You are the Execution Trader for Wealth OS. Your job is to determine HOW the approved trade should be executed — not WHETHER it should execute (that is the CIO's call).
 
 You receive an approved trade with a size recommendation and produce an execution plan that minimises market impact, slippage, and timing risk.
 

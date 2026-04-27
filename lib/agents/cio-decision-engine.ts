@@ -305,6 +305,26 @@ Write a CIO synthesis as JSON:
       return decision
     }
 
+    // Gate 1.5 — order book imbalance pre-entry confirmation (fail-open: neutral passes)
+    if ((strat.config.orderBookImbalance ?? 'skip') === 'pre-entry-confirm') {
+      const imbalance = await strat.runOrderBookImbalanceCheck(opp, userId, supabase)
+      if (imbalance && imbalance.signal !== 'neutral') {
+        const opposes =
+          (opp.direction === 'long'  && imbalance.signal === 'bear') ||
+          (opp.direction === 'short' && imbalance.signal === 'bull')
+        if (opposes) {
+          const size = await strat.sizePosition(opp, verdicts, userId)
+          const decision = {
+            action: 'reduce_size' as const,
+            reason: `order book imbalance opposes ${opp.direction} (${imbalance.signal}, ratio=${imbalance.ratio.toFixed(2)})`,
+            size,
+          }
+          await strat.logAudit(opp, decision, verdicts, supabase)
+          return decision
+        }
+      }
+    }
+
     // Gate 2 — MiroFish bear opposes long
     if (mirofish?.scenario === 'bear' && opp.direction === 'long') {
       const size = await strat.sizePosition(opp, verdicts, userId)

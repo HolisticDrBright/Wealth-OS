@@ -59,12 +59,16 @@ export type DefaultBroker =
   | 'binance_us' | 'oanda' | 'tastyfx' | 'polymarket'
 export type AssetClass = 'stocks' | 'options' | 'crypto' | 'forex' | 'polymarket' | 'multi-asset'
 
+export type OrderBookImbalanceTier = 'pre-entry-confirm' | 'skip'
+
 export interface StrategyAIConfig {
   mirofish: MiroFishTier
   kronos: KronosTier
   edgeType: EdgeType
   defaultBroker: DefaultBroker
   assetClass: AssetClass
+  /** Optional: 'pre-entry-confirm' runs the imbalance check before sizing. Default: 'skip'. */
+  orderBookImbalance?: OrderBookImbalanceTier
 }
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
@@ -74,6 +78,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   vcp_minervini: {
     mirofish: 'skip', kronos: 'high',
     edgeType: 'technical', defaultBroker: 'alpaca', assetClass: 'stocks',
+    orderBookImbalance: 'pre-entry-confirm',
   },
   quant_momentum: {
     mirofish: 'skip', kronos: 'high',
@@ -184,6 +189,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   pead: {
     mirofish: 'high', kronos: 'medium',
     edgeType: 'event', defaultBroker: 'alpaca', assetClass: 'stocks',
+    orderBookImbalance: 'pre-entry-confirm',
   },
 
   // ── MEDIUM — conditional on regime; Claude fallback is acceptable ─────────────
@@ -206,6 +212,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   onchain_signal: {
     mirofish: 'medium', kronos: 'high',
     edgeType: 'onchain', defaultBroker: 'coinbase', assetClass: 'crypto',
+    orderBookImbalance: 'pre-entry-confirm',
   },
   liquidation_hunting: {
     mirofish: 'medium', kronos: 'skip',
@@ -226,6 +233,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   gamma_exposure: {
     mirofish: 'medium', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'tastyfx', assetClass: 'options',
+    orderBookImbalance: 'pre-entry-confirm',
   },
   autopilot_congressional: {
     mirofish: 'medium', kronos: 'skip',
