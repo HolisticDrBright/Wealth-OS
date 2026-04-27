@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import { Plus, X, Calculator, TrendingUp, TrendingDown, Clock } from 'lucide-react'
+import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 
 interface OptionPos {
   id: string
@@ -273,6 +274,9 @@ export function OptionsClient({ initialPositions }: Props) {
           </div>
         )}
       </div>
+
+      {/* Strategies */}
+      <AssetStrategyPanel assetClasses={['options']} />
 
       {/* Greeks Calculator */}
       <div>

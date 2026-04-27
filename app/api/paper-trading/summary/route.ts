@@ -1,24 +1,32 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { PaperSummary } from '@/lib/paper-trading/types'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [{ data: closed }, { data: open }] = await Promise.all([
-    supabase
-      .from('paper_positions')
-      .select('realized_pnl_usd, strategy_key, exit_reason')
-      .eq('user_id', user.id)
-      .eq('status', 'closed'),
-    supabase
-      .from('paper_positions')
-      .select('unrealized_pnl_usd, strategy_key')
-      .eq('user_id', user.id)
-      .eq('status', 'open'),
-  ])
+  const assetClass = new URL(req.url).searchParams.get('assetClass')
+
+  let closedQuery = supabase
+    .from('paper_positions')
+    .select('realized_pnl_usd, strategy_key, exit_reason')
+    .eq('user_id', user.id)
+    .eq('status', 'closed')
+
+  let openQuery = supabase
+    .from('paper_positions')
+    .select('unrealized_pnl_usd, strategy_key')
+    .eq('user_id', user.id)
+    .eq('status', 'open')
+
+  if (assetClass) {
+    closedQuery = closedQuery.eq('asset_class', assetClass)
+    openQuery = openQuery.eq('asset_class', assetClass)
+  }
+
+  const [{ data: closed }, { data: open }] = await Promise.all([closedQuery, openQuery])
 
   const closedRows = closed ?? []
   const openRows   = open   ?? []

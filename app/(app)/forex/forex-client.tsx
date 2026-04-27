@@ -5,6 +5,7 @@ import { syncOandaPositions } from '@/lib/actions/forex'
 import type { ForexRate, ForexPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Globe, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
+import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 
 interface Props {
   initialRates: ForexRate[]
@@ -157,6 +158,9 @@ export function ForexClient({ initialRates, initialPositions }: Props) {
           </div>
         )}
       </div>
+
+      {/* Strategies */}
+      <AssetStrategyPanel assetClasses={['forex', 'multi-asset']} />
     </div>
   )
 }

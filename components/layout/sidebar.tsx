@@ -50,8 +50,6 @@ const navItems = [
   { href: '/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/strategies', label: 'Strategies', icon: BarChart2 },
   { href: '/options', label: 'Options', icon: Sigma },
-  // Paper Trading
-  { href: '/paper-trading', label: 'Paper Trading', icon: FlaskConical },
   // Automation
   { href: '/autopilot', label: 'Autopilot', icon: Zap },
   { href: '/autopilot/rules', label: 'Rules', icon: ListChecks },

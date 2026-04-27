@@ -5,6 +5,7 @@ import { syncKrakenBalances } from '@/lib/actions/crypto'
 import type { CryptoPortfolioPosition, CryptoPrice } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Bitcoin, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
+import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 
 interface Props {
   initialPortfolio: CryptoPortfolioPosition[]
@@ -157,6 +158,9 @@ export function CryptoClient({ initialPortfolio, initialPrices }: Props) {
           </div>
         )}
       </div>
+
+      {/* Strategies */}
+      <AssetStrategyPanel assetClasses={['crypto']} />
     </div>
   )
 }
