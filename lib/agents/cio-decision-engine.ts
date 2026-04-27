@@ -3,8 +3,6 @@ import { miroFishClient, simulateWithClaude } from './mirofish-client'
 import { renderDecisionNote } from '../vault/templates'
 import { writeFile } from '../vault/client'
 import { DIRECTOR_CIO_PROMPT } from '@/lib/integrations/autohedge-distilled/director-cio-prompt'
-
-const USE_AUTOHEDGE_DISTILLED = process.env.USE_AUTOHEDGE_DISTILLED_PROMPTS === 'true'
 import {
   OrchestratorAgent,
   ClientProfileAgent,
@@ -21,6 +19,7 @@ import {
 } from './agents/all-agents'
 import Anthropic from '@anthropic-ai/sdk'
 
+const USE_AUTOHEDGE_DISTILLED = process.env.USE_AUTOHEDGE_DISTILLED_PROMPTS === 'true'
 const anthropic = new Anthropic()
 
 // ─── Tier definitions for parallel execution ──────────────────────────────
