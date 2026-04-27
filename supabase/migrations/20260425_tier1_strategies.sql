@@ -283,5 +283,22 @@ CREATE INDEX IF NOT EXISTS user_watchlist_user_idx
 
 -- ─── 10. Realtime ─────────────────────────────────────────────────────────────
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.kronos_forecasts;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.user_enabled_strategies;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'kronos_forecasts'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.kronos_forecasts;
+  END IF;
+END$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'user_enabled_strategies'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.user_enabled_strategies;
+  END IF;
+END$$;
