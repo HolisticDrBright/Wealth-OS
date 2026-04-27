@@ -70,6 +70,10 @@ export interface StrategyAIConfig {
   assetClass: AssetClass
   /** Optional: 'pre-entry-confirm' runs the imbalance check before sizing. Default: 'skip'. */
   orderBookImbalance?: OrderBookImbalanceTier
+  /** Env vars that must be set for this strategy to produce signals at all. */
+  requiredEnv?: string[]
+  /** Env vars that enhance signals but the strategy runs without them. */
+  optionalEnv?: string[]
 }
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
@@ -80,14 +84,17 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'skip', kronos: 'high',
     edgeType: 'technical', defaultBroker: 'alpaca', assetClass: 'stocks',
     orderBookImbalance: 'pre-entry-confirm',
+    optionalEnv: ['POLYGON_API_KEY'],
   },
   quant_momentum: {
     mirofish: 'skip', kronos: 'high',
     edgeType: 'technical', defaultBroker: 'alpaca', assetClass: 'stocks',
+    optionalEnv: ['POLYGON_API_KEY'],
   },
   qvm_multifactor: {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'fundamental', defaultBroker: 'ibkr', assetClass: 'stocks',
+    optionalEnv: ['POLYGON_API_KEY'],
   },
   dividend_aristocrat: {
     mirofish: 'skip', kronos: 'skip',
@@ -96,6 +103,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   options_wheel: {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'tastyfx', assetClass: 'options',
+    optionalEnv: ['POLYGON_API_KEY'],
   },
   funding_basis_arb: {
     mirofish: 'skip', kronos: 'skip',
@@ -104,22 +112,27 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   ict_smc: {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'technical', defaultBroker: 'oanda', assetClass: 'forex',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   session_breakout: {
     mirofish: 'skip', kronos: 'high',
     edgeType: 'technical', defaultBroker: 'oanda', assetClass: 'forex',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   fx_trendfollowing: {
     mirofish: 'skip', kronos: 'high',
     edgeType: 'technical', defaultBroker: 'oanda', assetClass: 'forex',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   triangular_arb: {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'kraken', assetClass: 'crypto',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   correlation_divergence: {
     mirofish: 'skip', kronos: 'medium',
     edgeType: 'structural', defaultBroker: 'ibkr', assetClass: 'multi-asset',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   memecoin_bondingcurve: {
     mirofish: 'skip', kronos: 'skip',
@@ -170,10 +183,12 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   macro_news_event: {
     mirofish: 'high', kronos: 'skip',
     edgeType: 'macro', defaultBroker: 'ibkr', assetClass: 'multi-asset',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   cb_divergence: {
     mirofish: 'high', kronos: 'skip',
     edgeType: 'macro', defaultBroker: 'oanda', assetClass: 'forex',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   narrative_rotation: {
     mirofish: 'high', kronos: 'medium',
@@ -191,6 +206,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'high', kronos: 'medium',
     edgeType: 'event', defaultBroker: 'alpaca', assetClass: 'stocks',
     orderBookImbalance: 'pre-entry-confirm',
+    optionalEnv: ['FINNHUB_API_KEY'],
   },
 
   // ── MEDIUM — conditional on regime; Claude fallback is acceptable ─────────────
@@ -205,6 +221,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   dca_halving: {
     mirofish: 'medium', kronos: 'medium',
     edgeType: 'onchain', defaultBroker: 'coinbase', assetClass: 'crypto',
+    optionalEnv: ['GLASSNODE_API_KEY'],
   },
   defi_yield: {
     mirofish: 'medium', kronos: 'skip',
@@ -214,6 +231,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'medium', kronos: 'high',
     edgeType: 'onchain', defaultBroker: 'coinbase', assetClass: 'crypto',
     orderBookImbalance: 'pre-entry-confirm',
+    requiredEnv: ['GLASSNODE_API_KEY'],
   },
   liquidation_hunting: {
     mirofish: 'medium', kronos: 'skip',
@@ -226,6 +244,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   carry_trade: {
     mirofish: 'medium', kronos: 'skip',
     edgeType: 'macro', defaultBroker: 'oanda', assetClass: 'forex',
+    requiredEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
   },
   cot_positioning: {
     mirofish: 'medium', kronos: 'skip',
@@ -235,10 +254,12 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'medium', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'tastyfx', assetClass: 'options',
     orderBookImbalance: 'pre-entry-confirm',
+    optionalEnv: ['POLYGON_API_KEY'],
   },
   autopilot_congressional: {
     mirofish: 'medium', kronos: 'skip',
     edgeType: 'flow', defaultBroker: 'alpaca', assetClass: 'stocks',
+    optionalEnv: ['QUIVER_QUANT_API_KEY'],
   },
   cex_latency_arb: {
     mirofish: 'skip', kronos: 'skip',

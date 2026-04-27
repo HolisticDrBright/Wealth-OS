@@ -46,6 +46,8 @@ export async function GET(req: NextRequest) {
       isEnabled: enabledMap.get(key)?.is_enabled ?? false,
       allocationPct: enabledMap.get(key)?.allocation_pct ?? null,
       paperEnabled: enabledMap.get(key)?.paper_enabled ?? false,
+      missingRequired: (cfg.requiredEnv ?? []).filter(v => !process.env[v]),
+      missingOptional: (cfg.optionalEnv ?? []).filter(v => !process.env[v]),
     }))
 
   return NextResponse.json({ strategies })

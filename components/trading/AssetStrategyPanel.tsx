@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Play, RefreshCw, TrendingUp, TrendingDown, Clock, FlaskConical, Zap, Fish, Atom } from 'lucide-react'
+import { Play, RefreshCw, TrendingUp, TrendingDown, Clock, FlaskConical, Zap, Fish, Atom, AlertTriangle, Info } from 'lucide-react'
 import type { StrategyKey, AssetClass, MiroFishTier, KronosTier } from '@/lib/strategies/strategy-registry'
 import type { PaperSummary } from '@/lib/paper-trading/types'
 
@@ -15,6 +15,8 @@ interface StrategyRow {
   mirofish: MiroFishTier
   kronos: KronosTier
   paperEnabled: boolean
+  missingRequired: string[]
+  missingOptional: string[]
 }
 
 interface Position {
@@ -55,6 +57,26 @@ function timeAgo(iso: string) {
   if (s < 60) return `${s}s ago`
   if (s < 3600) return `${Math.floor(s / 60)}m ago`
   return `${Math.floor(s / 3600)}h ago`
+}
+
+function ApiWarning({ missingRequired, missingOptional }: { missingRequired: string[]; missingOptional: string[] }) {
+  if (missingRequired.length === 0 && missingOptional.length === 0) return null
+
+  if (missingRequired.length > 0) {
+    const tip = `Needs ${missingRequired.join(', ')} — strategy will return no signals without it`
+    return (
+      <span title={tip} className="shrink-0 cursor-help">
+        <AlertTriangle className="h-3.5 w-3.5 text-orange-400" />
+      </span>
+    )
+  }
+
+  const tip = `Add ${missingOptional.join(', ')} for full signals (runs with reduced data without it)`
+  return (
+    <span title={tip} className="shrink-0 cursor-help">
+      <Info className="h-3.5 w-3.5 text-yellow-500/70" />
+    </span>
+  )
 }
 
 function AiTierBadge({ tier, label, icon }: { tier: MiroFishTier | KronosTier; label: string; icon: React.ReactNode }) {
@@ -107,7 +129,7 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
   useEffect(() => {
     fetch('/api/users/me/strategies')
       .then(r => r.json())
-      .then((data: { strategies: (StrategyRow & { mirofish: MiroFishTier; kronos: KronosTier })[] }) => {
+      .then((data: { strategies: StrategyRow[] }) => {
         setStrategies((data.strategies ?? []).filter(s => assetClasses.includes(s.assetClass)))
       })
     void loadPositions()
@@ -229,11 +251,14 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
                     <AiTierBadge tier={s.mirofish} label="MF" icon={<Fish className="h-2.5 w-2.5" />} />
                     <AiTierBadge tier={s.kronos} label="KR" icon={<Atom className="h-2.5 w-2.5" />} />
                   </div>
-                  <PaperToggle
-                    enabled={s.paperEnabled}
-                    onChange={() => void togglePaper(s.strategyKey, s.paperEnabled)}
-                    disabled={toggling === s.strategyKey}
-                  />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <ApiWarning missingRequired={s.missingRequired ?? []} missingOptional={s.missingOptional ?? []} />
+                    <PaperToggle
+                      enabled={s.paperEnabled}
+                      onChange={() => void togglePaper(s.strategyKey, s.paperEnabled)}
+                      disabled={toggling === s.strategyKey}
+                    />
+                  </div>
                 </div>
               ))}
               {strategies.length === 0 && (
