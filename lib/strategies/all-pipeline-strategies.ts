@@ -54,6 +54,7 @@ import {
 // ── Polymarket: concrete implementations ──────────────────────────────────────
 import { PolymarketWalletCopyStrategy } from './impl/polymarket/polymarket-wallet-copy'
 import { PolymarketInfoLagStrategy } from './impl/polymarket/polymarket-info-lag'
+import { PolymarketCryptoBinary5MinStrategy } from './impl/polymarket/polymarket-crypto-binary-5min'
 
 // ── Polymarket stubs ──────────────────────────────────────────────────────────
 import {
@@ -114,6 +115,7 @@ const ALL_STRATEGIES = [
   new PolymarketLiquidityPocketStrategy(),
   new PolymarketNoTradeStrategy(),
   new PolymarketWalletCopyStrategy(),
+  new PolymarketCryptoBinary5MinStrategy(),
 ]
 
 for (const s of ALL_STRATEGIES) {

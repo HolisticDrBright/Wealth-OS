@@ -69,8 +69,9 @@ export const STRATEGY_AI_CONFIG: Record<string, StrategyAIConfig> = {
   social_sentiment:           { mirofish: 'medium', kronos: 'skip'  },
 
   // ── Prediction market ─────────────────────────────────────────────────────
-  polymarket_arbitrage:       { mirofish: 'high',   kronos: 'skip'  },
-  prediction_market:          { mirofish: 'high',   kronos: 'skip'  },
+  polymarket_arbitrage:              { mirofish: 'high',   kronos: 'skip'  },
+  prediction_market:                 { mirofish: 'high',   kronos: 'skip'  },
+  polymarket_crypto_binary_5min:     { mirofish: 'medium', kronos: 'skip'  },
 
   // ── Copy trading ─────────────────────────────────────────────────────────
   copy_trade:                 { mirofish: 'high',   kronos: 'warn'  },

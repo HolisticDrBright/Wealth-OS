@@ -18,6 +18,7 @@ import type { OpportunityContext, Opportunity } from '@/lib/strategies/pipeline-
 
 import { PolymarketWalletCopyStrategy } from '@/lib/strategies/impl/polymarket/polymarket-wallet-copy'
 import { PolymarketInfoLagStrategy } from '@/lib/strategies/impl/polymarket/polymarket-info-lag'
+import { PolymarketCryptoBinary5MinStrategy } from '@/lib/strategies/impl/polymarket/polymarket-crypto-binary-5min'
 import { AutopilotCongressionalStrategy } from '@/lib/strategies/impl/stocks/autopilot-congressional'
 import { DcaHalvingStrategy } from '@/lib/strategies/impl/crypto/dca-halving'
 import { FundingBasisArbStrategy } from '@/lib/strategies/impl/crypto/funding-basis-arb'
@@ -86,6 +87,7 @@ async function getHistoricalClose(symbol: string, date: Date): Promise<number | 
 const HOLD_DAYS: Record<string, number> = {
   polymarket_wallet_copy: 3,
   polymarket_info_lag: 1,
+  polymarket_crypto_binary_5min: 0,  // intra-window; exits before resolution
   autopilot_congressional: 90,
   dca_halving: 30,
   funding_basis_arb: 1,
@@ -212,6 +214,7 @@ export async function runTier1Backtest(days = 90): Promise<{
   const strategies = [
     new PolymarketWalletCopyStrategy(),
     new PolymarketInfoLagStrategy(),
+    new PolymarketCryptoBinary5MinStrategy(),
     new AutopilotCongressionalStrategy(),
     new DcaHalvingStrategy(),
     new FundingBasisArbStrategy(),

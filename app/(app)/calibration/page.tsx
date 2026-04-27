@@ -350,6 +350,90 @@ export default async function CalibrationPage() {
             Check back here after the paper trading window closes.
           </p>
         </section>
+
+        {/* ── Polymarket Binary 5-Min — 90-day Brier gate ─────────────────── */}
+        <section className="mt-10 border-t border-gray-800 pt-8">
+          <h2 className="text-lg font-semibold mb-1">
+            Polymarket Crypto Binary 5-Min — Promotion Gate
+          </h2>
+          <p className="text-xs text-gray-500 mb-4">
+            This strategy is subject to a 90-day Brier-score confirmation gate before position sizing
+            may exceed 2% of portfolio. MiroFish is only activated for high-conviction entries
+            (off-chain deviation ≥ $100). Kronos is skipped per the AI matrix.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 space-y-2">
+              <p className="font-medium text-sm">30-Day Paper Trade Gate</p>
+              <p className="text-xs text-gray-500">Must pass before live execution</p>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between text-gray-400">
+                  <span>Win rate requirement</span>
+                  <span className="text-gray-300 font-mono">&gt; 55%</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Sharpe (approx) requirement</span>
+                  <span className="text-gray-300 font-mono">&gt; 1.5</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t border-gray-800 pt-1">
+                  <span className="text-gray-300">Gate status</span>
+                  <span className="text-gray-600">Collecting</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 space-y-2">
+              <p className="font-medium text-sm">90-Day Brier Confirmation</p>
+              <p className="text-xs text-gray-500">Required before scaling above 2%</p>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between text-gray-400">
+                  <span>Target Brier score</span>
+                  <span className="text-gray-300 font-mono">&lt; 0.15</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Min samples</span>
+                  <span className="text-gray-300 font-mono">50 entries</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Current Brier</span>
+                  <span className="text-gray-600">—</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t border-gray-800 pt-1">
+                  <span className="text-gray-300">Max size until confirmed</span>
+                  <span className="text-yellow-400 font-mono">0.5%</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 space-y-2">
+              <p className="font-medium text-sm">Oracle Lag Edge Decay</p>
+              <p className="text-xs text-gray-500">Monitor for edge erosion as arb closes</p>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between text-gray-400">
+                  <span>Avg deviation at entry (30d)</span>
+                  <span className="text-gray-600">—</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Avg lag closed before exit (30d)</span>
+                  <span className="text-gray-600">—</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t border-gray-800 pt-1">
+                  <span className="text-gray-300">Edge alert threshold</span>
+                  <span className="text-gray-300 font-mono">&lt; $30 avg dev</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600">
+                If avg entry deviation drops below $30 for 14 consecutive days, strategy is auto-paused.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-600 mt-4">
+            Max position cap: <code className="bg-gray-800 px-1 rounded">0.5% (hard-coded)</code> until 90-day Brier confirms
+            accuracy. The promotion gate runs automatically via the tier1 backtest runner. Do not
+            manually override the cap before the 90-day window closes.
+          </p>
+        </section>
       </div>
     </div>
   )

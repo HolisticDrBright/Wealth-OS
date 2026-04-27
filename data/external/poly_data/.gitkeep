@@ -1,0 +1,11 @@
+# warproxxx/poly_data snapshot directory
+#
+# Add the submodule then run the snapshot download:
+#   git submodule add https://github.com/warproxxx/poly_data data/external/poly_data
+#   cd data/external/poly_data && python download_snapshot.py
+#
+# Expected layout after download:
+#   data/external/poly_data/
+#     markets/           — markets.csv  (condition_id, question, end_date, …)
+#     order_events/      — {condition_id}.csv  (ts, side, price, size, …)
+#     trades/            — {condition_id}.csv  (ts, price, size, maker_side, …)

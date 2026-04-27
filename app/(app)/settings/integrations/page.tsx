@@ -10,6 +10,12 @@ import { ExternalLink, CheckCircle2, XCircle, AlertCircle, RefreshCw } from 'luc
 interface IntegrationHealth {
   status: 'ok' | 'degraded' | 'down' | 'unknown'
   latencyMs?: number
+  // Polymarket-engine specific
+  walletConnected?: boolean
+  lastTradeAt?: string | null
+  trades30d?: number
+  avgPnl30d?: number | null
+  brierScore30d?: number | null
 }
 
 interface Integration {
@@ -82,6 +88,27 @@ const INTEGRATIONS: Integration[] = [
     costNote: 'Free. Reduces Claude API costs during development by compressing context.',
   },
   {
+    id: 'polymarket_engine',
+    name: 'Polymarket Trade Engine',
+    tagline: 'Oracle-lag execution for BTC/ETH/SOL binary price markets',
+    description:
+      'KaustubhPatange/polymarket-trade-engine: Python REST wrapper around the Polymarket CLOB API. '
+      + 'Powers the polymarket_crypto_binary_5min strategy — places limit orders, detects fills, '
+      + 'pre-arms exit at 0.75, and hard-exits 15s before window close. '
+      + 'Runs as a local HTTP sidecar on port 7432. Requires a funded Polymarket wallet (MATIC).',
+    githubUrl: 'https://github.com/KaustubhPatange/polymarket-trade-engine',
+    docsUrl: '/docs/external/polymarket-engine-audit.md',
+    type: 'docker_service',
+    deploymentNote:
+      'pip install -r requirements.txt && python -m polymarket_engine --port 7432 --private-key $POLYMARKET_PRIVATE_KEY. '
+      + 'Add POLYMARKET_ENGINE_URL=http://localhost:7432 and POLYMARKET_PRIVATE_KEY to .env.local. '
+      + 'Wallet must hold MATIC for gas and USDC.e for position funding.',
+    featureKey: 'polymarket_engine',
+    enabledInStrategies: ['polymarket_crypto_binary_5min'],
+    costNote: '$0.05/order call (compute estimate). Default $5/month budget cap.',
+    checkHealthUrl: '/api/integrations/polymarket-engine/health',
+  },
+  {
     id: 'fincept',
     name: 'Fincept Terminal',
     tagline: 'Manual research companion (standalone desktop app)',
@@ -121,10 +148,22 @@ export default function IntegrationsPage() {
     setChecking(integration.id)
     try {
       const res = await fetch(integration.checkHealthUrl)
-      const data = await res.json() as { status: string; latencyMs?: number }
+      const data = await res.json() as {
+        status: string; latencyMs?: number;
+        walletConnected?: boolean; lastTradeAt?: string | null;
+        trades30d?: number; avgPnl30d?: number | null; brierScore30d?: number | null
+      }
       setHealth(prev => ({
         ...prev,
-        [integration.id]: { status: (data.status as IntegrationHealth['status']) ?? 'unknown', latencyMs: data.latencyMs },
+        [integration.id]: {
+          status: (data.status as IntegrationHealth['status']) ?? 'unknown',
+          latencyMs: data.latencyMs,
+          walletConnected: data.walletConnected,
+          lastTradeAt: data.lastTradeAt,
+          trades30d: data.trades30d,
+          avgPnl30d: data.avgPnl30d,
+          brierScore30d: data.brierScore30d,
+        },
       }))
     } catch {
       setHealth(prev => ({ ...prev, [integration.id]: { status: 'down' } }))
@@ -148,7 +187,7 @@ export default function IntegrationsPage() {
 
       <div className="p-6 max-w-4xl mx-auto space-y-4">
         <p className="text-sm text-muted-foreground">
-          5 integrations configured. All paid-path integrations route through the{' '}
+          6 integrations configured. All paid-path integrations route through the{' '}
           <span className="font-mono text-xs bg-muted px-1 rounded">FeatureFlagService</span>{' '}
           budget gate. Every integration degrades gracefully when unreachable.
         </p>
@@ -218,6 +257,34 @@ export default function IntegrationsPage() {
                     </span>
                   )}
                 </div>
+
+                {/* Polymarket-engine extended health stats */}
+                {integration.id === 'polymarket_engine' && h.status !== 'unknown' && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                    <div className="bg-muted/30 rounded p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Wallet</p>
+                      <p className={`text-xs font-semibold ${h.walletConnected ? 'text-green-400' : 'text-red-400'}`}>
+                        {h.walletConnected == null ? '—' : h.walletConnected ? 'Connected' : 'Disconnected'}
+                      </p>
+                    </div>
+                    <div className="bg-muted/30 rounded p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Trades (30d)</p>
+                      <p className="text-xs font-semibold text-foreground">{h.trades30d ?? '—'}</p>
+                    </div>
+                    <div className="bg-muted/30 rounded p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg PnL (30d)</p>
+                      <p className={`text-xs font-semibold ${h.avgPnl30d == null ? 'text-muted-foreground' : h.avgPnl30d >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {h.avgPnl30d == null ? '—' : `${(h.avgPnl30d * 100).toFixed(1)}%`}
+                      </p>
+                    </div>
+                    <div className="bg-muted/30 rounded p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Brier (30d)</p>
+                      <p className={`text-xs font-semibold ${h.brierScore30d == null ? 'text-muted-foreground' : h.brierScore30d < 0.10 ? 'text-green-400' : h.brierScore30d < 0.20 ? 'text-yellow-400' : 'text-red-400'}`}>
+                        {h.brierScore30d == null ? '—' : h.brierScore30d.toFixed(3)}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )

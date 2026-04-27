@@ -47,6 +47,7 @@ export type StrategyKey =
   | 'polymarket_liquidity_pocket'
   | 'polymarket_no_trade'
   | 'polymarket_wallet_copy'
+  | 'polymarket_crypto_binary_5min'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -155,6 +156,10 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   polymarket_wallet_copy: {
     mirofish: 'high', kronos: 'skip',
     edgeType: 'flow', defaultBroker: 'polymarket', assetClass: 'polymarket',
+  },
+  polymarket_crypto_binary_5min: {
+    mirofish: 'medium', kronos: 'skip',
+    edgeType: 'information', defaultBroker: 'polymarket', assetClass: 'polymarket',
   },
   macro_news_event: {
     mirofish: 'high', kronos: 'skip',
