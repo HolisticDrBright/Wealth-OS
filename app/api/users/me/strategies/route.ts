@@ -23,13 +23,13 @@ export async function GET(req: NextRequest) {
 
   const { data: userRows } = await supabase
     .from('user_enabled_strategies')
-    .select('strategy_key, is_enabled, allocation_pct, paper_enabled')
+    .select('strategy_key, is_enabled, paper_enabled')
     .eq('user_id', userId)
 
   const enabledMap = new Map(
     (userRows ?? []).map(r => [r.strategy_key as StrategyKey, {
       is_enabled: r.is_enabled,
-      allocation_pct: r.allocation_pct,
+      allocation_pct: null,
       paper_enabled: r.paper_enabled,
     }])
   )
@@ -77,11 +77,6 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'is_enabled or paper_enabled (boolean) is required' }, { status: 400 })
   }
 
-  if (body.allocation_pct !== undefined) {
-    if (body.allocation_pct < 0 || body.allocation_pct > 100) {
-      return NextResponse.json({ error: 'allocation_pct must be 0–100' }, { status: 400 })
-    }
-  }
 
   const now = new Date().toISOString()
 
@@ -101,7 +96,6 @@ export async function PUT(req: NextRequest) {
   const updateFields: Record<string, unknown> = { updated_at: now }
   if (typeof body.is_enabled === 'boolean')    updateFields.is_enabled    = body.is_enabled
   if (typeof body.paper_enabled === 'boolean') updateFields.paper_enabled = body.paper_enabled
-  if (body.allocation_pct !== undefined)       updateFields.allocation_pct = body.allocation_pct ?? null
 
   const { error } = await supabase
     .from('user_enabled_strategies')
