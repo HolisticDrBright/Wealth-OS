@@ -92,7 +92,10 @@ export async function PUT(req: NextRequest) {
       { user_id: userId, strategy_key: body.strategy_key, is_enabled: false, paper_enabled: false, updated_at: now },
       { onConflict: 'user_id,strategy_key', ignoreDuplicates: true }
     )
-  if (ensureError) return NextResponse.json({ error: ensureError.message }, { status: 500 })
+  if (ensureError) {
+    console.error('[strategies PUT] ensure error:', ensureError)
+    return NextResponse.json({ error: ensureError.message }, { status: 500 })
+  }
 
   // Step 2: update only the specific fields being changed
   const updateFields: Record<string, unknown> = { updated_at: now }
@@ -106,7 +109,10 @@ export async function PUT(req: NextRequest) {
     .eq('user_id', userId)
     .eq('strategy_key', body.strategy_key as string)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('[strategies PUT] update error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({
     strategyKey: body.strategy_key,
