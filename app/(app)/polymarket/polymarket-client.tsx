@@ -21,6 +21,7 @@ import type { PolymarketAnalysis } from '@/lib/agents/agents/polymarket-intellig
 import { recordPolyTradeAction } from '@/lib/actions/polymarket'
 import { Brain, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 
 type Tab = 'markets' | 'signals' | 'positions' | 'whale' | 'entropy'
 
@@ -207,6 +208,11 @@ export function PolymarketClient({
           {tab === 'whale'     && <WhalePlaceholder />}
           {tab === 'entropy'   && <EntropyPlaceholder />}
         </div>
+      </div>
+
+      {/* Paper trading toggles */}
+      <div className="px-6 pb-6">
+        <AssetStrategyPanel assetClasses={['polymarket']} />
       </div>
     </div>
   )

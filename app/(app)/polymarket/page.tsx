@@ -10,6 +10,7 @@ import {
 } from '@/lib/meta-poly/client'
 import { PolymarketClient } from './polymarket-client'
 import { Topbar } from '@/components/layout/topbar'
+import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 import { Terminal, ExternalLink } from 'lucide-react'
 
 export default async function PolymarketPage() {
@@ -103,6 +104,11 @@ function SetupGuide({ errorCode, errorMessage }: { errorCode: string; errorMessa
             setup guide <ExternalLink className="h-3 w-3" />
           </a>
         </div>
+      </div>
+
+      {/* Paper trading toggles — available even when sidecar is offline */}
+      <div className="px-6 pb-6">
+        <AssetStrategyPanel assetClasses={['polymarket']} />
       </div>
     </div>
   )

@@ -19,9 +19,10 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Info, Camera, MessageCircle, X, Send, Bot } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Wallet, ArrowUpRight, ArrowDownRight, Info, Camera, MessageCircle, X, Send, Bot, FlaskConical } from 'lucide-react'
 import { snapshotNetWorth } from '@/lib/actions/networth'
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -438,6 +439,9 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
 
       <PortfolioChat />
 
+      {/* Paper Positions overview */}
+      <PaperPositionsCard />
+
       {/* Research Terminal card — Fincept Terminal */}
       <Card className="border-border/40 bg-muted/20">
         <CardContent className="flex items-center justify-between p-4">
@@ -466,5 +470,112 @@ export function DashboardClient({ assets, transactions, netWorthHistory, isDemo 
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+// ─── Paper Positions Card ────────────────────────────────────────────────────
+
+interface PaperPos {
+  id: string
+  strategy_key: string
+  symbol: string
+  side: string
+  quantity: number
+  entry_price: number
+  current_price: number | null
+  unrealized_pnl: number | null
+  asset_class: string
+}
+
+const ASSET_PAGE: Record<string, string> = {
+  crypto: '/crypto',
+  forex: '/forex',
+  options: '/options',
+  polymarket: '/polymarket',
+  stocks: '/portfolio',
+  'multi-asset': '/crypto',
+}
+
+function PaperPositionsCard() {
+  const [positions, setPositions] = useState<PaperPos[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/paper-trading/positions')
+      if (!res.ok) return
+      const data = await res.json()
+      setPositions(data.openPositions ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  return (
+    <Card className="border-border/40 bg-muted/20">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-indigo-400" />
+            <CardTitle className="text-sm font-medium">Paper Positions</CardTitle>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {loading ? '…' : positions.length} open
+          </Badge>
+        </div>
+        <CardDescription className="text-xs">
+          Simulated trades across all asset classes
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {loading ? (
+          <p className="text-xs text-muted-foreground py-4 text-center">Loading…</p>
+        ) : positions.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <p className="text-xs text-muted-foreground">No open paper positions</p>
+            <p className="text-xs text-muted-foreground/60">
+              Enable Paper switches on the{' '}
+              <Link href="/crypto" className="text-primary hover:underline">Crypto</Link>,{' '}
+              <Link href="/forex" className="text-primary hover:underline">Forex</Link>, or{' '}
+              <Link href="/options" className="text-primary hover:underline">Options</Link> pages, then run a pass.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {positions.slice(0, 8).map(pos => {
+              const pnl = pos.unrealized_pnl ?? 0
+              const page = ASSET_PAGE[pos.asset_class] ?? '/crypto'
+              return (
+                <div key={pos.id} className="flex items-center justify-between text-xs rounded-lg border border-border/40 bg-background/40 px-3 py-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Link href={page} className="font-mono font-medium text-foreground hover:text-primary truncate">
+                      {pos.symbol}
+                    </Link>
+                    <span className={`px-1.5 py-0.5 rounded-full font-medium ${
+                      pos.side === 'long' ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
+                    }`}>
+                      {pos.side.toUpperCase()}
+                    </span>
+                    <span className="text-muted-foreground truncate hidden sm:block">
+                      {pos.strategy_key.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <span className={`font-mono font-semibold shrink-0 ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                  </span>
+                </div>
+              )
+            })}
+            {positions.length > 8 && (
+              <p className="text-xs text-muted-foreground text-center pt-1">
+                +{positions.length - 8} more — view on asset pages
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
