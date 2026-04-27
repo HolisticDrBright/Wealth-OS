@@ -17,7 +17,7 @@ VALUES
     'and analyst reports. Provides structured summaries for pead, spinoff, merger_arb, '
     'qvm_multifactor strategies. Runs as HTTP sidecar on DEXTER_URL (default localhost:7433). '
     'Requires Python: pip install dexter-research.',
-    'ai_inference',
+    'ai_confluence',
     0.05,    -- $0.05 per research call (1 LLM call approx)
     'call',
     1.50     -- $1.50 default monthly budget cap
@@ -104,35 +104,61 @@ CREATE TABLE IF NOT EXISTS public.cex_latency_arb_paper_trades (
 CREATE INDEX IF NOT EXISTS cex_paper_trades_symbol_idx
   ON public.cex_latency_arb_paper_trades(symbol, detected_at DESC);
 
--- ─── 4. user_enabled_strategies ─────────────────────────────────────────────
+-- ─── 4. user_enabled_strategies — extend existing table ─────────────────────
 --
--- Tracks which users have explicitly opted into non-default strategies.
--- cex_latency_arb is default-disabled and requires a row here to activate.
+-- This table was created in 20260425_tier1_strategies.sql with `is_enabled`.
+-- Here we add the extra columns needed for cex_latency_arb opt-in tracking.
+-- All statements are idempotent.
 --
-CREATE TABLE IF NOT EXISTS public.user_enabled_strategies (
-  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at   timestamptz DEFAULT now(),
-  user_id      uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  strategy_key text NOT NULL,
-  enabled      boolean NOT NULL DEFAULT true,
-  enabled_by   text DEFAULT 'user',  -- 'user' | 'admin' | 'onboarding'
-  notes        text,
-  UNIQUE (user_id, strategy_key)
-);
+ALTER TABLE public.user_enabled_strategies
+  ADD COLUMN IF NOT EXISTS enabled_by text DEFAULT 'user',
+  ADD COLUMN IF NOT EXISTS notes      text;
 
-ALTER TABLE public.user_enabled_strategies ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "users read own strategy settings"
-  ON public.user_enabled_strategies FOR SELECT
-  USING (auth.uid() = user_id);
-CREATE POLICY "users manage own strategy settings"
-  ON public.user_enabled_strategies FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "users update own strategy settings"
-  ON public.user_enabled_strategies FOR UPDATE
-  USING (auth.uid() = user_id);
-CREATE POLICY "service role manages strategy settings"
-  ON public.user_enabled_strategies FOR ALL
-  USING (auth.role() = 'service_role');
+-- Normalise column name: add `enabled` as alias where only `is_enabled` existed.
+-- If this table was freshly created (no prior migration), add the canonical column.
+ALTER TABLE public.user_enabled_strategies
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
+
+-- Unique constraint (tier1 migration omitted it)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'user_enabled_strategies_user_id_strategy_key_key'
+      AND conrelid = 'public.user_enabled_strategies'::regclass
+  ) THEN
+    ALTER TABLE public.user_enabled_strategies
+      ADD CONSTRAINT user_enabled_strategies_user_id_strategy_key_key
+      UNIQUE (user_id, strategy_key);
+  END IF;
+END$$;
+
+-- Additional RLS policies for cex_latency_arb opt-in path
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'user_enabled_strategies'
+      AND policyname = 'users read own strategy settings'
+  ) THEN
+    CREATE POLICY "users read own strategy settings"
+      ON public.user_enabled_strategies FOR SELECT
+      USING (auth.uid() = user_id);
+  END IF;
+END$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'user_enabled_strategies'
+      AND policyname = 'service role manages strategy settings'
+  ) THEN
+    CREATE POLICY "service role manages strategy settings"
+      ON public.user_enabled_strategies FOR ALL
+      USING (auth.role() = 'service_role');
+  END IF;
+END$$;
 
 CREATE INDEX IF NOT EXISTS user_enabled_strategies_idx
   ON public.user_enabled_strategies(user_id, strategy_key)
