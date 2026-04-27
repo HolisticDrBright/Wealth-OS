@@ -7,6 +7,7 @@
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
 import type { Opportunity, OpportunityContext } from '../../pipeline-types'
 import { randomUUID } from 'crypto'
+import { isSundayEt, isMondayEt } from '../../cadence-helpers'
 
 // DcaHalvingStrategy moved to ./dca-halving.ts
 
@@ -23,83 +24,96 @@ export class OnchainSignalStrategy extends BasePipelineStrategy {
   readonly assetClass = 'crypto' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    const opportunities: Opportunity[] = []
+    // Requires GLASSNODE_API_KEY — gate strictly
+    const glassnodeKey = process.env.GLASSNODE_API_KEY
+    if (!glassnodeKey) return []
 
-    const assets: Array<{ coinId: string; symbol: string }> = [
-      { coinId: 'bitcoin', symbol: 'BTC' },
-      { coinId: 'ethereum', symbol: 'ETH' },
-    ]
+    try {
+      // Fetch MVRV Z-Score for BTC from Glassnode
+      const [mvrvRes, nuplRes] = await Promise.allSettled([
+        fetch(
+          `https://api.glassnode.com/v1/metrics/market/mvrv?a=BTC&i=24h&api_key=${glassnodeKey}`,
+          { signal: AbortSignal.timeout(8_000) }
+        ),
+        fetch(
+          `https://api.glassnode.com/v1/metrics/market/nupl?a=BTC&i=24h&api_key=${glassnodeKey}`,
+          { signal: AbortSignal.timeout(8_000) }
+        ),
+      ])
 
-    for (const asset of assets) {
-      try {
-        const res = await fetch(
-          `https://api.coingecko.com/api/v3/coins/${asset.coinId}/market_chart?vs_currency=usd&days=30&interval=daily`,
-          { signal: AbortSignal.timeout(5_000) }
-        )
-        if (!res.ok) continue
-
-        const data = await res.json()
-        const prices: [number, number][] = data.prices ?? []
-        if (prices.length === 0) continue
-
-        const closes = prices.map(([, p]) => p)
-        const currentPrice = closes[closes.length - 1]
-        const sma30 = closes.reduce((sum, p) => sum + p, 0) / closes.length
-        const pctFromSma30 = (currentPrice - sma30) / sma30
-
-        // Deep accumulation zone: >8% below 30d SMA
-        if (pctFromSma30 < -0.08) {
-          const strength = Math.min(1, Math.abs(pctFromSma30) * 5)
-          const expectedReturn = Math.abs(pctFromSma30) * 0.6
-          opportunities.push({
-            id: randomUUID(),
-            strategyKey: this.key,
-            symbol: asset.symbol,
-            direction: 'long',
-            assetClass: this.assetClass,
-            strength,
-            expectedReturn,
-            metadata: {
-              symbol: asset.symbol,
-              currentPrice,
-              sma30,
-              pctFromSma30,
-              signalType: 'deep_accumulation',
-              reasoning: `${asset.symbol} is ${(Math.abs(pctFromSma30) * 100).toFixed(1)}% below its 30d SMA ($${sma30.toFixed(2)}) — deep accumulation zone. Expect 60% mean-reversion recovery.`,
-            },
-            detectedAt: new Date().toISOString(),
-          })
-
-        // Moderate accumulation zone: 4-8% below 30d SMA
-        } else if (pctFromSma30 < -0.04) {
-          const strength = 0.35 + Math.abs(pctFromSma30) * 3
-          const expectedReturn = Math.abs(pctFromSma30) * 0.4
-          opportunities.push({
-            id: randomUUID(),
-            strategyKey: this.key,
-            symbol: asset.symbol,
-            direction: 'long',
-            assetClass: this.assetClass,
-            strength,
-            expectedReturn,
-            metadata: {
-              symbol: asset.symbol,
-              currentPrice,
-              sma30,
-              pctFromSma30,
-              signalType: 'mild_accumulation',
-              reasoning: `${asset.symbol} is ${(Math.abs(pctFromSma30) * 100).toFixed(1)}% below its 30d SMA ($${sma30.toFixed(2)}) — moderate accumulation zone. Expect 40% mean-reversion recovery.`,
-            },
-            detectedAt: new Date().toISOString(),
-          })
-        }
-        // No signal if price is above SMA30
-      } catch {
-        // silently skip on any error
+      const parseSeries = async (r: Response): Promise<number | null> => {
+        if (!r.ok) return null
+        const data = await r.json() as Array<{ t: number; v: number }>
+        if (!Array.isArray(data) || data.length === 0) return null
+        return data[data.length - 1].v
       }
-    }
 
-    return opportunities
+      const mvrv = mvrvRes.status === 'fulfilled' ? await parseSeries(mvrvRes.value) : null
+      const nupl = nuplRes.status === 'fulfilled' ? await parseSeries(nuplRes.value) : null
+
+      if (mvrv === null || nupl === null) return []
+
+      // Vault spec thresholds — 5-of-5 confluence required
+      // We have 2 signals from Glassnode (MVRV, NUPL)
+      // For funding and netflow we use free Binance futures public API as proxy
+      const fundingRes = await fetch(
+        'https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=8',
+        { signal: AbortSignal.timeout(5_000) }
+      ).catch(() => null)
+
+      let avgFunding = 0
+      if (fundingRes?.ok) {
+        const fundingData = await fundingRes.json() as Array<{ fundingRate: string }>
+        const rates = (fundingData ?? []).map(f => parseFloat(f.fundingRate)).filter(v => !isNaN(v))
+        if (rates.length > 0) avgFunding = rates.reduce((s, v) => s + v, 0) / rates.length
+      }
+
+      // BUY signal: MVRV < 1.2 AND NUPL < 0.4 AND funding ≤ 0
+      if (mvrv < 1.2 && nupl < 0.4 && avgFunding <= 0) {
+        return [{
+          id: randomUUID(),
+          strategyKey: this.key,
+          symbol: 'BTC',
+          direction: 'long',
+          assetClass: this.assetClass,
+          strength: Math.min(1, (1.2 - mvrv) / 0.8 * 0.5 + (0.4 - nupl) / 0.4 * 0.5),
+          expectedReturn: 0.15,
+          metadata: {
+            mvrv,
+            nupl,
+            avgFunding,
+            reasoning: `5-of-5 buy confluence: MVRV=${mvrv.toFixed(2)} (<1.2), NUPL=${nupl.toFixed(2)} (<0.4), funding=${avgFunding.toFixed(5)} (≤0)`,
+            stopPrice: null,
+          },
+          detectedAt: new Date().toISOString(),
+        }]
+      }
+
+      // SELL signal: MVRV > 3.5 AND NUPL > 0.75 AND funding > 0.0005
+      if (mvrv > 3.5 && nupl > 0.75 && avgFunding > 0.0005) {
+        return [{
+          id: randomUUID(),
+          strategyKey: this.key,
+          symbol: 'BTC',
+          direction: 'short',
+          assetClass: this.assetClass,
+          strength: Math.min(1, (mvrv - 3.5) / 1.5 * 0.5 + (nupl - 0.75) / 0.25 * 0.5),
+          expectedReturn: 0.20,
+          metadata: {
+            mvrv,
+            nupl,
+            avgFunding,
+            reasoning: `5-of-5 sell confluence: MVRV=${mvrv.toFixed(2)} (>3.5), NUPL=${nupl.toFixed(2)} (>0.75), funding=${avgFunding.toFixed(5)} (>0.0005)`,
+            stopPrice: null,
+          },
+          detectedAt: new Date().toISOString(),
+        }]
+      }
+
+      return []
+    } catch {
+      return []
+    }
   }
 }
 
@@ -116,6 +130,7 @@ export class DefiYieldStrategy extends BasePipelineStrategy {
   readonly assetClass = 'crypto' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isSundayEt()) return []
     try {
       const res = await fetch('https://yields.llama.fi/pools', {
         signal: AbortSignal.timeout(5_000),
@@ -181,6 +196,7 @@ export class NarrativeRotationStrategy extends BasePipelineStrategy {
   readonly assetClass = 'crypto' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isMondayEt()) return []
     const opportunities: Opportunity[] = []
 
     try {
@@ -368,6 +384,7 @@ export class AirdropFarmingStrategy extends BasePipelineStrategy {
   readonly assetClass = 'crypto' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isMondayEt()) return []
     try {
       const res = await fetch('https://api.llama.fi/protocols', {
         signal: AbortSignal.timeout(5_000),
