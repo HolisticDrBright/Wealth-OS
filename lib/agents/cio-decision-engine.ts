@@ -285,7 +285,8 @@ Write a CIO synthesis as JSON:
     opp: import('@/lib/strategies/pipeline-types').Opportunity,
     userId: string,
     supabase: import('@supabase/supabase-js').SupabaseClient,
-    cache?: import('@/lib/brokers/BrokerFactory').BrokerCache
+    cache?: import('@/lib/brokers/BrokerFactory').BrokerCache,
+    options?: { paperMode?: boolean }
   ): Promise<import('@/lib/strategies/pipeline-types').Decision> {
     const { strategyRegistry } = await import('@/lib/strategies/all-pipeline-strategies')
     const strat = strategyRegistry.get(opp.strategyKey)
@@ -352,9 +353,12 @@ Write a CIO synthesis as JSON:
     const size = await strat.sizePosition(opp, verdicts, userId)
     const decision = { action: 'execute' as const, size }
     await strat.logAudit(opp, decision, verdicts, supabase)
-    strat.execute(opp, size, userId, supabase, cache).catch(err =>
-      console.error(`[CIO] execute failed for ${opp.symbol}:`, err)
-    )
+    // In paper mode the caller (PaperTradeRunner) handles the fill — skip real broker
+    if (!options?.paperMode) {
+      strat.execute(opp, size, userId, supabase, cache).catch(err =>
+        console.error(`[CIO] execute failed for ${opp.symbol}:`, err)
+      )
+    }
     return decision
 
     void edge  // referenced for audit trail completeness
