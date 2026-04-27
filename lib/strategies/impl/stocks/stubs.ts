@@ -5,6 +5,14 @@
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
 import type { Opportunity, OpportunityContext } from '../../pipeline-types'
 import { randomUUID } from 'crypto'
+import {
+  isFirstBusinessDayOfQuarter,
+  isFirstBusinessDayOfMonth,
+  isSundayEod,
+  isMondayEt,
+  hourEt,
+  dowEt,
+} from '../../cadence-helpers'
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -54,6 +62,7 @@ export class QuantMomentumStrategy extends BasePipelineStrategy {
   readonly assetClass = 'stocks' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isFirstBusinessDayOfQuarter()) return []
     try {
       const results = await Promise.allSettled(
         QM_WATCHLIST.map(async (ticker) => {
@@ -106,6 +115,7 @@ export class QvmMultifactorStrategy extends BasePipelineStrategy {
   readonly assetClass = 'stocks' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isFirstBusinessDayOfQuarter()) return []
     try {
       const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${QVM_WATCHLIST.join(',')}`
       const res = await fetch(url, { signal: AbortSignal.timeout(6_000) })
@@ -163,6 +173,7 @@ export class DividendAristocratStrategy extends BasePipelineStrategy {
   readonly assetClass = 'stocks' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isFirstBusinessDayOfQuarter()) return []
     try {
       const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ARISTOCRATS.join(',')}`
       const res = await fetch(url, { signal: AbortSignal.timeout(6_000) })
@@ -215,6 +226,7 @@ export class SectorRotationStrategy extends BasePipelineStrategy {
   readonly assetClass = 'stocks' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isFirstBusinessDayOfMonth()) return []
     try {
       const results = await Promise.allSettled(
         SECTOR_ETFS.map(async (ticker) => {
@@ -342,6 +354,9 @@ export class OptionsWheelStrategy extends BasePipelineStrategy {
   readonly assetClass = 'options' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    const h = hourEt()
+    const dow = dowEt()
+    if (!(isSundayEod(18) || (dow === 1 && h < 9))) return []
     try {
       const results = await Promise.allSettled(
         WHEEL_WATCHLIST.map(async (ticker) => {
@@ -393,6 +408,8 @@ export class GammaExposureStrategy extends BasePipelineStrategy {
   readonly assetClass = 'options' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    const h = hourEt()
+    if (h < 8 || h >= 16) return []
     try {
       const data = await fetchChart('%5EVIX', '60d')
       const closes = getCloses(data)
@@ -514,6 +531,7 @@ export class SpinoffStrategy extends BasePipelineStrategy {
   readonly assetClass = 'stocks' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    if (!isMondayEt()) return []
     try {
       const results = await Promise.allSettled(
         SPINOFFS.map(async ({ ticker, spinoffDate }) => {
@@ -567,6 +585,11 @@ export class TailRiskHedgingStrategy extends BasePipelineStrategy {
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
     try {
+      const vixData = await fetchChart('%5EVIX', '5d')
+      const vixClosesGate = getCloses(vixData)
+      const currentVixGate = vixClosesGate.length > 0 ? vixClosesGate[vixClosesGate.length - 1] : 0
+      if (!isSundayEod(18) && currentVixGate <= 30) return []
+
       const [vixResult, spyResult] = await Promise.allSettled([
         fetchChart('%5EVIX', '30d'),
         fetchChart('SPY', '30d'),
