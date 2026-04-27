@@ -119,6 +119,117 @@ const INTEGRATIONS: Integration[] = [
     deploymentNote: 'Install separately: Windows (MSI), macOS (DMG), Linux (AppImage). See README § Fincept Terminal.',
     costNote: 'Free and open source.',
   },
+  {
+    id: 'openbb',
+    name: 'OpenBB Platform',
+    tagline: 'Open-source investment research terminal',
+    description:
+      'OpenBB-finance/OpenBBTerminal: 200+ data connectors (SEC EDGAR, FRED, Yahoo Finance, Quandl, Intrinio, EOD, Tiingo, etc.). '
+      + 'Use as a manual research companion alongside Wealth OS automated strategies. The OpenBB Copilot integration (AI assistant) can be pointed at a local Claude endpoint. '
+      + 'Primary use case: ad-hoc research, portfolio attribution analysis, strategy hypothesis testing before committing to automated runs.',
+    githubUrl: 'https://github.com/OpenBB-finance/OpenBBTerminal',
+    docsUrl: 'https://docs.openbb.co/platform',
+    type: 'external_app',
+    deploymentNote:
+      'pip install openbb. Launch: openbb. For Hub integration: openbb.account.login(). '
+      + 'Standalone — no Wealth OS .env config needed unless wiring Copilot to local Claude.',
+    costNote: 'Free open source core. Premium data connectors use your own API keys (Bloomberg, Refinitiv, etc.).',
+  },
+  {
+    id: 'polygon_l2',
+    name: 'Polygon L2 Order Book',
+    tagline: 'Real-time level-2 order book snapshots for OBI confluence',
+    description:
+      'Polygon.io WebSocket L2 snapshots powering the order book imbalance (OBI) confluence gate (Stage 4.5 in the strategy pipeline). '
+      + 'Strategies vcp_minervini, pead, gamma_exposure, and onchain_signal use OBI as a pre-entry confirmation: '
+      + 'if the order book opposes the trade direction (bid/ask ratio < 0.55 for longs, > 1.8 for shorts), the CIO engine emits reduce_size. '
+      + 'Falls back to IEX Deep for stocks; skipped for forex and polymarket assets.',
+    githubUrl: 'https://github.com/polygon-io/client-js',
+    type: 'mcp_server',
+    deploymentNote:
+      'Set POLYGON_API_KEY in .env.local (Starter plan or above for L2 data). '
+      + 'IEX fallback requires IEX_API_KEY. OBI is fail-open: if both sources are unreachable, the strategy proceeds normally.',
+    featureKey: 'polygon_l2',
+    enabledInStrategies: ['vcp_minervini', 'pead', 'gamma_exposure', 'onchain_signal'],
+    costNote: '$0.001/snapshot call. Default $5/month budget cap. Falls back to iex_deep (free tier) when budget exhausted.',
+  },
+  {
+    id: 'dexter_research',
+    name: 'Dexter — SEC & Earnings Researcher',
+    tagline: 'Autonomous researcher over SEC EDGAR, earnings transcripts, analyst reports',
+    description:
+      'virattt/dexter: Python LLM agent that reads SEC filings (10-K, 10-Q, 8-K), earnings call transcripts, '
+      + 'and analyst reports. Returns structured summaries for use in pead, spinoff, merger_arb, and qvm_multifactor strategies. '
+      + 'Runs as an HTTP sidecar on port 7433 (DEXTER_URL). Results are cached 24h in dexter_research_cache to minimise repeat LLM calls.',
+    githubUrl: 'https://github.com/virattt/dexter',
+    type: 'docker_service',
+    deploymentNote:
+      'pip install dexter-research && python -m dexter --port 7433. '
+      + 'Set DEXTER_URL=http://localhost:7433 and OPENAI_API_KEY (or ANTHROPIC_API_KEY) in .env.local. '
+      + 'Requires EDGAR_FULL_TEXT_SEARCH_API key for full-text EDGAR search (free at efts.sec.gov).',
+    featureKey: 'dexter_research',
+    enabledInStrategies: ['pead', 'spinoff', 'merger_arb', 'qvm_multifactor'],
+    costNote: '$0.05/research call (approx 1 LLM call). Default $1.50/month budget cap.',
+  },
+  {
+    id: 'financial_datasets_mcp',
+    name: 'Financial Datasets MCP',
+    tagline: 'Typed financial statement data via MCP protocol',
+    description:
+      'financial-datasets/mcp-server: second MCP source alongside Vibe-Trading. Provides typed financial data: '
+      + 'income statements, balance sheets, cash flows, SEC filings, historical prices, and earnings estimates. '
+      + 'Free tier covers most strategy needs; premium endpoints (institutional ownership, analyst estimates) require FINANCIAL_DATASETS_API_KEY. '
+      + 'Tool manifest mapped to: pead (earnings), qvm_multifactor (statements), merger_arb (SEC filings), vcp_minervini (price history).',
+    githubUrl: 'https://github.com/financial-datasets/mcp-server',
+    type: 'mcp_server',
+    deploymentNote:
+      'npx @financial-datasets/mcp-server --port 8766. '
+      + 'Set FINANCIAL_DATASETS_MCP_URL=http://localhost:8766 in .env.local. '
+      + 'Optional: FINANCIAL_DATASETS_API_KEY for premium endpoints (institutional ownership, analyst estimates).',
+    featureKey: 'financial_datasets_mcp',
+    enabledInStrategies: ['pead', 'qvm_multifactor', 'merger_arb', 'vcp_minervini'],
+    costNote: 'Free tier: $0/call. Premium tier: ~$15/month subscription. Free tier sufficient for most strategies.',
+  },
+  {
+    id: 'crucix',
+    name: 'Crucix On-Chain Whale Aggregator',
+    tagline: 'Polygon whale wallet movements with 85% labeled-actor coverage',
+    description:
+      'Polygon-native whale wallet movement tracker used as supplementary signal for onchain_signal and polymarket_wallet_copy strategies. '
+      + 'Covers ~85% of known actors (CEX hot wallets, Polymarket LPs, MEV bots) vs ~40% for direct Polygonscan queries. '
+      + 'Wired as confirmation signal: CIO increases size +15% on agreement with strategy direction, reduces -25% on contradiction. '
+      + 'See docs/external/crucix-evaluation.md for full coverage comparison and re-evaluation triggers.',
+    githubUrl: 'https://github.com/crucix-io/crucix',
+    docsUrl: '/docs/external/crucix-evaluation.md',
+    type: 'mcp_server',
+    deploymentNote:
+      'REST API — no self-hosting required. Set CRUCIX_API_KEY in .env.local (free tier: 1,000 req/day; premium for higher limits). '
+      + 'Free tier is sufficient for ≤10 symbols monitored at 15-min intervals.',
+    featureKey: 'crucix',
+    enabledInStrategies: ['onchain_signal', 'polymarket_wallet_copy'],
+    costNote: 'Free tier: $0 (1,000 req/day). Premium tier: contact Crucix for pricing.',
+  },
+  {
+    id: 'cex_latency_arb',
+    name: 'CEX Latency Arb',
+    tagline: 'Cross-venue BTC/ETH/SOL spread capture (paper trade gate)',
+    description:
+      'Structural delta-neutral strategy that buys at the cheaper venue and sells at the more expensive venue when the spread exceeds 8 bps net of fees. '
+      + 'Monitors Coinbase, Kraken, and Binance.US in parallel. Max 0.25% per leg (0.5% combined). Hard exit at 5 minutes. '
+      + 'DEFAULT DISABLED — requires explicit opt-in via user_enabled_strategies. '
+      + 'PAPER TRADE GATE: 30-day mandatory paper-trade window before live capital. Promotion requires Sharpe > 1.5 AND max drawdown < 5%. '
+      + 'See docs/external/cex-latency-arb-audit.md for risk assessment and known limitations (REST polling captures lags >200ms only).',
+    githubUrl: 'https://github.com/anthropics/claude-code',
+    docsUrl: '/docs/external/cex-latency-arb-audit.md',
+    type: 'external_app',
+    deploymentNote:
+      'No external sidecar required — strategy polls Coinbase, Kraken, and Binance.US public REST APIs directly. '
+      + 'Set COINBASE_API_KEY, KRAKEN_API_KEY, BINANCE_US_API_KEY in .env.local for order placement. '
+      + 'Enable via Settings → Strategies → CEX Latency Arb toggle (requires user_enabled_strategies opt-in).',
+    featureKey: undefined,
+    enabledInStrategies: ['cex_latency_arb'],
+    costNote: 'No integration cost. Trading fees: ~10 bps round-trip per pair (Coinbase 5bps + Kraken 5bps). Min threshold: 8 bps net.',
+  },
 ]
 
 function StatusBadge({ status }: { status: IntegrationHealth['status'] }) {
@@ -187,7 +298,7 @@ export default function IntegrationsPage() {
 
       <div className="p-6 max-w-4xl mx-auto space-y-4">
         <p className="text-sm text-muted-foreground">
-          6 integrations configured. All paid-path integrations route through the{' '}
+          12 integrations configured. All paid-path integrations route through the{' '}
           <span className="font-mono text-xs bg-muted px-1 rounded">FeatureFlagService</span>{' '}
           budget gate. Every integration degrades gracefully when unreachable.
         </p>

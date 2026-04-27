@@ -48,6 +48,7 @@ export type StrategyKey =
   | 'polymarket_no_trade'
   | 'polymarket_wallet_copy'
   | 'polymarket_crypto_binary_5min'
+  | 'cex_latency_arb'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -238,6 +239,10 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   autopilot_congressional: {
     mirofish: 'medium', kronos: 'skip',
     edgeType: 'flow', defaultBroker: 'alpaca', assetClass: 'stocks',
+  },
+  cex_latency_arb: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'coinbase', assetClass: 'crypto',
   },
 }
 

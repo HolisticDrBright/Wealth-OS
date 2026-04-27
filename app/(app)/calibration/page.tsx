@@ -351,6 +351,116 @@ export default async function CalibrationPage() {
           </p>
         </section>
 
+        {/* ── B8: Order Book Imbalance A/B lift ────────────────────────────── */}
+        <section className="mt-10 border-t border-gray-800 pt-8">
+          <h2 className="text-lg font-semibold mb-1">Order Book Imbalance Gate Lift</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Strategies with <code className="bg-gray-800 px-1 rounded">orderBookImbalance: pre-entry-confirm</code>{' '}
+            are A/B tracked: trades where the gate passed vs. trades where it would have blocked.
+            Populates after 30 days. Negative lift = disable the gate for that strategy.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { name: 'VCP Minervini', key: 'vcp_minervini', venue: 'Polygon L2 / IEX Deep' },
+              { name: 'PEAD', key: 'pead', venue: 'Polygon L2 / IEX Deep' },
+              { name: 'Onchain Signal', key: 'onchain_signal', venue: 'Binance REST' },
+            ].map(({ name, venue }) => (
+              <div key={name} className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium text-sm">{name}</p>
+                    <p className="text-xs text-gray-500">{venue}</p>
+                  </div>
+                  <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">Collecting</span>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-gray-400">
+                    <span>Gate passed trades</span>
+                    <span className="text-gray-600">— bps (n=0)</span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Gate blocked trades</span>
+                    <span className="text-gray-600">— bps (n=0)</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t border-gray-800 pt-1">
+                    <span className="text-gray-300">Net lift (after data cost)</span>
+                    <span className="text-gray-600">—</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── B8: Dexter Research lift ──────────────────────────────────────── */}
+        <section className="mt-10 border-t border-gray-800 pt-8">
+          <h2 className="text-lg font-semibold mb-1">Dexter Research Lift</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Tracks decision quality (CIO score delta) on trades where Dexter SEC filing context
+            was attached vs. trades without it. Requires dexter_research feature flag enabled and
+            DEXTER_URL configured.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { name: 'PEAD', key: 'pead', forms: '10-Q, 8-K, earnings transcript' },
+              { name: 'Spinoff Alpha', key: 'spinoff', forms: '10-K, 14A, Form 10-12B' },
+            ].map(({ name, forms }) => (
+              <div key={name} className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium text-sm">{name}</p>
+                    <p className="text-xs text-gray-500">Filing types: {forms}</p>
+                  </div>
+                  <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">Collecting</span>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-gray-400">
+                    <span>With Dexter context</span>
+                    <span className="text-gray-600">— avg CIO score (n=0)</span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Without Dexter context</span>
+                    <span className="text-gray-600">— avg CIO score (n=0)</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t border-gray-800 pt-1">
+                    <span className="text-gray-300">Decision quality delta</span>
+                    <span className="text-gray-600">—</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600">Cost: $0.05/call. Budget: $1.50/month default.</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── B8: CEX Latency Arb paper-trade gate ─────────────────────────── */}
+        <section className="mt-10 border-t border-gray-800 pt-8">
+          <h2 className="text-lg font-semibold mb-1">CEX Latency Arb — Paper Trade Gate</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Default-disabled strategy. Must complete 30-day paper trade with Sharpe &gt; 1.5 and
+            max drawdown &lt; 5% before live capital. Leg risk mitigation (fill confirmation) must
+            also be implemented. See <code className="bg-gray-800 px-1 rounded">docs/external/cex-latency-arb-audit.md</code>.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Paper trades (30d)', value: '—' },
+              { label: 'Sharpe (target >1.5)', value: '—' },
+              { label: 'Max DD (target <5%)', value: '—' },
+              { label: 'Leg risk events', value: '—' },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-xl border border-gray-800 bg-gray-900/60 p-3 text-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</p>
+                <p className="text-sm font-semibold text-gray-400 mt-1">{value}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-600 mt-3">
+            Enable paper trading: add <code className="bg-gray-800 px-1 rounded">cex_latency_arb</code> to{' '}
+            <code className="bg-gray-800 px-1 rounded">user_enabled_strategies</code> with{' '}
+            <code className="bg-gray-800 px-1 rounded">enabled_by = &apos;admin&apos;</code>.
+          </p>
+        </section>
+
         {/* ── Polymarket Binary 5-Min — 90-day Brier gate ─────────────────── */}
         <section className="mt-10 border-t border-gray-800 pt-8">
           <h2 className="text-lg font-semibold mb-1">

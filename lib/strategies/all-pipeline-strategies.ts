@@ -27,6 +27,7 @@ import {
 // ── Crypto: concrete implementations ─────────────────────────────────────────
 import { FundingBasisArbStrategy } from './impl/crypto/funding-basis-arb'
 import { DcaHalvingStrategy } from './impl/crypto/dca-halving'
+import { CexLatencyArbStrategy } from './impl/crypto/cex-latency-arb'
 
 // ── Crypto stubs ──────────────────────────────────────────────────────────────
 import {
@@ -84,9 +85,10 @@ const ALL_STRATEGIES = [
   new TailRiskHedgingStrategy(),
   new AutopilotCongressionalStrategy(),
 
-  // Crypto (8)
+  // Crypto (9)
   new DcaHalvingStrategy(),
   new FundingBasisArbStrategy(),
+  new CexLatencyArbStrategy(),
   new OnchainSignalStrategy(),
   new DefiYieldStrategy(),
   new NarrativeRotationStrategy(),
