@@ -23,11 +23,15 @@ export async function GET(req: NextRequest) {
 
   const { data: userRows } = await supabase
     .from('user_enabled_strategies')
-    .select('strategy_key, is_enabled, allocation_pct')
+    .select('strategy_key, is_enabled, allocation_pct, paper_enabled')
     .eq('user_id', userId)
 
   const enabledMap = new Map(
-    (userRows ?? []).map(r => [r.strategy_key as StrategyKey, { is_enabled: r.is_enabled, allocation_pct: r.allocation_pct }])
+    (userRows ?? []).map(r => [r.strategy_key as StrategyKey, {
+      is_enabled: r.is_enabled,
+      allocation_pct: r.allocation_pct,
+      paper_enabled: r.paper_enabled,
+    }])
   )
 
   const strategies = (Object.entries(STRATEGY_REGISTRY_CONFIG) as [StrategyKey, typeof STRATEGY_REGISTRY_CONFIG[StrategyKey]][])
@@ -41,6 +45,7 @@ export async function GET(req: NextRequest) {
       defaultBroker: cfg.defaultBroker,
       isEnabled: enabledMap.get(key)?.is_enabled ?? false,
       allocationPct: enabledMap.get(key)?.allocation_pct ?? null,
+      paperEnabled: enabledMap.get(key)?.paper_enabled ?? false,
     }))
 
   return NextResponse.json({ strategies })
@@ -58,6 +63,7 @@ export async function PUT(req: NextRequest) {
     strategy_key?: string
     is_enabled?: boolean
     allocation_pct?: number
+    paper_enabled?: boolean
   }
 
   if (!body.strategy_key || !isStrategyKey(body.strategy_key)) {
@@ -67,8 +73,8 @@ export async function PUT(req: NextRequest) {
     )
   }
 
-  if (typeof body.is_enabled !== 'boolean') {
-    return NextResponse.json({ error: 'is_enabled (boolean) is required' }, { status: 400 })
+  if (typeof body.is_enabled !== 'boolean' && typeof body.paper_enabled !== 'boolean') {
+    return NextResponse.json({ error: 'is_enabled or paper_enabled (boolean) is required' }, { status: 400 })
   }
 
   if (body.allocation_pct !== undefined) {
@@ -86,6 +92,7 @@ export async function PUT(req: NextRequest) {
         strategy_key: body.strategy_key,
         is_enabled: body.is_enabled,
         allocation_pct: body.allocation_pct ?? null,
+        paper_enabled: body.paper_enabled ?? null,
         updated_at: now,
       },
       { onConflict: 'user_id,strategy_key' }
@@ -97,6 +104,7 @@ export async function PUT(req: NextRequest) {
     strategyKey: body.strategy_key,
     isEnabled: body.is_enabled,
     allocationPct: body.allocation_pct ?? null,
+    paperEnabled: body.paper_enabled ?? null,
     updatedAt: now,
   })
 }

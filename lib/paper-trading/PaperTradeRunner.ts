@@ -17,7 +17,8 @@ const broker = new PaperBroker()
  */
 export async function runPaperTradingPass(
   userId: string,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  enabledKeys?: string[]
 ): Promise<PaperRunResult> {
   const runAt = new Date().toISOString()
   const errors: string[] = []
@@ -38,12 +39,16 @@ export async function runPaperTradingPass(
     metadata: {
       userId,
       // Pass all keys so default-disabled strategies (cex_latency_arb) run in paper mode
-      userEnabledStrategies: allStrategyKeys,
+      userEnabledStrategies: enabledKeys ?? allStrategyKeys,
     },
   }
 
+  const strategiesToRun = enabledKeys
+    ? ALL_STRATEGIES.filter(s => enabledKeys.includes(s.key))
+    : ALL_STRATEGIES
+
   // Step 3–5 — detect → decide → fill
-  for (const strategy of ALL_STRATEGIES) {
+  for (const strategy of strategiesToRun) {
     let opps: Awaited<ReturnType<typeof strategy.detectOpportunities>> = []
     try {
       opps = await strategy.detectOpportunities(ctx)
@@ -76,7 +81,7 @@ export async function runPaperTradingPass(
 
   return {
     runAt,
-    strategiesRun:    ALL_STRATEGIES.length,
+    strategiesRun:    strategiesToRun.length,
     opportunitiesFound,
     decisionsExecute,
     decisionsBlock,
