@@ -53,9 +53,10 @@ CREATE TABLE IF NOT EXISTS public.news_sentiment (
 );
 
 ALTER TABLE public.news_sentiment ENABLE ROW LEVEL SECURITY;
--- Authenticated users can read all sentiment (no PII)
+DROP POLICY IF EXISTS "authenticated users read sentiment" ON public.news_sentiment;
 CREATE POLICY "authenticated users read sentiment"
   ON public.news_sentiment FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "service role manages sentiment" ON public.news_sentiment;
 CREATE POLICY "service role manages sentiment"
   ON public.news_sentiment FOR ALL USING (auth.role() = 'service_role');
 
@@ -94,8 +95,10 @@ CREATE TABLE IF NOT EXISTS public.user_telemetry_events (
 );
 
 ALTER TABLE public.user_telemetry_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users insert own telemetry" ON public.user_telemetry_events;
 CREATE POLICY "users insert own telemetry"
   ON public.user_telemetry_events FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "service role reads telemetry" ON public.user_telemetry_events;
 CREATE POLICY "service role reads telemetry"
   ON public.user_telemetry_events FOR SELECT USING (auth.role() = 'service_role');
 
@@ -121,8 +124,10 @@ CREATE TABLE IF NOT EXISTS public.agent_performance_logs (
 );
 
 ALTER TABLE public.agent_performance_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users read own performance logs" ON public.agent_performance_logs;
 CREATE POLICY "users read own performance logs"
   ON public.agent_performance_logs FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "service role manages performance logs" ON public.agent_performance_logs;
 CREATE POLICY "service role manages performance logs"
   ON public.agent_performance_logs FOR ALL USING (auth.role() = 'service_role');
 

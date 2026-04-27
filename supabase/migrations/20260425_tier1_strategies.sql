@@ -34,7 +34,8 @@ ALTER TABLE public.audit_logs
   ADD COLUMN IF NOT EXISTS kronos_used    boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS decision       text,
   ADD COLUMN IF NOT EXISTS size_fraction  numeric,
-  ADD COLUMN IF NOT EXISTS decided_at     timestamptz DEFAULT now();
+  ADD COLUMN IF NOT EXISTS decided_at     timestamptz DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS metadata       jsonb DEFAULT '{}';
 
 CREATE INDEX IF NOT EXISTS audit_logs_strategy_key_idx
   ON public.audit_logs(strategy_key, decided_at DESC);

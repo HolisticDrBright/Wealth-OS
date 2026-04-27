@@ -75,9 +75,11 @@ CREATE TABLE IF NOT EXISTS public.polymarket_engine_fills (
 );
 
 ALTER TABLE public.polymarket_engine_fills ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users read own fills" ON public.polymarket_engine_fills;
 CREATE POLICY "users read own fills"
   ON public.polymarket_engine_fills FOR SELECT
   USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "service role manages fills" ON public.polymarket_engine_fills;
 CREATE POLICY "service role manages fills"
   ON public.polymarket_engine_fills FOR ALL
   USING (auth.role() = 'service_role');
