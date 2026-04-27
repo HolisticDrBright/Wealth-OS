@@ -7,6 +7,9 @@
 
 -- ─── 1. paper_positions ──────────────────────────────────────────────────────
 
+DROP TABLE IF EXISTS public.paper_trades CASCADE;
+DROP TABLE IF EXISTS public.paper_positions CASCADE;
+
 CREATE TABLE IF NOT EXISTS public.paper_positions (
   id                 uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   opened_at          timestamptz NOT NULL DEFAULT now(),
