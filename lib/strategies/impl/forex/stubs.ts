@@ -1,12 +1,12 @@
 /**
  * Full signal implementations for all 9 forex/multi-asset strategies.
- * OANDA v20 for price data (gated via oandaEnabled()), CFTC.gov for COT (free).
+ * Candle data: OANDA v20 when configured, Yahoo Finance free fallback otherwise.
  */
 
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
 import type { Opportunity, OpportunityContext } from '../../pipeline-types'
 import { randomUUID } from 'crypto'
-import { getCandles, getBidAsk, oandaEnabled } from '../../../oanda-client'
+import { getCandles, getBidAsk } from '../../../oanda-client'
 import type { OandaCandle } from '../../../oanda-client'
 import {
   isFridayEod,
@@ -69,7 +69,7 @@ export class IctSmcStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     if (!isInKillZone()) return []
 
     const results: Opportunity[] = []
@@ -157,7 +157,7 @@ export class CarryTradeStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     if (!isFridayEod()) return []
 
     try {
@@ -309,7 +309,7 @@ export class CbDivergenceStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     if (!hasCbMeetingWithin7Days()) return []
 
     try {
@@ -358,7 +358,7 @@ export class SessionBreakoutStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     if (!isLondonOpen(15)) return []
     if (isHighImpactNewsDay()) return []
 
@@ -429,7 +429,7 @@ export class FxTrendfollowingStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     if (!isNyCloseWindow()) return []
 
     const results: Opportunity[] = []
@@ -496,7 +496,7 @@ export class MacroNewsEventStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     if (!isHighImpactNewsDay()) return []
     // Post-release window: 8:35–10:30 ET
     const totalMin = hourEt() * 60 + minuteEt()
@@ -552,7 +552,7 @@ export class TriangularArbStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     try {
       const [eurusd, gbpusd, eurgbp] = await Promise.all([
         getBidAsk('EUR_USD'),
@@ -632,7 +632,7 @@ export class CorrelationDivergenceStrategy extends BasePipelineStrategy {
   readonly assetClass = 'multi-asset' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!oandaEnabled()) return []
+
     if (!isNyCloseWindow()) return []
 
     const results: Opportunity[] = []

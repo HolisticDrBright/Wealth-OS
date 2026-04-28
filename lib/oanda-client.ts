@@ -38,7 +38,6 @@ export async function getPricing(instruments: string[]): Promise<OandaPrice[]> {
   return (data.prices ?? []).map(p => {
     const bid = parseFloat(p.bids?.[0]?.price ?? '0')
     const ask = parseFloat(p.asks?.[0]?.price ?? '0')
-    // Spread in pips (4th decimal for most pairs, 2nd for JPY)
     const pipSize = p.instrument.includes('JPY') ? 0.01 : 0.0001
     return { instrument: p.instrument, bid, ask, spread_pips: (ask - bid) / pipSize }
   })
@@ -107,17 +106,134 @@ export interface OandaCandle {
   complete: boolean
 }
 
+// ─── Yahoo Finance forex fallback ─────────────────────────────────────────────
+
+/** Convert OANDA instrument (EUR_USD) to Yahoo Finance ticker (EURUSD=X). */
+function toYahooFxTicker(instrument: string): string {
+  return instrument.replace('_', '') + '=X'
+}
+
+const YF_INTERVAL: Record<string, string> = {
+  M1: '1m', M5: '5m', M15: '15m', H1: '1h', H4: '1h', D: '1d',
+}
+// Yahoo Finance range that gives enough bars for each granularity
+const YF_RANGE: Record<string, string> = {
+  M1: '1d', M5: '5d', M15: '5d', H1: '60d', H4: '60d', D: '2y',
+}
+
+async function getYahooForexCandles(
+  instrument: string,
+  granularity: 'M1' | 'M5' | 'M15' | 'H1' | 'H4' | 'D',
+  count: number
+): Promise<OandaCandle[]> {
+  try {
+    const ticker   = toYahooFxTicker(instrument)
+    const interval = YF_INTERVAL[granularity] ?? '1d'
+    const range    = YF_RANGE[granularity]    ?? '2y'
+
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}`,
+      { signal: AbortSignal.timeout(6_000) }
+    )
+    if (!res.ok) return []
+
+    const data = await res.json() as {
+      chart?: { result?: Array<{
+        timestamp: number[]
+        indicators: { quote: Array<{ open: number[]; high: number[]; low: number[]; close: number[]; volume: number[] }> }
+      }> }
+    }
+
+    const result = data.chart?.result?.[0]
+    if (!result) return []
+
+    const { timestamp, indicators } = result
+    const q = indicators.quote[0]
+    const candles: OandaCandle[] = []
+
+    for (let i = 0; i < timestamp.length; i++) {
+      if (q.open[i] == null || q.close[i] == null) continue
+      candles.push({
+        time:     new Date(timestamp[i] * 1000).toISOString(),
+        open:     q.open[i],
+        high:     q.high[i] ?? q.close[i],
+        low:      q.low[i]  ?? q.close[i],
+        close:    q.close[i],
+        volume:   q.volume[i] ?? 0,
+        complete: true,
+      })
+    }
+
+    // H4: aggregate 1h candles into 4-hour blocks
+    if (granularity === 'H4') {
+      const h4: OandaCandle[] = []
+      for (let i = 0; i < candles.length; i += 4) {
+        const block = candles.slice(i, i + 4)
+        if (block.length === 0) continue
+        h4.push({
+          time:     block[0].time,
+          open:     block[0].open,
+          high:     Math.max(...block.map(c => c.high)),
+          low:      Math.min(...block.map(c => c.low)),
+          close:    block[block.length - 1].close,
+          volume:   block.reduce((s, c) => s + c.volume, 0),
+          complete: true,
+        })
+      }
+      return h4.slice(-count)
+    }
+
+    return candles.slice(-count)
+  } catch {
+    return []
+  }
+}
+
+async function getYahooBidAsk(
+  instrument: string
+): Promise<{ bid: number; ask: number } | null> {
+  try {
+    const ticker = toYahooFxTicker(instrument)
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`,
+      { signal: AbortSignal.timeout(5_000) }
+    )
+    if (!res.ok) return null
+
+    const data = await res.json() as {
+      chart?: { result?: Array<{ meta: { regularMarketPrice: number } }> }
+    }
+    const mid = data.chart?.result?.[0]?.meta?.regularMarketPrice
+    if (!mid) return null
+
+    // Estimate a typical interbank spread (1.5 pips for majors, 3 pips for JPY)
+    const pipSize = instrument.includes('JPY') ? 0.01 : 0.0001
+    const halfSpread = 1.5 * pipSize / 2
+    return { bid: mid - halfSpread, ask: mid + halfSpread }
+  } catch {
+    return null
+  }
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/** True if OANDA is configured (real trading-quality data). */
+export function oandaEnabled(): boolean {
+  return !!(process.env.OANDA_API_KEY && process.env.OANDA_ACCOUNT_ID)
+}
+
 /**
- * Fetch OANDA candlestick data.
- * @param instrument  e.g. 'EUR_USD'
- * @param granularity 'M1' | 'M5' | 'M15' | 'H1' | 'H4' | 'D'
- * @param count       Number of candles to fetch (max 5000)
+ * Fetch candlestick data.
+ * Uses OANDA when configured, falls back to Yahoo Finance (free) otherwise.
  */
 export async function getCandles(
   instrument: string,
   granularity: 'M1' | 'M5' | 'M15' | 'H1' | 'H4' | 'D',
   count: number
 ): Promise<OandaCandle[]> {
+  if (!oandaEnabled()) {
+    return getYahooForexCandles(instrument, granularity, count)
+  }
   try {
     const data = await oandaFetch(
       `/v3/instruments/${instrument}/candles?granularity=${granularity}&count=${count}&price=M`
@@ -136,15 +252,13 @@ export async function getCandles(
   }
 }
 
-/** True if OANDA is configured (API key + account ID present). */
-export function oandaEnabled(): boolean {
-  return !!(process.env.OANDA_API_KEY && process.env.OANDA_ACCOUNT_ID)
-}
-
-/** Fetch current bid/ask for a single instrument. Returns null if unavailable. */
+/** Fetch current bid/ask. Uses OANDA when configured, Yahoo Finance otherwise. */
 export async function getBidAsk(
   instrument: string
 ): Promise<{ bid: number; ask: number } | null> {
+  if (!oandaEnabled()) {
+    return getYahooBidAsk(instrument)
+  }
   try {
     const prices = await getPricing([instrument])
     const p = prices[0]
