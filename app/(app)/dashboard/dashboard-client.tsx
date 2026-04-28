@@ -479,12 +479,25 @@ interface PaperPos {
   id: string
   strategy_key: string
   symbol: string
-  side: string
+  direction?: string
+  side?: string
   quantity: number
   entry_price: number
   current_price: number | null
-  unrealized_pnl: number | null
+  unrealized_pnl_usd?: number | null
+  unrealized_pnl?: number | null
   asset_class: string
+}
+
+interface PaperStats {
+  closedTrades: number
+  openPositions: number
+  winRate: number | null
+  totalRealizedPnlUsd: number
+  totalUnrealizedPnlUsd: number
+  totalPnlUsd: number
+  avgWinUsd: number | null
+  avgLossUsd: number | null
 }
 
 const ASSET_PAGE: Record<string, string> = {
@@ -498,20 +511,32 @@ const ASSET_PAGE: Record<string, string> = {
 
 function PaperPositionsCard() {
   const [positions, setPositions] = useState<PaperPos[]>([])
+  const [stats, setStats] = useState<PaperStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/paper-trading/positions')
-      if (!res.ok) return
-      const data = await res.json()
-      setPositions(data.open ?? data.openPositions ?? [])
+      const [posRes, sumRes] = await Promise.all([
+        fetch('/api/paper-trading/positions'),
+        fetch('/api/paper-trading/summary'),
+      ])
+      if (posRes.ok) {
+        const data = await posRes.json()
+        setPositions(data.open ?? data.openPositions ?? [])
+      }
+      if (sumRes.ok) {
+        setStats(await sumRes.json())
+      }
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const wins   = stats ? Math.round((stats.winRate ?? 0) * stats.closedTrades) : 0
+  const losses = stats ? stats.closedTrades - wins : 0
+  const totalPnl = stats?.totalPnlUsd ?? 0
 
   return (
     <Card className="border-border/40 bg-muted/20">
@@ -529,6 +554,35 @@ function PaperPositionsCard() {
           Simulated trades across all asset classes
         </CardDescription>
       </CardHeader>
+      {/* Stats row */}
+      {!loading && stats && stats.closedTrades > 0 && (
+        <div className="px-6 pb-3 grid grid-cols-4 gap-2">
+          <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
+            <p className="text-xs text-muted-foreground">Trades</p>
+            <p className="text-sm font-semibold">{stats.closedTrades}</p>
+          </div>
+          <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
+            <p className="text-xs text-muted-foreground">W / L</p>
+            <p className="text-sm font-semibold">
+              <span className="text-green-400">{wins}</span>
+              <span className="text-muted-foreground mx-0.5">/</span>
+              <span className="text-red-400">{losses}</span>
+            </p>
+          </div>
+          <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
+            <p className="text-xs text-muted-foreground">Win Rate</p>
+            <p className="text-sm font-semibold">
+              {stats.winRate != null ? `${(stats.winRate * 100).toFixed(0)}%` : '—'}
+            </p>
+          </div>
+          <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
+            <p className="text-xs text-muted-foreground">Total P&L</p>
+            <p className={`text-sm font-semibold font-mono ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      )}
       <CardContent className="pt-0">
         {loading ? (
           <p className="text-xs text-muted-foreground py-4 text-center">Loading…</p>
@@ -545,7 +599,7 @@ function PaperPositionsCard() {
         ) : (
           <div className="space-y-2">
             {positions.slice(0, 8).map(pos => {
-              const pnl = pos.unrealized_pnl ?? 0
+              const pnl = pos.unrealized_pnl_usd ?? pos.unrealized_pnl ?? 0
               const page = ASSET_PAGE[pos.asset_class] ?? '/crypto'
               return (
                 <div key={pos.id} className="flex items-center justify-between text-xs rounded-lg border border-border/40 bg-background/40 px-3 py-2">
