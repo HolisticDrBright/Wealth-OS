@@ -38,37 +38,105 @@ const TRADE_RISK_PCT       = 0.005   // 0.5% per trade (flow-following is lower-
 const HOLD_DAYS            = 90      // target 90-day hold
 const MAX_SIMULTANEOUS     = 5       // max open congressional positions
 
-// ─── Free fallback: SEC EDGAR ─────────────────────────────────────────────────
+// ─── Free fallback: House/Senate Stock Watcher public S3 feeds ───────────────
 
-interface EdgarFiling {
-  ticker: string
-  representative: string
-  transaction: string
-  amount: string
-  transactionDate: string
-  reportDate: string
+const HOUSE_WATCHER_URL  = 'https://house-stock-watcher-data.s3-us-east-2.amazonaws.com/data/all_transactions.json'
+const SENATE_WATCHER_URL = 'https://senate-stock-watcher-data.s3-us-east-2.amazonaws.com/aggregate/all_transactions.json'
+
+interface HouseRecord {
+  disclosure_year?: string
+  disclosure_date?: string
+  transaction_date?: string
+  ticker?: string
+  type?: string
+  amount?: string
+  representative?: string
+}
+
+interface SenateRecord {
+  transaction_date?: string
+  ticker?: string
+  asset_type?: string
+  type?: string
+  amount?: string
+  senator?: string
+  disclosure_date?: string
+}
+
+/** Parse dollar range midpoint. e.g. "$15,001 - $50,000" → 32500 */
+function parseAmountRange(amount: string): number {
+  const nums = amount.replace(/[$,]/g, '').match(/\d+/g)?.map(Number) ?? []
+  if (nums.length === 0) return 0
+  if (nums.length === 1) return nums[0]
+  return (nums[0] + nums[1]) / 2
 }
 
 /**
- * Scrape recent congressional filings from SEC EDGAR EDGAR full-text search.
- * Returns an empty array if the request fails — used only when Quiver key is absent.
+ * Fetch recent congressional stock trades from the free public S3 feeds.
+ * housestockwatcher.com and senatestockwatcher.com maintain these.
+ * Returns trades from the last 60 days, sorted by transaction_date desc.
  */
-async function fetchEdgarCongressFallback(): Promise<EdgarFiling[]> {
-  try {
-    // EDGAR provides EFTS (full-text search) for form 8-K filings
-    // Congress members file via eFD (Electronic Financial Disclosure) — not available on EDGAR
-    // Realistic fallback: House Clerk XML feed (public, no auth)
-    const res = await fetch(
-      'https://disclosures-clerk.house.gov/public_disc/financial-pdfs/2024FD.xml',
-      { signal: AbortSignal.timeout(8_000) }
-    )
-    if (!res.ok) return []
-    // XML parsing is complex — in production use a proper parser
-    // For now return empty to signal "no data" so Quiver gate handles it
-    return []
-  } catch {
-    return []
+async function fetchStockWatcherFallback(): Promise<CongressTrade[]> {
+  const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const trades: CongressTrade[] = []
+
+  const [houseRes, senateRes] = await Promise.allSettled([
+    fetch(HOUSE_WATCHER_URL, { signal: AbortSignal.timeout(10_000) }),
+    fetch(SENATE_WATCHER_URL, { signal: AbortSignal.timeout(10_000) }),
+  ])
+
+  if (houseRes.status === 'fulfilled' && houseRes.value.ok) {
+    try {
+      const rows: HouseRecord[] = await houseRes.value.json()
+      for (const r of rows) {
+        const txDate = r.transaction_date ?? ''
+        if (!txDate || txDate < cutoff) continue
+        const ticker = (r.ticker ?? '').trim().toUpperCase()
+        if (!ticker || ticker === 'N/A' || ticker.length > 5) continue
+        const txType = (r.type ?? '').toLowerCase()
+        if (!txType.includes('purchase')) continue
+        const amount_usd = parseAmountRange(r.amount ?? '')
+        trades.push({
+          Ticker:          ticker,
+          Representative:  r.representative ?? 'Unknown',
+          Transaction:     'Purchase',
+          Range:           r.amount ?? '',
+          TransactionDate: txDate,
+          ReportDate:      r.disclosure_date ?? txDate,
+          House:           'House',
+          amount_usd,
+        })
+      }
+    } catch { /* ignore parse errors */ }
   }
+
+  if (senateRes.status === 'fulfilled' && senateRes.value.ok) {
+    try {
+      const rows: SenateRecord[] = await senateRes.value.json()
+      for (const r of rows) {
+        const txDate = r.transaction_date ?? ''
+        if (!txDate || txDate < cutoff) continue
+        const ticker = (r.ticker ?? '').trim().toUpperCase()
+        if (!ticker || ticker === 'N/A' || ticker.length > 5) continue
+        if ((r.asset_type ?? '').toLowerCase() !== 'stock') continue
+        const txType = (r.type ?? '').toLowerCase()
+        if (!txType.includes('purchase')) continue
+        const amount_usd = parseAmountRange(r.amount ?? '')
+        trades.push({
+          Ticker:          ticker,
+          Representative:  r.senator ?? 'Unknown',
+          Transaction:     'Purchase',
+          Range:           r.amount ?? '',
+          TransactionDate: txDate,
+          ReportDate:      r.disclosure_date ?? txDate,
+          House:           'Senate',
+          amount_usd,
+        })
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  return trades.sort((a, b) => b.TransactionDate.localeCompare(a.TransactionDate))
 }
 
 // ─── Market cap check ─────────────────────────────────────────────────────────
@@ -128,23 +196,13 @@ export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
       if (openCount >= MAX_SIMULTANEOUS) return []
     }
 
-    // Pull congress trades — prefer Quiver, fall back to EDGAR (usually empty)
+    // Pull congress trades — prefer Quiver Quant, fall back to free S3 feeds
     let rawTrades: CongressTrade[] = []
     const hasQuiver = !!process.env.QUIVER_QUANT_API_KEY
     if (hasQuiver) {
       rawTrades = await getLiveCongressTrades()
     } else {
-      const edgarFallback = await fetchEdgarCongressFallback()
-      // Convert EDGAR format to CongressTrade shape (simplified mapping)
-      rawTrades = edgarFallback.map(f => ({
-        Ticker: f.ticker,
-        Representative: f.representative,
-        Transaction: f.transaction as CongressTrade['Transaction'],
-        Range: f.amount,
-        TransactionDate: f.transactionDate,
-        ReportDate: f.reportDate,
-        House: 'House' as const,
-      }))
+      rawTrades = await fetchStockWatcherFallback()
     }
 
     if (rawTrades.length === 0) return []
@@ -212,7 +270,7 @@ export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
           isTopDecile,
           holdDays: HOLD_DAYS,
           targetExitDate: targetDate,
-          source: hasQuiver ? 'quiver' : 'edgar',
+          source: hasQuiver ? 'quiver' : 'stockwatcher',
           reasoning: `${trade.Representative} (${trade.House}) purchased $${(tradeAmount / 1000).toFixed(0)}k of ${ticker} on ${trade.TransactionDate}, filed ${lag}d later.${isTopDecile ? ' Top-decile size.' : ''} 90-day hold.`,
         },
         detectedAt: new Date().toISOString(),

@@ -505,7 +505,7 @@ function PaperPositionsCard() {
       const res = await fetch('/api/paper-trading/positions')
       if (!res.ok) return
       const data = await res.json()
-      setPositions(data.openPositions ?? [])
+      setPositions(data.open ?? data.openPositions ?? [])
     } finally {
       setLoading(false)
     }
