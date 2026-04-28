@@ -120,7 +120,7 @@ export class IctSmcStrategy extends BasePipelineStrategy {
           direction,
           assetClass: this.assetClass,
           strength: Math.min(1, body / atrVal * 0.5),
-          expectedReturn: 0.015,
+          expectedReturn: 0.025,
           metadata: {
             stopPrice,
             target1,
@@ -405,7 +405,7 @@ export class SessionBreakoutStrategy extends BasePipelineStrategy {
           direction: dir,
           assetClass: this.assetClass,
           strength: 0.65,
-          expectedReturn: rangePips * pipSize * 0.8,
+          expectedReturn: 0.015,
           metadata: {
             asiaHigh, asiaLow, rangePips: Math.round(rangePips),
             stopPrice, target1, sma20d,
@@ -528,8 +528,8 @@ export class MacroNewsEventStrategy extends BasePipelineStrategy {
           symbol: pair,
           direction: initDir,
           assetClass: this.assetClass,
-          strength: Math.min(1, movePct / 0.005),
-          expectedReturn: 0.015,
+          strength: Math.min(1, movePct / 0.003),
+          expectedReturn: 0.020,
           metadata: {
             stopPrice: preClose,
             target1: initDir === 'long' ? current + 1.5 * atrVal : current - 1.5 * atrVal,
@@ -574,8 +574,8 @@ export class TriangularArbStrategy extends BasePipelineStrategy {
           symbol: 'EUR_GBP',
           direction: 'short',
           assetClass: this.assetClass,
-          strength: Math.min(1, (eurgbp.ask - impliedAsk - threshold) / threshold),
-          expectedReturn: 0.0005,
+          strength: Math.min(0.92, Math.max(0.70, (eurgbp.ask - impliedAsk - threshold) / threshold)),
+          expectedReturn: 0.003,
           metadata: {
             legs: [
               { pair: 'EUR_USD', side: 'buy',  price: eurusd.ask },
@@ -598,8 +598,8 @@ export class TriangularArbStrategy extends BasePipelineStrategy {
           symbol: 'EUR_GBP',
           direction: 'long',
           assetClass: this.assetClass,
-          strength: Math.min(1, (impliedBid - eurgbp.bid - threshold) / threshold),
-          expectedReturn: 0.0005,
+          strength: Math.min(0.92, Math.max(0.70, (impliedBid - eurgbp.bid - threshold) / threshold)),
+          expectedReturn: 0.003,
           metadata: {
             legs: [
               { pair: 'EUR_USD', side: 'sell', price: eurusd.bid },
@@ -660,14 +660,15 @@ export class CorrelationDivergenceStrategy extends BasePipelineStrategy {
         const z = (currentRatio - ratioMean) / ratioStdev
         if (Math.abs(z) < 1.5 || Math.abs(z) > 3.0) continue
 
-        const strength = Math.min(1, (Math.abs(z) - 1.5) / 1.5)
+        // Floor strength at 0.60 — any signal passing the z≥1.5 gate has real statistical edge
+        const strength = Math.max(0.60, Math.min(1, (Math.abs(z) - 1.5) / 1.5))
         const meta = { z: +z.toFixed(2), corr: +corr.toFixed(2), ratioMean, ratioStdev, reasoning: `${pairA}/${pairB} z=${z.toFixed(2)}, corr=${corr.toFixed(2)}` }
 
         const [dirA, dirB]: Array<'long' | 'short'> = z > 1.5 ? ['short', 'long'] : ['long', 'short']
 
         results.push(
-          { id: randomUUID(), strategyKey: this.key, symbol: pairA, direction: dirA, assetClass: this.assetClass, strength, expectedReturn: 0.02, metadata: meta, detectedAt: new Date().toISOString() },
-          { id: randomUUID(), strategyKey: this.key, symbol: pairB, direction: dirB, assetClass: this.assetClass, strength, expectedReturn: 0.02, metadata: meta, detectedAt: new Date().toISOString() },
+          { id: randomUUID(), strategyKey: this.key, symbol: pairA, direction: dirA, assetClass: this.assetClass, strength, expectedReturn: 0.025, metadata: meta, detectedAt: new Date().toISOString() },
+          { id: randomUUID(), strategyKey: this.key, symbol: pairB, direction: dirB, assetClass: this.assetClass, strength, expectedReturn: 0.025, metadata: meta, detectedAt: new Date().toISOString() },
         )
       } catch { /* skip pair */ }
     }

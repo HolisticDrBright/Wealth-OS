@@ -94,8 +94,8 @@ export class QuantMomentumStrategy extends BasePipelineStrategy {
         symbol: c.ticker,
         direction: 'long' as const,
         assetClass: this.assetClass,
-        strength: Math.min(1, c.momentum / 0.5),
-        expectedReturn: c.ret1m * 0.5,
+        strength: Math.min(1, c.momentum / 0.3),
+        expectedReturn: 0.04,
         metadata: { momentum: c.momentum, ret1m: c.ret1m },
         detectedAt: new Date().toISOString(),
       }))
@@ -258,7 +258,7 @@ export class SectorRotationStrategy extends BasePipelineStrategy {
           direction: 'long',
           assetClass: this.assetClass,
           strength: Math.min(1, top.return1m / 0.10),
-          expectedReturn: top.return1m * 0.3,
+          expectedReturn: Math.max(top.return1m * 0.3, 0.05),
           metadata: { return1m: top.return1m, rank: 'top' },
           detectedAt: new Date().toISOString(),
         })
@@ -272,7 +272,7 @@ export class SectorRotationStrategy extends BasePipelineStrategy {
           direction: 'short',
           assetClass: this.assetClass,
           strength: Math.min(1, Math.abs(bottom.return1m) / 0.10),
-          expectedReturn: Math.abs(bottom.return1m) * 0.3,
+          expectedReturn: Math.max(Math.abs(bottom.return1m) * 0.3, 0.05),
           metadata: { return1m: bottom.return1m, rank: 'bottom' },
           detectedAt: new Date().toISOString(),
         })
@@ -333,8 +333,8 @@ export class PeadStrategy extends BasePipelineStrategy {
         symbol: c.ticker,
         direction: (c.gapMagnitude > 0 ? 'long' : 'short') as 'long' | 'short',
         assetClass: this.assetClass,
-        strength: Math.min(1, Math.abs(c.gapMagnitude) / 0.20),
-        expectedReturn: Math.abs(c.gapMagnitude) * 0.25,
+        strength: Math.min(1, Math.abs(c.gapMagnitude) / 0.10),
+        expectedReturn: Math.max(Math.abs(c.gapMagnitude) * 0.25, 0.04),
         metadata: { gapMagnitude: c.gapMagnitude },
         detectedAt: new Date().toISOString(),
       }))
@@ -390,7 +390,7 @@ export class OptionsWheelStrategy extends BasePipelineStrategy {
         direction: 'neutral' as const,
         assetClass: this.assetClass,
         strength: Math.min(1, (c.rvAnn - 0.30) / 0.40),
-        expectedReturn: (c.rvAnn / 52) * 0.40,
+        expectedReturn: (c.rvAnn - 0.30) * 0.5,
         metadata: { rvAnn: c.rvAnn, sma50: c.sma50, lastClose: c.lastClose },
         detectedAt: new Date().toISOString(),
       }))
@@ -437,7 +437,7 @@ export class GammaExposureStrategy extends BasePipelineStrategy {
         expectedReturn = 0.05
       } else if (currentVix > 30 && vixPercentile > 0.75) {
         direction = 'short'
-        strength = (currentVix - 30) / 20
+        strength = (currentVix - 30) / 10
         expectedReturn = 0.04
       } else {
         return []
@@ -565,8 +565,8 @@ export class SpinoffStrategy extends BasePipelineStrategy {
         symbol: c.ticker,
         direction: 'long' as const,
         assetClass: this.assetClass,
-        strength: Math.min(1, Math.abs(c.returnSince) / 0.30),
-        expectedReturn: Math.abs(c.returnSince) * 0.4,
+        strength: Math.min(1, Math.abs(c.returnSince) / 0.15),
+        expectedReturn: Math.max(Math.abs(c.returnSince) * 0.4, 0.06),
         metadata: { returnSince: c.returnSince, recentMom: c.recentMom, daysSinceSpinoff: c.daysSinceSpinoff },
         detectedAt: new Date().toISOString(),
       }))
@@ -630,8 +630,8 @@ export class TailRiskHedgingStrategy extends BasePipelineStrategy {
           symbol: 'VIX-SHORT',
           direction: 'short',
           assetClass: this.assetClass,
-          strength: Math.min(1, (currentVix - 35) / 15),
-          expectedReturn: 0.08,
+          strength: Math.min(1, (currentVix - 35) / 10),
+          expectedReturn: 0.10,
           metadata: { currentVix, vixSma30, spyReturn30d, vixContango },
           detectedAt: new Date().toISOString(),
         }]

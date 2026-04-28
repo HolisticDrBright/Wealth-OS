@@ -19,7 +19,13 @@ export async function fetchCurrentPrice(
       case 'options':     return await fetchStockPrice(symbol)
       case 'forex':       return await fetchForexPrice(symbol)
       case 'polymarket':  return await fetchPolymarketPrice(symbol)
-      case 'multi-asset': return await fetchStockPrice(symbol)
+      case 'multi-asset': {
+        // Forex pairs (EUR_USD, EUR/USD) route to fetchForexPrice; stocks route to fetchStockPrice
+        const fxPairRe = /^[A-Za-z]{3}[_/][A-Za-z]{3}$/
+        return fxPairRe.test(symbol)
+          ? await fetchForexPrice(symbol)
+          : await fetchStockPrice(symbol)
+      }
       default:            return null
     }
   } catch {
@@ -59,9 +65,15 @@ async function fetchCryptoPrice(symbol: string): Promise<number | null> {
 
 // ─── Stocks — Yahoo Finance v8 (no key required) ────────────────────────────
 
+// Map synthetic/index symbols to Yahoo Finance tickers
+const YAHOO_TICKER_MAP: Record<string, string> = {
+  'VIX': '^VIX',
+}
+
 async function fetchStockPrice(symbol: string): Promise<number | null> {
-  // Strip option suffixes: AAPL-call → AAPL
-  const ticker = symbol.split(/[-/]/)[0].toUpperCase()
+  // Strip option suffixes: AAPL-call → AAPL, VIX-SHORT → VIX → ^VIX
+  const raw = symbol.split(/[-/]/)[0].toUpperCase()
+  const ticker = YAHOO_TICKER_MAP[raw] ?? raw
 
   const res = await fetch(
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1m&range=1d`,
@@ -78,8 +90,8 @@ async function fetchStockPrice(symbol: string): Promise<number | null> {
 // ─── Forex — ExchangeRate API free tier (no key required) ───────────────────
 
 async function fetchForexPrice(symbol: string): Promise<number | null> {
-  // Accepts EUR-USD, EUR/USD, EURUSD
-  const clean = symbol.replace('/', '-')
+  // Accepts EUR-USD, EUR/USD, EUR_USD, EURUSD
+  const clean = symbol.replace(/[/_]/g, '-')
   const parts = clean.includes('-') ? clean.split('-') : [clean.slice(0, 3), clean.slice(3)]
   const [base, quote = 'USD'] = parts
 

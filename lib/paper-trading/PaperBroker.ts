@@ -35,8 +35,10 @@ export class PaperBroker {
 
     const slippageBps = SLIPPAGE_BPS[opp.assetClass] ?? 10
     const slip = price * slippageBps / 10_000
-    // Longs pay the ask (price + slip); shorts receive the bid (price - slip)
-    const fillPrice = opp.direction === 'long' ? price + slip : price - slip
+    // Longs pay the ask (+slip); shorts receive the bid (-slip); neutral enters at mid
+    const fillPrice = opp.direction === 'long' ? price + slip
+      : opp.direction === 'short' ? price - slip
+      : price
     if (fillPrice <= 0) return null
 
     const quantity = size.notionalUsd / fillPrice
@@ -113,9 +115,11 @@ export class PaperBroker {
       )
       if (currentPrice == null) return
 
-      const pnlUsd = pos.direction === 'long'
-        ? (currentPrice - (pos.entry_price as number)) * (pos.quantity as number)
-        : ((pos.entry_price as number) - currentPrice) * (pos.quantity as number)
+      const entryP = pos.entry_price as number
+      const qty    = pos.quantity as number
+      const pnlUsd = pos.direction === 'long'  ? (currentPrice - entryP) * qty
+        : pos.direction === 'short' ? (entryP - currentPrice) * qty
+        : 0
       const pnlPct = (pos.notional_usd as number) > 0 ? pnlUsd / (pos.notional_usd as number) : 0
 
       await supabase
@@ -146,9 +150,9 @@ export class PaperBroker {
       if (currentPrice == null) return
 
       const entryPrice = pos.entry_price as number
-      const pnlPct = pos.direction === 'long'
-        ? (currentPrice - entryPrice) / entryPrice
-        : (entryPrice - currentPrice) / entryPrice
+      const pnlPct = pos.direction === 'long'  ? (currentPrice - entryPrice) / entryPrice
+        : pos.direction === 'short' ? (entryPrice - currentPrice) / entryPrice
+        : 0
 
       const ageHours = (Date.now() - new Date(pos.opened_at as string).getTime()) / 3_600_000
 
@@ -161,11 +165,14 @@ export class PaperBroker {
       // Exits also incur slippage (adverse to the position)
       const slippageBps = SLIPPAGE_BPS[pos.asset_class as AssetClass] ?? 10
       const slip = currentPrice * slippageBps / 10_000
-      const exitPrice = pos.direction === 'long' ? currentPrice - slip : currentPrice + slip
+      const exitPrice = pos.direction === 'long'  ? currentPrice - slip
+        : pos.direction === 'short' ? currentPrice + slip
+        : currentPrice
 
-      const pnlUsd = pos.direction === 'long'
-        ? (exitPrice - entryPrice) * (pos.quantity as number)
-        : (entryPrice - exitPrice) * (pos.quantity as number)
+      const qty = pos.quantity as number
+      const pnlUsd = pos.direction === 'long'  ? (exitPrice - entryPrice) * qty
+        : pos.direction === 'short' ? (entryPrice - exitPrice) * qty
+        : 0
       const realizedPct = (pos.notional_usd as number) > 0 ? pnlUsd / (pos.notional_usd as number) : 0
 
       await supabase.from('paper_positions').update({

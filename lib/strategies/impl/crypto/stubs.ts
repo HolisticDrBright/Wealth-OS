@@ -76,7 +76,7 @@ export class OnchainSignalStrategy extends BasePipelineStrategy {
           symbol: 'BTC',
           direction: 'long',
           assetClass: this.assetClass,
-          strength: Math.min(1, (1.2 - mvrv) / 0.8 * 0.5 + (0.4 - nupl) / 0.4 * 0.5),
+          strength: Math.max(0.40, Math.min(1, (1.2 - mvrv) / 0.8 * 0.5 + (0.4 - nupl) / 0.4 * 0.5)),
           expectedReturn: 0.15,
           metadata: {
             mvrv,
@@ -97,7 +97,7 @@ export class OnchainSignalStrategy extends BasePipelineStrategy {
           symbol: 'BTC',
           direction: 'short',
           assetClass: this.assetClass,
-          strength: Math.min(1, (mvrv - 3.5) / 1.5 * 0.5 + (nupl - 0.75) / 0.25 * 0.5),
+          strength: Math.max(0.40, Math.min(1, (mvrv - 3.5) / 1.5 * 0.5 + (nupl - 0.75) / 0.25 * 0.5)),
           expectedReturn: 0.20,
           metadata: {
             mvrv,
@@ -165,7 +165,7 @@ export class DefiYieldStrategy extends BasePipelineStrategy {
         symbol: pool.symbol,
         direction: 'neutral' as const,
         assetClass: this.assetClass,
-        strength: Math.min(1, (pool.apy - 12) / 40),
+        strength: Math.min(1, 0.50 + (pool.apy - 12) / 60),
         expectedReturn: pool.apy / 100,
         metadata: {
           pool: pool.symbol,
@@ -248,7 +248,7 @@ export class NarrativeRotationStrategy extends BasePipelineStrategy {
             direction: 'long',
             assetClass: this.assetClass,
             strength: Math.min(1, categoryChange24h / 10),
-            expectedReturn: 0.04,
+            expectedReturn: 0.05,
             metadata: {
               category: category.name,
               categoryChange24h,
@@ -329,7 +329,7 @@ export class LiquidationHuntingStrategy extends BasePipelineStrategy {
             symbol: sym,
             direction: 'short',
             assetClass: this.assetClass,
-            strength: Math.min(1, (ratio - 1.8) / 0.6),
+            strength: Math.min(1, 0.50 + (ratio - 1.8) / 0.8),
             expectedReturn: 0.025,
             metadata: {
               symbol: sym,
@@ -349,7 +349,7 @@ export class LiquidationHuntingStrategy extends BasePipelineStrategy {
             symbol: sym,
             direction: 'long',
             assetClass: this.assetClass,
-            strength: Math.min(1, (0.55 - ratio) / 0.25),
+            strength: Math.min(1, 0.50 + (0.55 - ratio) / 0.35),
             expectedReturn: 0.025,
             metadata: {
               symbol: sym,
@@ -474,7 +474,8 @@ export class MemecoinBondingcurveStrategy extends BasePipelineStrategy {
       return qualified.map((token) => ({
         id: randomUUID(),
         strategyKey: this.key,
-        symbol: token.tokenAddress.slice(0, 8).toUpperCase() + '-SOL',
+        // Use SOL as the position vehicle — bonding curve exposure is via SOL deposits
+        symbol: 'SOL',
         direction: 'long' as const,
         assetClass: this.assetClass,
         strength: Math.min(1, Math.log10(token.amount) / 4),
