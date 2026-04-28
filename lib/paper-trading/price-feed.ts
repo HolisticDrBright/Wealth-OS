@@ -108,17 +108,27 @@ async function fetchForexPrice(symbol: string): Promise<number | null> {
 // ─── Polymarket — Gamma API (no key required) ────────────────────────────────
 
 async function fetchPolymarketPrice(symbol: string): Promise<number | null> {
-  // symbol is either a market slug or a conditionId
-  const isSlug = !symbol.startsWith('0x') && symbol.length < 80
+  // Strip POLY: prefix added by strategy opportunity builders
+  const raw = symbol.startsWith('POLY:') ? symbol.slice(5) : symbol
 
-  const url = isSlug
-    ? `https://gamma-api.polymarket.com/markets?slug=${encodeURIComponent(symbol)}&limit=1`
-    : `https://gamma-api.polymarket.com/markets?clob_token_ids=${encodeURIComponent(symbol)}&limit=1`
+  // conditionId is a hex string starting with 0x; everything else is treated as a slug
+  const isConditionId = raw.startsWith('0x') && raw.length >= 60
+  const url = isConditionId
+    ? `https://gamma-api.polymarket.com/markets?condition_id=${encodeURIComponent(raw)}&limit=1`
+    : `https://gamma-api.polymarket.com/markets?slug=${encodeURIComponent(raw)}&limit=1`
 
   const res = await fetch(url, { signal: AbortSignal.timeout(5_000) })
   if (!res.ok) return null
 
-  const markets = await res.json() as Array<{ outcomePrices?: string[] }>
-  const price = markets[0]?.outcomePrices?.[0]
+  const markets = await res.json() as Array<{ outcomePrices?: string[]; bestBid?: string; bestAsk?: string }>
+  const mkt = markets[0]
+  if (!mkt) return null
+
+  // Prefer mid from bestBid/bestAsk; fall back to outcomePrices YES price
+  const bid = parseFloat(mkt.bestBid ?? '0')
+  const ask = parseFloat(mkt.bestAsk ?? '0')
+  if (bid > 0 && ask > 0) return (bid + ask) / 2
+
+  const price = mkt.outcomePrices?.[0]
   return price != null ? parseFloat(price) : null
 }

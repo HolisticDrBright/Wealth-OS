@@ -316,8 +316,8 @@ export abstract class BasePipelineStrategy {
       red_team_score: verdicts.redTeam.score,
       mirofish_score: verdicts.mirofish?.score ?? null,
       kronos_pass: verdicts.kronos?.pass ?? null,
-      detected_at: opp.detectedAt,
       decided_at: new Date().toISOString(),
+      metadata: { detected_at: opp.detectedAt },
     }
 
     if (supabase) {

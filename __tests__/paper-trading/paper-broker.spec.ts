@@ -36,21 +36,24 @@ function makeSize(notionalUsd = 500): PositionSize {
   return { fraction: 0.05, notionalUsd, rationale: 'test' }
 }
 
+/** Supabase mock that handles the dedup count query + insert flow. */
 function makeSupabase(positionId = 'pos-1'): SupabaseClient {
-  return {
-    from: vi.fn().mockReturnValue({
-      insert: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: positionId }, error: null }),
-        }),
-        // for paper_trades insert (no .select)
-        then: vi.fn().mockResolvedValue({ error: null }),
+  // Builder that resolves to { count: 0 } when awaited (dedup check)
+  // and supports .insert().select().single() for position insert
+  const builder = {
+    insert: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({ data: { id: positionId }, error: null }),
       }),
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
     }),
-  } as unknown as SupabaseClient
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+    // Makes the chain awaitable — resolves to { count: 0 } for the dedup check
+    then: (resolve: (v: { count: number; data: null; error: null }) => void) =>
+      Promise.resolve({ count: 0, data: null, error: null }).then(resolve),
+  }
+  return { from: vi.fn().mockReturnValue(builder) } as unknown as SupabaseClient
 }
 
 describe('PaperBroker', () => {
@@ -73,19 +76,25 @@ describe('PaperBroker', () => {
     const midPrice = 50_000
     mockFetchCurrentPrice.mockResolvedValue(midPrice)
 
-    // Capture what fill_price was passed to insert
     let capturedFillPrice: number | undefined
     const supabase = {
-      from: vi.fn().mockImplementation((table: string) => ({
-        insert: vi.fn().mockImplementation((row: Record<string, unknown>) => {
-          if (table === 'paper_positions') capturedFillPrice = row.entry_price as number
-          return {
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: { id: 'pos-1' }, error: null }),
-            }),
-          }
-        }),
-      })),
+      from: vi.fn().mockImplementation((table: string) => {
+        const builder = {
+          insert: vi.fn().mockImplementation((row: Record<string, unknown>) => {
+            if (table === 'paper_positions') capturedFillPrice = row.entry_price as number
+            return {
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: { id: 'pos-1' }, error: null }),
+              }),
+            }
+          }),
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          then: (resolve: (v: unknown) => void) =>
+            Promise.resolve({ count: 0, data: null, error: null }).then(resolve),
+        }
+        return builder
+      }),
     } as unknown as SupabaseClient
 
     const { PaperBroker } = await import('@/lib/paper-trading/PaperBroker')
@@ -93,7 +102,7 @@ describe('PaperBroker', () => {
     const result = await broker.fill(makeOpp({ direction: 'long' }), makeSize(), 'user-1', supabase)
 
     expect(result).not.toBeNull()
-    const expectedFillPrice = midPrice * (1 + 5 / 10_000)  // mid + 5 bps
+    const expectedFillPrice = midPrice * (1 + 5 / 10_000)
     expect(capturedFillPrice).toBeCloseTo(expectedFillPrice, 2)
   })
 
@@ -103,23 +112,30 @@ describe('PaperBroker', () => {
 
     let capturedFillPrice: number | undefined
     const supabase = {
-      from: vi.fn().mockImplementation((table: string) => ({
-        insert: vi.fn().mockImplementation((row: Record<string, unknown>) => {
-          if (table === 'paper_positions') capturedFillPrice = row.entry_price as number
-          return {
-            select: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: { id: 'pos-1' }, error: null }),
-            }),
-          }
-        }),
-      })),
+      from: vi.fn().mockImplementation((table: string) => {
+        const builder = {
+          insert: vi.fn().mockImplementation((row: Record<string, unknown>) => {
+            if (table === 'paper_positions') capturedFillPrice = row.entry_price as number
+            return {
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: { id: 'pos-1' }, error: null }),
+              }),
+            }
+          }),
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          then: (resolve: (v: unknown) => void) =>
+            Promise.resolve({ count: 0, data: null, error: null }).then(resolve),
+        }
+        return builder
+      }),
     } as unknown as SupabaseClient
 
     const { PaperBroker } = await import('@/lib/paper-trading/PaperBroker')
     const broker = new PaperBroker()
     await broker.fill(makeOpp({ direction: 'short' }), makeSize(), 'user-1', supabase)
 
-    const expectedFillPrice = midPrice * (1 - 5 / 10_000)  // mid - 5 bps
+    const expectedFillPrice = midPrice * (1 - 5 / 10_000)
     expect(capturedFillPrice).toBeCloseTo(expectedFillPrice, 2)
   })
 

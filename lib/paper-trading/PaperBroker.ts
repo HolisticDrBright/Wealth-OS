@@ -27,6 +27,16 @@ export class PaperBroker {
     userId: string,
     supabase: SupabaseClient
   ): Promise<{ id: string } | null> {
+    // Deduplication: skip if this user already has an open position for this strategy+symbol
+    const { count } = await supabase
+      .from('paper_positions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('strategy_key', opp.strategyKey)
+      .eq('symbol', opp.symbol)
+      .eq('status', 'open')
+    if ((count ?? 0) > 0) return null
+
     const price = await fetchCurrentPrice(opp.symbol, opp.assetClass)
     if (price == null) {
       console.warn(`[PaperBroker] no price for ${opp.symbol} (${opp.assetClass}) — skipping fill`)
