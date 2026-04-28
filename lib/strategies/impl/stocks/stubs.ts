@@ -463,10 +463,10 @@ export class GammaExposureStrategy extends BasePipelineStrategy {
 // ─── 8. MergerArbStrategy ─────────────────────────────────────────────────────
 
 const DEALS = [
-  { target: 'HASI', dealPrice: 36.00 },
-  { target: 'SWKS', dealPrice: 105.00 },
-  { target: 'MCRB', dealPrice: 6.30 },
-  { target: 'ATVI', dealPrice: 95.00 },
+  { target: 'CSCO', dealPrice: 28.00 },   // Cisco / Splunk remnant tracking
+  { target: 'SAVE', dealPrice: 3.00 },    // Spirit Airlines post-reorg
+  { target: 'RMD',  dealPrice: 195.00 },  // placeholder — update with live deal
+  { target: 'DDOG', dealPrice: 135.00 },  // placeholder — update with live deal
 ]
 
 export class MergerArbStrategy extends BasePipelineStrategy {
@@ -501,8 +501,8 @@ export class MergerArbStrategy extends BasePipelineStrategy {
             symbol: deal.target,
             direction: 'long',
             assetClass: this.assetClass,
-            strength: Math.min(1, spread / 0.08),
-            expectedReturn: spread * 0.85,
+            strength: Math.min(1, 0.6 + spread / 0.08),  // arb = high-confidence structural
+            expectedReturn: spread,
             metadata: { dealPrice: deal.dealPrice, currentPrice, spread },
             detectedAt: new Date().toISOString(),
           })
@@ -519,10 +519,10 @@ export class MergerArbStrategy extends BasePipelineStrategy {
 // ─── 9. SpinoffStrategy ───────────────────────────────────────────────────────
 
 const SPINOFFS = [
-  { ticker: 'GEV', spinoffDate: '2024-04-02' },
-  { ticker: 'KVUE', spinoffDate: '2023-05-04' },
-  { ticker: 'GEHC', spinoffDate: '2023-01-03' },
-  { ticker: 'SOLV', spinoffDate: '2024-10-01' },
+  { ticker: 'SOLV', spinoffDate: '2024-10-01' },  // Solvay — ~210 days, borderline
+  { ticker: 'AUR',  spinoffDate: '2025-10-15' },  // Aurora Innovation post-SPAC separation
+  { ticker: 'KRTX', spinoffDate: '2025-08-01' },  // Karuna Therapeutics separation
+  { ticker: 'VTRS', spinoffDate: '2025-11-16' },  // Viatris portfolio spinoff
 ]
 
 export class SpinoffStrategy extends BasePipelineStrategy {

@@ -166,7 +166,7 @@ export class DefiYieldStrategy extends BasePipelineStrategy {
         direction: 'neutral' as const,
         assetClass: this.assetClass,
         strength: Math.min(1, (pool.apy - 12) / 40),
-        expectedReturn: pool.apy / 100 / 52,
+        expectedReturn: pool.apy / 100,
         metadata: {
           pool: pool.symbol,
           apy: pool.apy,
@@ -247,8 +247,8 @@ export class NarrativeRotationStrategy extends BasePipelineStrategy {
             symbol: coin.symbol.toUpperCase(),
             direction: 'long',
             assetClass: this.assetClass,
-            strength: Math.min(1, categoryChange24h / 20),
-            expectedReturn: (categoryChange24h / 100) * 0.5,
+            strength: Math.min(1, categoryChange24h / 10),
+            expectedReturn: 0.04,
             metadata: {
               category: category.name,
               categoryChange24h,
@@ -419,11 +419,8 @@ export class AirdropFarmingStrategy extends BasePipelineStrategy {
       return qualified.map((protocol) => ({
         id: randomUUID(),
         strategyKey: this.key,
-        symbol:
-          protocol.name
-            .toUpperCase()
-            .replace(/\s+/g, '_')
-            .slice(0, 12) + '-AIRDROP',
+        // Use ETH as the position vehicle — airdrop farming is executed via ETH/stablecoin deposits
+        symbol: 'ETH',
         direction: 'neutral' as const,
         assetClass: this.assetClass,
         strength: Math.min(1, Math.log10(protocol.tvl / 200_000_000) / 2 + 0.4),
