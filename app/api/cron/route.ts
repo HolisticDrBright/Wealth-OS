@@ -150,6 +150,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'promote', users: userIds.length, summary })
     }
 
+    if (task === 'learning') {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      // Run for every user who has at least one open paper position
+      const { data: rows } = await supabase
+        .from('paper_positions')
+        .select('user_id')
+        .eq('status', 'open')
+      const userIds = [...new Set((rows ?? []).map(r => r.user_id as string))]
+      if (!userIds.length) {
+        return NextResponse.json({ task: 'learning', users: 0, message: 'No users with open positions' })
+      }
+      const { runLearningPass } = await import('@/lib/learning/loop')
+      const results = await Promise.allSettled(userIds.map(uid => runLearningPass(uid)))
+      const summary = results.map((r, i) => ({
+        userId: userIds[i],
+        ...(r.status === 'fulfilled'
+          ? r.value
+          : { updated: false, reason: r.reason instanceof Error ? r.reason.message : String(r.reason) }),
+      }))
+      return NextResponse.json({ task: 'learning', users: userIds.length, summary })
+    }
+
     if (task === 'news-sentiment') {
       const { createAdminClient } = await import('@/lib/supabase/admin')
       const supabase = createAdminClient()

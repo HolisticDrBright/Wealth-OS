@@ -77,6 +77,8 @@ describe('PaperBroker', () => {
     mockFetchCurrentPrice.mockResolvedValue(midPrice)
 
     let capturedFillPrice: number | undefined
+    const thenable = (resolve: (v: unknown) => void) =>
+      Promise.resolve({ error: null }).then(resolve)
     const supabase = {
       from: vi.fn().mockImplementation((table: string) => {
         const builder = {
@@ -86,6 +88,7 @@ describe('PaperBroker', () => {
               select: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({ data: { id: 'pos-1' }, error: null }),
               }),
+              then: thenable,
             }
           }),
           select: vi.fn().mockReturnThis(),
@@ -111,6 +114,8 @@ describe('PaperBroker', () => {
     mockFetchCurrentPrice.mockResolvedValue(midPrice)
 
     let capturedFillPrice: number | undefined
+    const thenable = (resolve: (v: unknown) => void) =>
+      Promise.resolve({ error: null }).then(resolve)
     const supabase = {
       from: vi.fn().mockImplementation((table: string) => {
         const builder = {
@@ -120,6 +125,7 @@ describe('PaperBroker', () => {
               select: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({ data: { id: 'pos-1' }, error: null }),
               }),
+              then: thenable,
             }
           }),
           select: vi.fn().mockReturnThis(),
