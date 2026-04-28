@@ -40,12 +40,35 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
   const [outcomes, setOutcomes] = useState(totalOutcomes)
   const [pending, setPending] = useState(pendingGrade)
   const [isRunning, setIsRunning] = useState(false)
+  const [isBackfilling, setIsBackfilling] = useState(false)
   const [lastResult, setLastResult] = useState<{
     updated: boolean
     reason: string
     graded?: number
     max_delta?: number
   } | null>(null)
+  const [backfillResult, setBackfillResult] = useState<{ backfilled: number; skipped: number } | null>(null)
+
+  async function backfill() {
+    setIsBackfilling(true)
+    setBackfillResult(null)
+    try {
+      const res = await fetch('/api/learning/backfill', { method: 'POST' })
+      const data = await res.json()
+      setBackfillResult(data)
+      // Refresh counts
+      const statsRes = await fetch('/api/learning')
+      const statsData = (await statsRes.json()).data
+      if (statsData) {
+        setDecisions(statsData.total_decisions)
+        setPending(statsData.pending_grade)
+      }
+    } catch {
+      setBackfillResult({ backfilled: 0, skipped: 0 })
+    } finally {
+      setIsBackfilling(false)
+    }
+  }
 
   async function runPass() {
     setIsRunning(true)
@@ -114,11 +137,28 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
                 Grades pending outcomes using real price data, then updates strategy weights
               </p>
             </div>
-            <Button onClick={runPass} disabled={isRunning}>
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRunning ? 'animate-spin' : ''}`} />
-              {isRunning ? 'Running...' : 'Run Now'}
-            </Button>
+            <div className="flex items-center gap-2">
+              {decisions === 0 && (
+                <Button variant="outline" size="sm" onClick={backfill} disabled={isBackfilling}>
+                  <BarChart2 className={`h-3.5 w-3.5 mr-1.5 ${isBackfilling ? 'animate-pulse' : ''}`} />
+                  {isBackfilling ? 'Backfilling...' : 'Backfill Positions'}
+                </Button>
+              )}
+              <Button onClick={runPass} disabled={isRunning}>
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRunning ? 'animate-spin' : ''}`} />
+                {isRunning ? 'Running...' : 'Run Now'}
+              </Button>
+            </div>
           </div>
+          {backfillResult && (
+            <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 flex items-center gap-3 mb-4">
+              <CheckCircle2 className="h-4 w-4 text-indigo-400 shrink-0" />
+              <p className="text-sm text-indigo-300">
+                Backfilled {backfillResult.backfilled} position{backfillResult.backfilled !== 1 ? 's' : ''} into decision log
+                {backfillResult.skipped > 0 ? ` (${backfillResult.skipped} already logged)` : ''}
+              </p>
+            </div>
+          )}
 
           {lastResult && (
             <div className={`rounded-lg border px-4 py-3 flex items-start gap-3 ${

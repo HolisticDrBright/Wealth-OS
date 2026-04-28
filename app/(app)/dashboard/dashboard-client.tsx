@@ -554,19 +554,25 @@ function PaperPositionsCard() {
           Simulated trades across all asset classes
         </CardDescription>
       </CardHeader>
-      {/* Stats row */}
-      {!loading && stats && stats.closedTrades > 0 && (
+      {/* Stats row — always visible once loaded */}
+      {!loading && stats && (
         <div className="px-6 pb-3 grid grid-cols-4 gap-2">
           <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
-            <p className="text-xs text-muted-foreground">Trades</p>
+            <p className="text-xs text-muted-foreground">Closed</p>
             <p className="text-sm font-semibold">{stats.closedTrades}</p>
           </div>
           <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
             <p className="text-xs text-muted-foreground">W / L</p>
             <p className="text-sm font-semibold">
-              <span className="text-green-400">{wins}</span>
-              <span className="text-muted-foreground mx-0.5">/</span>
-              <span className="text-red-400">{losses}</span>
+              {stats.closedTrades > 0 ? (
+                <>
+                  <span className="text-green-400">{wins}</span>
+                  <span className="text-muted-foreground mx-0.5">/</span>
+                  <span className="text-red-400">{losses}</span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
             </p>
           </div>
           <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
@@ -576,9 +582,9 @@ function PaperPositionsCard() {
             </p>
           </div>
           <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
-            <p className="text-xs text-muted-foreground">Total P&L</p>
-            <p className={`text-sm font-semibold font-mono ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+            <p className="text-xs text-muted-foreground">Unrealized P&L</p>
+            <p className={`text-sm font-semibold font-mono ${(stats.totalUnrealizedPnlUsd ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {(stats.totalUnrealizedPnlUsd ?? 0) >= 0 ? '+' : ''}${(stats.totalUnrealizedPnlUsd ?? 0).toFixed(2)}
             </p>
           </div>
         </div>
