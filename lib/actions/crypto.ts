@@ -28,7 +28,50 @@ export async function getCryptoPrices(symbols: string[]): Promise<CryptoPrice[]>
     .select('*')
     .in('symbol', symbols)
 
-  return data ?? []
+  if (data && data.length > 0) return data
+
+  // DB is empty (Kraken not configured) — fetch live from Coinbase public API
+  return fetchCoinbasePrices(symbols)
+}
+
+async function fetchCoinbasePrices(symbols: string[]): Promise<CryptoPrice[]> {
+  const productIds = symbols.map(s => `${s}-USD`).join(',')
+  try {
+    const res = await fetch(
+      `https://api.coinbase.com/api/v3/brokerage/best_bid_ask?product_ids=${productIds}`,
+      { next: { revalidate: 60 }, signal: AbortSignal.timeout(8_000) }
+    )
+    if (!res.ok) return []
+
+    const json = await res.json() as {
+      pricebooks?: Array<{
+        product_id: string
+        bids: Array<{ price: string; size: string }>
+        asks: Array<{ price: string; size: string }>
+        time: string
+      }>
+    }
+
+    const now = new Date().toISOString()
+    return (json.pricebooks ?? []).map(pb => {
+      const symbol = pb.product_id.replace('-USD', '')
+      const bid    = parseFloat(pb.bids[0]?.price ?? '0')
+      const ask    = parseFloat(pb.asks[0]?.price ?? '0')
+      const mid    = bid > 0 && ask > 0 ? (bid + ask) / 2 : bid || ask
+      return {
+        id:            pb.product_id,
+        symbol,
+        pair:          pb.product_id,
+        price_usd:     mid,
+        bid:           bid || undefined,
+        ask:           ask || undefined,
+        source:        'coinbase',
+        fetched_at:    now,
+      } satisfies CryptoPrice
+    }).filter(p => p.price_usd > 0)
+  } catch {
+    return []
+  }
 }
 
 export async function syncKrakenBalances(): Promise<{ synced: number; error?: string }> {
