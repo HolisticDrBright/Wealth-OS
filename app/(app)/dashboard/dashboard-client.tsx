@@ -582,9 +582,11 @@ function PaperPositionsCard() {
             </p>
           </div>
           <div className="rounded-lg bg-background/60 border border-border/30 px-3 py-2 text-center">
-            <p className="text-xs text-muted-foreground">Unrealized P&L</p>
-            <p className={`text-sm font-semibold font-mono ${(stats.totalUnrealizedPnlUsd ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {(stats.totalUnrealizedPnlUsd ?? 0) >= 0 ? '+' : ''}${(stats.totalUnrealizedPnlUsd ?? 0).toFixed(2)}
+            <p className="text-xs text-muted-foreground">Realized P&L</p>
+            <p className={`text-sm font-semibold font-mono ${(stats.totalRealizedPnlUsd ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {stats.closedTrades > 0
+                ? `${(stats.totalRealizedPnlUsd ?? 0) >= 0 ? '+' : ''}$${(stats.totalRealizedPnlUsd ?? 0).toFixed(2)}`
+                : '—'}
             </p>
           </div>
         </div>
