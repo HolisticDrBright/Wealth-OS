@@ -5,6 +5,7 @@
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
 import type { Opportunity, OpportunityContext } from '../../pipeline-types'
 import { randomUUID } from 'crypto'
+import { getSentimentScore, applySentimentToStrength } from '@/lib/market-data/news-sentiment'
 import {
   isFirstBusinessDayOfQuarter,
   isFirstBusinessDayOfMonth,
@@ -327,17 +328,33 @@ export class PeadStrategy extends BasePipelineStrategy {
         )
         .map((r) => r.value!)
 
-      return candidates.map((c) => ({
-        id: randomUUID(),
-        strategyKey: this.key,
-        symbol: c.ticker,
-        direction: (c.gapMagnitude > 0 ? 'long' : 'short') as 'long' | 'short',
-        assetClass: this.assetClass,
-        strength: Math.min(1, Math.abs(c.gapMagnitude) / 0.10),
-        expectedReturn: Math.max(Math.abs(c.gapMagnitude) * 0.25, 0.04),
-        metadata: { gapMagnitude: c.gapMagnitude },
-        detectedAt: new Date().toISOString(),
-      }))
+      const opps: Opportunity[] = []
+      for (const c of candidates) {
+        const direction = (c.gapMagnitude > 0 ? 'long' : 'short') as 'long' | 'short'
+        const baseStrength = Math.min(1, Math.abs(c.gapMagnitude) / 0.10)
+
+        const sentiment = await getSentimentScore(_ctx.supabase, c.ticker)
+        const adjStrength = applySentimentToStrength(baseStrength, direction, sentiment)
+        if (adjStrength === null) continue  // strongly contrary news — block
+
+        opps.push({
+          id: randomUUID(),
+          strategyKey: this.key,
+          symbol: c.ticker,
+          direction,
+          assetClass: this.assetClass,
+          strength: adjStrength,
+          expectedReturn: Math.max(Math.abs(c.gapMagnitude) * 0.25, 0.04),
+          metadata: {
+            gapMagnitude: c.gapMagnitude,
+            sentimentScore: sentiment?.score ?? null,
+            sentimentLabel: sentiment?.sentiment ?? 'unknown',
+            sentimentSources: sentiment?.sources ?? [],
+          },
+          detectedAt: new Date().toISOString(),
+        })
+      }
+      return opps
     } catch {
       return []
     }

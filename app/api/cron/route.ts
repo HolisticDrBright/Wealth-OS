@@ -150,6 +150,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'promote', users: userIds.length, summary })
     }
 
+    if (task === 'news-sentiment') {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      // Gather all unique tickers currently held in open paper positions
+      const { data: positions } = await supabase
+        .from('paper_positions')
+        .select('symbol, asset_class')
+        .eq('status', 'open')
+        .in('asset_class', ['stocks', 'options'])
+      const tickers = [...new Set((positions ?? []).map(p => (p.symbol as string).split(/[-/]/)[0].toUpperCase()))]
+      const { runSyncNewsSentiment } = await import('@/lib/workers/sync-news-sentiment')
+      // Use a system-level userId (null user_id written to DB for cron-sourced rows)
+      const result = await runSyncNewsSentiment(supabase, 'cron', tickers)
+      return NextResponse.json({ task: 'news-sentiment', ...result })
+    }
+
     return NextResponse.json({ error: `Unknown task: ${task}` }, { status: 400 })
   } catch (err) {
     return NextResponse.json(

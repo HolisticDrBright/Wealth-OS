@@ -28,6 +28,7 @@ import type {
 import { getRiskControl, getPortfolioUsd, quarterKelly, applyConfluenceHaircut } from '../../risk-controls'
 import { getLiveCongressTrades } from '@/lib/market-data/quiver'
 import type { CongressTrade } from '@/lib/market-data/quiver'
+import { getSentimentScore, applySentimentToStrength } from '@/lib/market-data/news-sentiment'
 import { randomUUID } from 'crypto'
 
 // ─── Thresholds (per vault recipe) ────────────────────────────────────────────
@@ -289,13 +290,18 @@ export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
       const isTopDecile = tradeAmount >= TOP_DECILE_USD
 
       // Strength: function of trade amount, freshness, and whether top decile
-      const amountScore   = Math.min(1, tradeAmount / 1_000_000)  // scale 0→1 at $1M
-      const freshnessScore = 1 - lag / MAX_FILING_LAG_DAYS         // higher for fresher
-      const decileBonus   = isTopDecile ? 0.2 : 0
-      const strength      = Math.min(1, amountScore * 0.5 + freshnessScore * 0.3 + decileBonus)
+      const amountScore    = Math.min(1, tradeAmount / 1_000_000)
+      const freshnessScore = 1 - lag / MAX_FILING_LAG_DAYS
+      const decileBonus    = isTopDecile ? 0.2 : 0
+      const baseStrength   = Math.min(1, amountScore * 0.5 + freshnessScore * 0.3 + decileBonus)
+
+      // News sentiment confluence — congressional longs benefit from bullish news
+      const sentiment = await getSentimentScore(ctx.supabase, ticker)
+      const adjStrength = applySentimentToStrength(baseStrength, 'long', sentiment)
+      if (adjStrength === null) continue  // strongly contrary news — block
 
       // Expected return: congressional alphas average ~6% over 90d (academic estimates)
-      const expectedReturn = 0.06 * (strength * 0.5 + 0.5)  // 3–6% range
+      const expectedReturn = 0.06 * (adjStrength * 0.5 + 0.5)
 
       const targetDate = new Date(Date.now() + HOLD_DAYS * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
@@ -305,7 +311,7 @@ export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
         symbol: ticker,
         direction: 'long',
         assetClass: this.assetClass,
-        strength,
+        strength: adjStrength,
         expectedReturn,
         metadata: {
           ticker,
@@ -320,7 +326,10 @@ export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
           holdDays: HOLD_DAYS,
           targetExitDate: targetDate,
           source: hasQuiver ? 'quiver' : 'stockwatcher',
-          reasoning: `${trade.Representative} (${trade.House}) purchased $${(tradeAmount / 1000).toFixed(0)}k of ${ticker} on ${trade.TransactionDate}, filed ${lag}d later.${isTopDecile ? ' Top-decile size.' : ''} 90-day hold.`,
+          sentimentScore: sentiment?.score ?? null,
+          sentimentLabel: sentiment?.sentiment ?? 'unknown',
+          sentimentSources: sentiment?.sources ?? [],
+          reasoning: `${trade.Representative} (${trade.House}) purchased $${(tradeAmount / 1000).toFixed(0)}k of ${ticker} on ${trade.TransactionDate}, filed ${lag}d later.${isTopDecile ? ' Top-decile size.' : ''}${sentiment ? ` News: ${sentiment.sentiment} (${sentiment.score.toFixed(2)}).` : ''} 90-day hold.`,
         },
         detectedAt: new Date().toISOString(),
       })
