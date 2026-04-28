@@ -33,7 +33,13 @@ export async function fetchCurrentPrice(
   }
 }
 
-// ─── Crypto — Coinbase public REST (no key required) ────────────────────────
+// ─── Crypto — Coinbase public REST with CoinGecko fallback ──────────────────
+
+const COINGECKO_ID: Record<string, string> = {
+  BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', XRP: 'ripple',
+  ADA: 'cardano', DOGE: 'dogecoin', AVAX: 'avalanche-2', DOT: 'polkadot',
+  LINK: 'chainlink', MATIC: 'matic-network', UNI: 'uniswap',
+}
 
 async function fetchCryptoPrice(symbol: string): Promise<number | null> {
   // Normalise: BTC-ARB → BTC, ETH-USD → ETH, SOL → SOL
@@ -41,26 +47,40 @@ async function fetchCryptoPrice(symbol: string): Promise<number | null> {
     .replace(/-ARB$/, '')
     .replace(/-(?:USD|USDT|USDC|PERP)$/, '')
     .toUpperCase()
-  const productId = `${base}-USD`
 
-  const res = await fetch(
-    `https://api.coinbase.com/api/v3/brokerage/best_bid_ask?product_ids=${productId}`,
-    { signal: AbortSignal.timeout(3_000) }
-  )
-  if (!res.ok) return null
+  // Try Coinbase first
+  try {
+    const res = await fetch(
+      `https://api.coinbase.com/api/v3/brokerage/best_bid_ask?product_ids=${base}-USD`,
+      { signal: AbortSignal.timeout(3_000) }
+    )
+    if (res.ok) {
+      const data = await res.json() as {
+        pricebooks?: Array<{ bids: Array<{ price: string }>; asks: Array<{ price: string }> }>
+      }
+      const pb = data.pricebooks?.[0]
+      if (pb) {
+        const bid = parseFloat(pb.bids[0]?.price ?? '0')
+        const ask = parseFloat(pb.asks[0]?.price ?? '0')
+        if (bid > 0 && ask > 0) return (bid + ask) / 2
+      }
+    }
+  } catch { /* fall through */ }
 
-  const data = await res.json() as {
-    pricebooks?: Array<{
-      bids: Array<{ price: string }>
-      asks: Array<{ price: string }>
-    }>
+  // Fallback: CoinGecko simple price (no API key required)
+  const geckoId = COINGECKO_ID[base]
+  if (!geckoId) return null
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${geckoId}&vs_currencies=usd`,
+      { signal: AbortSignal.timeout(5_000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json() as Record<string, { usd?: number }>
+    return data[geckoId]?.usd ?? null
+  } catch {
+    return null
   }
-  const pb = data.pricebooks?.[0]
-  if (!pb) return null
-
-  const bid = parseFloat(pb.bids[0]?.price ?? '0')
-  const ask = parseFloat(pb.asks[0]?.price ?? '0')
-  return bid > 0 && ask > 0 ? (bid + ask) / 2 : null
 }
 
 // ─── Stocks — Yahoo Finance v8 (no key required) ────────────────────────────
@@ -129,6 +149,8 @@ async function fetchPolymarketPrice(symbol: string): Promise<number | null> {
   const ask = parseFloat(mkt.bestAsk ?? '0')
   if (bid > 0 && ask > 0) return (bid + ask) / 2
 
-  const price = mkt.outcomePrices?.[0]
-  return price != null ? parseFloat(price) : null
+  const rawPrice = mkt.outcomePrices?.[0]
+  if (rawPrice == null) return null
+  const parsed = parseFloat(rawPrice)
+  return isFinite(parsed) && parsed > 0 ? parsed : null
 }

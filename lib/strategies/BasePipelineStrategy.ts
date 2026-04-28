@@ -307,7 +307,6 @@ export abstract class BasePipelineStrategy {
     const row = {
       strategy_key: this.key,
       symbol: opp.symbol,
-      direction: opp.direction,
       edge_type: this.config.edgeType,
       mirofish_used: verdicts.mirofish?.used ?? false,
       kronos_used: verdicts.kronos?.used ?? false,
@@ -317,7 +316,7 @@ export abstract class BasePipelineStrategy {
       mirofish_score: verdicts.mirofish?.score ?? null,
       kronos_pass: verdicts.kronos?.pass ?? null,
       decided_at: new Date().toISOString(),
-      metadata: { detected_at: opp.detectedAt },
+      metadata: { detected_at: opp.detectedAt, direction: opp.direction },
     }
 
     if (supabase) {

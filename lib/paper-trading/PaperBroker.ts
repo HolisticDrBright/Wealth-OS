@@ -47,7 +47,7 @@ export class PaperBroker {
     if ((count ?? 0) > 0) return null
 
     const price = await fetchCurrentPrice(opp.symbol, opp.assetClass)
-    if (price == null) {
+    if (price == null || !isFinite(price) || price <= 0) {
       console.warn(`[PaperBroker] no price for ${opp.symbol} (${opp.assetClass}) — skipping fill`)
       return null
     }
