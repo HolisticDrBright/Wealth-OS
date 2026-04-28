@@ -554,12 +554,12 @@ function PaperPositionsCard() {
                       {pos.symbol}
                     </Link>
                     <span className={`px-1.5 py-0.5 rounded-full font-medium ${
-                      pos.side === 'long' ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
+                      (pos.direction ?? pos.side) === 'long' ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
                     }`}>
-                      {pos.side.toUpperCase()}
+                      {(pos.direction ?? pos.side ?? '').toUpperCase()}
                     </span>
                     <span className="text-muted-foreground truncate hidden sm:block">
-                      {pos.strategy_key.replace(/_/g, ' ')}
+                      {(pos.strategy_key ?? '').replace(/_/g, ' ')}
                     </span>
                   </div>
                   <span className={`font-mono font-semibold shrink-0 ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
