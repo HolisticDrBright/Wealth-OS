@@ -16,6 +16,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { binomialPValue } from '@/lib/stats/binomial-pvalue'
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
 import type {
   Opportunity,
@@ -179,6 +180,44 @@ async function countOpenCongressPositions(supabase: SupabaseClient, userId: stri
   return (data ?? []).length
 }
 
+// Minimum trades to apply binomial filter; below this we skip the filter
+const MIN_FILER_HISTORY = 10
+
+interface FilerStat {
+  wins: number
+  total: number
+  avgReturnVsSpy: number
+}
+
+/** Fetch closed congress trades for this representative from paper_trades. */
+async function getFilerHistory(
+  supabase: SupabaseClient,
+  representative: string
+): Promise<FilerStat> {
+  try {
+    const { data } = await supabase
+      .from('paper_trades')
+      .select('pnl_pct, metadata')
+      .eq('strategy_key', 'autopilot_congressional')
+      .not('pnl_pct', 'is', null)
+      .limit(100)
+    if (!data || data.length === 0) return { wins: 0, total: 0, avgReturnVsSpy: 0 }
+
+    // Filter to trades from this representative
+    const filerTrades = data.filter(t => {
+      const meta = t.metadata as Record<string, unknown> | null
+      return meta?.representative === representative
+    })
+    if (filerTrades.length === 0) return { wins: 0, total: filerTrades.length, avgReturnVsSpy: 0 }
+
+    const wins = filerTrades.filter(t => (t.pnl_pct as number) > 0).length
+    const avg = filerTrades.reduce((s, t) => s + (t.pnl_pct as number), 0) / filerTrades.length
+    return { wins, total: filerTrades.length, avgReturnVsSpy: avg / 100 }
+  } catch {
+    return { wins: 0, total: 0, avgReturnVsSpy: 0 }
+  }
+}
+
 // ─── Strategy ─────────────────────────────────────────────────────────────────
 
 export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
@@ -234,6 +273,16 @@ export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
       // Market cap filter (>$1B) — skip if fetch fails (conservative)
       const cap = await getMarketCapUsd(ticker)
       if (cap > 0 && cap < 1_000_000_000) continue
+
+      // Binomial p-value filter (suislanchez methodology)
+      // Only applied when we have enough history for this filer
+      if (ctx.supabase) {
+        const filerStat = await getFilerHistory(ctx.supabase, trade.Representative)
+        if (filerStat.total >= MIN_FILER_HISTORY) {
+          if (binomialPValue(filerStat.wins, filerStat.total) > 0.001) continue
+          if (filerStat.avgReturnVsSpy < 0.02) continue
+        }
+      }
 
       const lag = filingLagDays(trade.TransactionDate, trade.ReportDate)
       const tradeAmount = trade.amount_usd ?? MIN_TRADE_AMOUNT_USD

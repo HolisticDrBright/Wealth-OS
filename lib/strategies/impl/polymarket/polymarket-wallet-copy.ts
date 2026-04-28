@@ -11,6 +11,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { binomialPValue } from '@/lib/stats/binomial-pvalue'
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
 import type {
   Opportunity,
@@ -67,7 +68,7 @@ interface WalletStats {
   tradeCount: number
 }
 
-const walletStatsCache = new Map<string, { stats: WalletStats; cachedAt: number }>()
+export const walletStatsCache = new Map<string, { stats: WalletStats; cachedAt: number }>()
 const STATS_CACHE_TTL_MS = 30 * 60 * 1000  // 30 min
 
 function estimateWalletStats(recentTrades: { side: 'buy' | 'sell' | 'YES' | 'NO'; price: number }[]): WalletStats {
@@ -157,8 +158,14 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
         ? cachedStats.stats
         : estimateWalletStats([{ side: tradeSide, price }])
 
-      if (stats.winRate < 0.55) continue
-      if (stats.maxDD  > 0.30) continue
+      // Multi-test statistical filter (suislanchez methodology)
+      if (stats.tradeCount < 100) continue
+      const estimatedWins = Math.round(stats.winRate * stats.tradeCount)
+      if (binomialPValue(estimatedWins, stats.tradeCount) > 0.001) continue
+      if (stats.maxDD > 0.30) continue
+      if (stats.avgHoldHours < 24) continue
+      // Pre-resolution timing tell: if stats are estimated only, skip Sybil check
+      // (Sybil detection via shared funding requires FundingTrailClient -- optional Tier 3)
 
       // Spread from yes/no prices (actual field names from getMarketDetails)
       const yesPrice = mkt.yes_price

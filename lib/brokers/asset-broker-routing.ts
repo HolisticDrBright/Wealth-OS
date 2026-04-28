@@ -24,6 +24,7 @@ export type Broker =
   | 'tastyfx'
   | 'forex_com'
   | 'polymarket'
+  | 'kalshi'
 
 export type AssetClass =
   | 'stocks'
@@ -227,6 +228,19 @@ export const BROKER_CONFIGS: Record<Broker, BrokerConfig> = {
     baseUrlEnvKey: 'POLYMARKET_BASE_URL',
     apiKeyEnvKey: 'POLYMARKET_PRIVATE_KEY',
     fees: { perTradeBps: 0, takerBps: 0, makerBps: 0 },
+    assetClasses: ['polymarket'],
+  },
+  kalshi: {
+    broker: 'kalshi',
+    displayName: 'Kalshi',
+    apiTier: 'free',
+    legalStatus: 'us_retail_ok',
+    supportsPaperTrading: true,
+    supportsFractionalShares: false,
+    baseUrlEnvKey: 'KALSHI_BASE_URL',
+    apiKeyEnvKey: 'KALSHI_API_KEY',
+    apiSecretEnvKey: 'KALSHI_API_SECRET',
+    fees: { perTradeBps: 0, takerBps: 50, makerBps: 50 },
     assetClasses: ['polymarket'],
   },
 }

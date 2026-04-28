@@ -16,7 +16,7 @@ import * as quiverModule from '@/lib/market-data/quiver'
 import * as halvingModule from '@/lib/market-data/halving'
 import * as fundingRatesModule from '@/lib/market-data/funding-rates'
 
-import { PolymarketWalletCopyStrategy } from '@/lib/strategies/impl/polymarket/polymarket-wallet-copy'
+import { PolymarketWalletCopyStrategy, walletStatsCache } from '@/lib/strategies/impl/polymarket/polymarket-wallet-copy'
 import { PolymarketInfoLagStrategy } from '@/lib/strategies/impl/polymarket/polymarket-info-lag'
 import { AutopilotCongressionalStrategy } from '@/lib/strategies/impl/stocks/autopilot-congressional'
 import { DcaHalvingStrategy } from '@/lib/strategies/impl/crypto/dca-halving'
@@ -84,7 +84,10 @@ function jsonResponse(data: unknown) {
 // ─── PolymarketWalletCopy ─────────────────────────────────────────────────────
 
 describe('PolymarketWalletCopy', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    walletStatsCache.clear()
+  })
 
   it('1. returns [] when no wallets are tracked', async () => {
     vi.mocked(polymarketWallets.getTrackedWallets).mockReturnValue([])
@@ -100,6 +103,12 @@ describe('PolymarketWalletCopy', () => {
   })
 
   it('2b. emits valid Opportunity when a qualifying trade arrives', async () => {
+    // Pre-populate stats cache so the binomial filter (>= 100 trades) passes
+    walletStatsCache.set('0xABC', {
+      stats: { winRate: 0.65, maxDD: 0.20, avgHoldHours: 48, tradeCount: 120 },
+      cachedAt: Date.now(),
+    })
+
     vi.mocked(polymarketWallets.getTrackedWallets).mockReturnValue(['0xABC'])
     vi.mocked(polymarketWallets.scanTrackedWalletTrades).mockResolvedValue([{
       wallet: '0xABC',

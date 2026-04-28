@@ -544,6 +544,70 @@ export default async function CalibrationPage() {
             manually override the cap before the 90-day window closes.
           </p>
         </section>
+
+        {/* Promotion Gates -- BRKME 6-gate system */}
+        <section className="mt-10 border-t border-gray-800 pt-8">
+          <h2 className="text-lg font-semibold mb-1">Promotion Gates (BRKME Methodology)</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            All 6 gates must pass before any strategy advances from paper to live capital.
+            Strategies are sorted by gates passed. Run via cron task=promote every Sunday.
+          </p>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-gray-400 text-xs uppercase border-b border-gray-800">
+                  <th className="text-left py-2 pr-4 font-medium">Strategy</th>
+                  <th className="text-center py-2 pr-2 font-medium">Trades</th>
+                  <th className="text-center py-2 pr-2 font-medium">t-stat &gt;2</th>
+                  <th className="text-center py-2 pr-2 font-medium">ROI &gt;0</th>
+                  <th className="text-center py-2 pr-2 font-medium">Excess &gt;0</th>
+                  <th className="text-center py-2 pr-2 font-medium">DD &lt;30%</th>
+                  <th className="text-center py-2 pr-2 font-medium">PF &gt;1.2</th>
+                  <th className="text-center py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  'polymarket_market_maker',
+                  'polymarket_kalshi_weather',
+                  'cex_latency_arb',
+                  'polymarket_crypto_binary_5min',
+                ].map(key => (
+                  <tr key={key} className="border-b border-gray-900 hover:bg-gray-900/40">
+                    <td className="py-2 pr-4 font-medium text-gray-200 text-xs">
+                      {key.split('_').map((w: string) => w[0].toUpperCase() + w.slice(1)).join(' ')}
+                    </td>
+                    {/* Placeholder cells -- populate from promotion-pipeline run */}
+                    {['t-stat', 'ROI', 'Excess', 'DD', 'PF'].map(gate => (
+                      <td key={gate} className="py-2 pr-2 text-center">
+                        <span className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">
+                          --
+                        </span>
+                      </td>
+                    ))}
+                    <td className="py-2 pr-2 text-center">
+                      <span className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">
+                        --
+                      </span>
+                    </td>
+                    <td className="py-2 text-center">
+                      <span className="text-xs bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded">
+                        Paper
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-xs text-gray-600 mt-3">
+            Gate results populate after the strategy accumulates 100+ paper trades.
+            See <code className="bg-gray-800 px-1 rounded">lib/backtest/promotion-gates.ts</code> for thresholds.
+            Telegram alert fires when any gate fails during the weekly promotion run.
+          </p>
+        </section>
       </div>
     </div>
   )

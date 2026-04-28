@@ -173,6 +173,7 @@ function apiKeyEnvVar(broker: Broker): string {
     tastyfx:        'TASTYFX_API_KEY',
     forex_com:      'FOREX_COM_API_KEY',
     polymarket:     'POLYMARKET_PRIVATE_KEY',
+    kalshi:         'KALSHI_API_KEY',
   }
   return m[broker]
 }

@@ -130,6 +130,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'paper-trading', users: byUser.size, summary })
     }
 
+    if (task === 'promote') {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { data: users } = await supabase
+        .from('user_enabled_strategies')
+        .select('user_id')
+        .eq('paper_enabled', true)
+      const userIds = [...new Set((users ?? []).map(r => r.user_id as string))]
+      const { runPromotionPipeline } = await import('@/lib/workers/promotion-pipeline')
+      const results = await Promise.allSettled(
+        userIds.map(uid => runPromotionPipeline(supabase, uid))
+      )
+      const summary = results.map(r =>
+        r.status === 'fulfilled'
+          ? r.value.map(s => ({ strategy: s.strategy, passed: s.result.passed, failedGates: s.result.failedGates }))
+          : []
+      ).flat()
+      return NextResponse.json({ task: 'promote', users: userIds.length, summary })
+    }
+
     return NextResponse.json({ error: `Unknown task: ${task}` }, { status: 400 })
   } catch (err) {
     return NextResponse.json(

@@ -230,6 +230,68 @@ const INTEGRATIONS: Integration[] = [
     enabledInStrategies: ['cex_latency_arb'],
     costNote: 'No integration cost. Trading fees: ~10 bps round-trip per pair (Coinbase 5bps + Kraken 5bps). Min threshold: 8 bps net.',
   },
+  {
+    id: 'polymarket_mm',
+    name: 'Polymarket Market Maker',
+    tagline: 'Automated bid-ask spread income on Polymarket CLOB',
+    description: 'Provides liquidity on Polymarket prediction markets. Income strategy analogous to options_wheel. Requires POLYMARKET_PRIVATE_KEY. Mandatory 14-day paper-trade validation before live.',
+    githubUrl: 'https://github.com/Polymarket/poly-market-maker',
+    type: 'external_app',
+    deploymentNote: 'Paper trading only until promotion gates pass. Set POLYMARKET_PRIVATE_KEY in .env.',
+    featureKey: 'polymarket_mm',
+    enabledInStrategies: ['polymarket_market_maker'],
+    costNote: 'Free (0 cents/call). Gas costs on Polygon for live orders.',
+  },
+  {
+    id: 'kalshi_api',
+    name: 'Kalshi API',
+    tagline: 'CFTC-regulated prediction market (US retail legal)',
+    description: 'Connects to Kalshi, a CFTC Designated Contract Market. Used by the polymarket_kalshi_weather strategy for weather market arbitrage between platforms.',
+    githubUrl: 'https://github.com/Kalshi/kalshi-python',
+    docsUrl: 'https://trading-api.readme.io',
+    type: 'external_app',
+    deploymentNote: 'Set KALSHI_API_KEY and KALSHI_API_SECRET. US retail accounts supported.',
+    featureKey: 'kalshi_api',
+    enabledInStrategies: ['polymarket_kalshi_weather'],
+    costNote: 'Free API. 50 bps taker fee per contract.',
+  },
+  {
+    id: 'weather_ensemble',
+    name: 'Open-Meteo Weather Ensemble',
+    tagline: 'Free multi-model ensemble forecasts (GFS, ECMWF, ICON)',
+    description: 'Open-Meteo provides GFS 31-member, ECMWF IFS, and ICON ensemble forecasts at no cost. Used by polymarket_kalshi_weather to compute fair probability of weather outcomes.',
+    githubUrl: 'https://github.com/open-meteo/open-meteo',
+    docsUrl: 'https://open-meteo.com/en/docs',
+    type: 'external_app',
+    deploymentNote: 'No API key required. Free tier: unlimited calls.',
+    featureKey: 'weather_ensemble',
+    enabledInStrategies: ['polymarket_kalshi_weather'],
+    costNote: 'Free (no API key required).',
+  },
+  {
+    id: 'polymarket_insider_score',
+    name: 'Polymarket Insider Score',
+    tagline: 'NickNaskida 0-10 insider indicator for wallet copy',
+    description: 'Scores each wallet trade on 5 insider-behavior signals: wallet age, market thinness, trade size, prior trade count, and pre-resolution timing. Scores >= 7 preferred for wallet copy.',
+    githubUrl: 'https://github.com/nicknaskida/polymarket-insider-detector',
+    type: 'external_app',
+    deploymentNote: 'No external API required. Feature flag: polymarket_insider_score.',
+    featureKey: 'polymarket_insider_score',
+    enabledInStrategies: ['polymarket_wallet_copy'],
+    costNote: 'Free (local scoring, no API calls).',
+  },
+  {
+    id: 'wallet_funding_trail',
+    name: 'Wallet Funding Trail',
+    tagline: 'Sybil detection via pselamy funding-trail methodology',
+    description: 'Traces wallet funding sources up to 3 hops using Polygonscan. Identifies Binance/Coinbase/Kraken hot-wallet origins and Sybil clusters. Blocks trades from clusters larger than 5.',
+    githubUrl: 'https://github.com/pselamy/polymarket-insider-tracker',
+    type: 'external_app',
+    deploymentNote: 'Optional: set POLYGONSCAN_API_KEY for higher rate limits (free tier works without key).',
+    featureKey: 'wallet_funding_trail',
+    enabledInStrategies: ['onchain_signal', 'polymarket_wallet_copy'],
+    costNote: 'Free via Polygonscan free tier. Optional POLYGONSCAN_API_KEY for 5 req/s.',
+  },
 ]
 
 function StatusBadge({ status }: { status: IntegrationHealth['status'] }) {
@@ -400,6 +462,55 @@ export default function IntegrationsPage() {
             </Card>
           )
         })}
+
+        {/* AI Feature Cards */}
+        <div className="pt-4 border-t border-border/50">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">AI Scoring Features</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card className="border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Insider Score</CardTitle>
+                <CardDescription className="text-xs">NickNaskida 0-10 rubric</CardDescription>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground space-y-1">
+                <p>+3 wallet age &lt; 7d</p>
+                <p>+2 market vol24h &lt; $50k</p>
+                <p>+2 trade size &gt; $5k</p>
+                <p>+2 prior trades &lt; 10</p>
+                <p>+1 timing &lt; 60min before resolution</p>
+                <p className="pt-1 font-medium text-foreground/70">Threshold: &gt;= 7 = insider-like</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Funding Trail</CardTitle>
+                <CardDescription className="text-xs">pselamy Sybil detection</CardDescription>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground space-y-1">
+                <p>Traces up to 3 hops via Polygonscan</p>
+                <p>Identifies CEX hot-wallet origins</p>
+                <p>Binance / Coinbase / Kraken labels</p>
+                <p>Sybil cluster detection</p>
+                <p className="pt-1 font-medium text-foreground/70">Blocks trades: cluster &gt; 5 wallets</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Weather Ensemble</CardTitle>
+                <CardDescription className="text-xs">Open-Meteo fair-value model</CardDescription>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground space-y-1">
+                <p>GFS 31-member ensemble</p>
+                <p>ECMWF IFS forecast</p>
+                <p>ICON model integration</p>
+                <p>No API key required</p>
+                <p className="pt-1 font-medium text-foreground/70">Used by: polymarket_kalshi_weather</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

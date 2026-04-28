@@ -49,6 +49,8 @@ export type StrategyKey =
   | 'polymarket_wallet_copy'
   | 'polymarket_crypto_binary_5min'
   | 'cex_latency_arb'
+  | 'polymarket_market_maker'
+  | 'polymarket_kalshi_weather'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -264,6 +266,16 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   cex_latency_arb: {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'coinbase', assetClass: 'crypto',
+  },
+  polymarket_market_maker: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'liquidity', defaultBroker: 'polymarket', assetClass: 'polymarket',
+    optionalEnv: ['POLYMARKET_PRIVATE_KEY'],
+  },
+  polymarket_kalshi_weather: {
+    mirofish: 'medium', kronos: 'skip',
+    edgeType: 'information', defaultBroker: 'polymarket', assetClass: 'polymarket',
+    optionalEnv: ['KALSHI_API_KEY', 'KALSHI_API_SECRET'],
   },
 }
 

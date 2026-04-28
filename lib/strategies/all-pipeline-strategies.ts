@@ -56,6 +56,8 @@ import {
 import { PolymarketWalletCopyStrategy } from './impl/polymarket/polymarket-wallet-copy'
 import { PolymarketInfoLagStrategy } from './impl/polymarket/polymarket-info-lag'
 import { PolymarketCryptoBinary5MinStrategy } from './impl/polymarket/polymarket-crypto-binary-5min'
+import { PolymarketMarketMakerStrategy } from './impl/polymarket/polymarket-market-maker'
+import { PolymarketKalshiWeatherStrategy } from './impl/polymarket/polymarket-kalshi-weather'
 
 // ── Polymarket stubs ──────────────────────────────────────────────────────────
 import {
@@ -118,6 +120,8 @@ const ALL_STRATEGIES = [
   new PolymarketNoTradeStrategy(),
   new PolymarketWalletCopyStrategy(),
   new PolymarketCryptoBinary5MinStrategy(),
+  new PolymarketMarketMakerStrategy(),
+  new PolymarketKalshiWeatherStrategy(),
 ]
 
 for (const s of ALL_STRATEGIES) {
