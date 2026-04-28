@@ -18,6 +18,15 @@ const DEFAULT_STOP_LOSS_PCT   = 0.02   // -2%
 const DEFAULT_TAKE_PROFIT_PCT = 0.05   // +5%
 const DEFAULT_MAX_HOLD_HOURS  = 24
 
+// How many calendar days after open to grade the outcome in the learning loop
+const LEARNING_HORIZON_DAYS: Partial<Record<AssetClass, number>> = {
+  stocks:       5,
+  options:      5,
+  crypto:       3,
+  forex:        2,
+  'multi-asset': 3,
+}
+
 export class PaperBroker {
   // ── Open a new paper position ──────────────────────────────────────────────
 
@@ -99,6 +108,26 @@ export class PaperBroker {
       opportunity_id: opp.id,
       metadata:       opp.metadata,
     })
+
+    // Write to decision_log so the learning loop can grade this trade once the horizon passes.
+    // Skip polymarket (conditionId-based symbols can't be priced via Yahoo Finance for grading).
+    if (opp.assetClass !== 'polymarket') {
+      const horizonDays = LEARNING_HORIZON_DAYS[opp.assetClass] ?? 5
+      const resolutionDue = new Date(Date.now() + horizonDays * 86_400_000).toISOString()
+      supabase.from('decision_log').insert({
+        user_id:            userId,
+        strategy:           opp.strategyKey,
+        symbol:             opp.symbol,
+        confidence:         Math.min(1, Math.max(0, opp.strength)),
+        direction:          opp.direction,
+        horizon_days:       horizonDays,
+        resolution_due_at:  resolutionDue,
+        outcome_graded:     false,
+        paper_position_id:  pos.id,
+      }).then(({ error: e }) => {
+        if (e) console.warn('[PaperBroker] decision_log insert error:', e.message)
+      })
+    }
 
     console.log(
       `[PaperBroker] ✓ opened ${opp.strategyKey} ${opp.direction.toUpperCase()} ` +
