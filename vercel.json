@@ -7,6 +7,7 @@
     { "path": "/api/cron?task=rebalance",    "schedule": "0 9 * * 1-5" },
     { "path": "/api/cron?task=harvest-scan", "schedule": "0 20 * * *" },
     { "path": "/api/cron?task=sync-crypto",  "schedule": "*/5 * * * *" },
-    { "path": "/api/cron?task=sync-forex",   "schedule": "*/1 * * * *" }
+    { "path": "/api/cron?task=sync-forex",     "schedule": "*/1 * * * *" },
+    { "path": "/api/cron?task=paper-trading", "schedule": "*/15 * * * *" }
   ]
 }

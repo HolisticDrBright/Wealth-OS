@@ -90,6 +90,46 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'sync-forex', result: data })
     }
 
+    if (task === 'paper-trading') {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+
+      // Find every user who has at least one strategy paper-enabled
+      const { data: rows } = await supabase
+        .from('user_enabled_strategies')
+        .select('user_id, strategy_key')
+        .eq('paper_enabled', true)
+
+      const byUser = new Map<string, string[]>()
+      for (const row of rows ?? []) {
+        const uid = row.user_id as string
+        const key = row.strategy_key as string
+        if (!byUser.has(uid)) byUser.set(uid, [])
+        byUser.get(uid)!.push(key)
+      }
+
+      if (byUser.size === 0) {
+        return NextResponse.json({ task: 'paper-trading', users: 0, message: 'No users have paper trading enabled' })
+      }
+
+      const { runPaperTradingPass } = await import('@/lib/paper-trading/PaperTradeRunner')
+
+      const results = await Promise.allSettled(
+        [...byUser.entries()].map(([userId, enabledKeys]) =>
+          runPaperTradingPass(userId, supabase, enabledKeys)
+        )
+      )
+
+      const summary = results.map((r, i) => ({
+        userId: [...byUser.keys()][i],
+        ...(r.status === 'fulfilled'
+          ? r.value
+          : { error: r.reason instanceof Error ? r.reason.message : String(r.reason) }),
+      }))
+
+      return NextResponse.json({ task: 'paper-trading', users: byUser.size, summary })
+    }
+
     return NextResponse.json({ error: `Unknown task: ${task}` }, { status: 400 })
   } catch (err) {
     return NextResponse.json(
