@@ -103,9 +103,9 @@ describe('PolymarketWalletCopy', () => {
   })
 
   it('2b. emits valid Opportunity when a qualifying trade arrives', async () => {
-    // Pre-populate stats cache so the binomial filter (>= 100 trades) passes
+    // Pre-populate with real (Dune-style) stats so the binomial filter applies and passes
     walletStatsCache.set('0xABC', {
-      stats: { winRate: 0.65, maxDD: 0.20, avgHoldHours: 48, tradeCount: 120 },
+      stats: { winRate: 0.65, maxDD: 0.20, avgHoldHours: 48, tradeCount: 120, isEstimated: false },
       cachedAt: Date.now(),
     })
 
@@ -138,6 +138,33 @@ describe('PolymarketWalletCopy', () => {
     expect(opp.metadata.walletAddress).toBe('0xABC')
     expect(opp.metadata.liquidity).toBe(50_000)
     expect(typeof opp.strength).toBe('number')
+  })
+
+  it('2c. new wallet (no Dune data) can still generate a trade via estimated stats', async () => {
+    // No pre-populated cache — strategy uses estimateWalletStats (isEstimated: true)
+    // The strict tradeCount >= 100 gate must be skipped for estimated stats
+    vi.mocked(polymarketWallets.getTrackedWallets).mockReturnValue(['0xNEW'])
+    vi.mocked(polymarketWallets.scanTrackedWalletTrades).mockResolvedValue([{
+      wallet: '0xNEW',
+      conditionId: '0xcondition2',
+      side: 'YES',
+      size: 500,
+      price: 0.30,
+      timestamp: new Date().toISOString(),
+      transaction_hash: '0xtx2',
+    }])
+    vi.mocked(polymarketWallets.getMarketDetails).mockResolvedValue({
+      question: 'Will Z happen?',
+      yes_price: 0.31,
+      no_price: 0.69,
+      liquidity: 30_000,
+      end_date_iso: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+
+    const result = await new PolymarketWalletCopyStrategy().detectOpportunities(makeCtx())
+    // Should emit at least one opportunity (estimated stats bypass strict tradeCount gate)
+    expect(result.length).toBeGreaterThanOrEqual(1)
+    expect(result[0].strategyKey).toBe('polymarket_wallet_copy')
   })
 })
 

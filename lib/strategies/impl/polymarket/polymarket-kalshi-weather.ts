@@ -80,16 +80,52 @@ function parseWeatherQuestion(question: string, endDate: string): {
 
   if (!tempMatch && !precipMatch) return null
 
-  // City -> lat/lon lookup (simplified, production would use geocoding API)
+  // City -> lat/lon lookup (production would use geocoding API)
   const cityCoords: Record<string, [number, number]> = {
     'NYC': [40.71, -74.01], 'New York': [40.71, -74.01],
     'LA': [34.05, -118.24], 'Los Angeles': [34.05, -118.24],
     'Chicago': [41.88, -87.63],
-    'Miami': [25.77, -80.19],
-    'Dallas': [32.78, -96.80],
+    'Houston': [29.76, -95.37],
+    'Philadelphia': [39.95, -75.17],
     'Phoenix': [33.45, -112.07],
+    'San Antonio': [29.42, -98.49],
+    'San Diego': [32.72, -117.15],
+    'Dallas': [32.78, -96.80],
+    'Jacksonville': [30.33, -81.66],
+    'Austin': [30.27, -97.74],
+    'San Francisco': [37.77, -122.42], 'SF': [37.77, -122.42],
+    'Columbus': [39.96, -82.99],
+    'Charlotte': [35.23, -80.84],
+    'Indianapolis': [39.77, -86.16],
+    'Seattle': [47.61, -122.33],
+    'Denver': [39.74, -104.99],
+    'Nashville': [36.17, -86.78],
+    'Oklahoma City': [35.47, -97.52],
+    'Las Vegas': [36.17, -115.14],
+    'Washington': [38.91, -77.04], 'DC': [38.91, -77.04],
+    'Memphis': [35.15, -90.05],
+    'Louisville': [38.25, -85.76],
+    'Portland': [45.52, -122.68],
+    'Baltimore': [39.29, -76.61],
+    'Milwaukee': [43.04, -87.91],
+    'Albuquerque': [35.08, -106.65],
     'Atlanta': [33.75, -84.39],
     'Boston': [42.36, -71.06],
+    'Miami': [25.77, -80.19],
+    'Minneapolis': [44.98, -93.27],
+    'New Orleans': [29.95, -90.07],
+    'Tampa': [27.95, -82.46],
+    'Raleigh': [35.78, -78.64],
+    'Cleveland': [41.50, -81.69],
+    'Kansas City': [39.10, -94.58],
+    'Detroit': [42.33, -83.05],
+    'Pittsburgh': [40.44, -79.99],
+    'Salt Lake City': [40.76, -111.89],
+    'Richmond': [37.54, -77.43],
+    'London': [51.51, -0.13],
+    'Paris': [48.85, 2.35],
+    'Tokyo': [35.68, 139.69],
+    'Sydney': [-33.87, 151.21],
   }
 
   let lat = 40.71
@@ -117,37 +153,47 @@ function parseWeatherQuestion(question: string, endDate: string): {
 
 /** Fetch active weather markets from Polymarket. */
 async function fetchPolymarketWeatherMarkets(): Promise<WeatherMarket[]> {
-  try {
-    const res = await fetch(
-      `${GAMMA_BASE}/markets?active=true&closed=false&limit=50&keyword=temperature&order=volumeNum`,
-      { signal: AbortSignal.timeout(8_000) }
-    )
-    if (!res.ok) return []
+  const keywords = ['temperature', 'weather', 'rain', 'precipitation', 'snow', 'wind', 'hurricane', 'tornado']
+  const seen = new Set<string>()
+  const markets: WeatherMarket[] = []
 
-    const data = await res.json() as Array<{
-      conditionId: string; question: string; endDate: string;
-      outcomePrices: string[]; liquidity: string; bestBid: string; bestAsk: string;
-    }>
+  await Promise.allSettled(keywords.map(async (kw) => {
+    try {
+      const res = await fetch(
+        `${GAMMA_BASE}/markets?active=true&closed=false&limit=30&keyword=${kw}&order=volumeNum`,
+        { signal: AbortSignal.timeout(8_000) }
+      )
+      if (!res.ok) return
 
-    return data.map(m => {
-      const yes = parseFloat(m.outcomePrices?.[0] ?? '0.5')
-      const no  = parseFloat(m.outcomePrices?.[1] ?? '0.5')
-      const bid = parseFloat(m.bestBid ?? '0')
-      const ask = parseFloat(m.bestAsk ?? '1')
-      return {
-        conditionId: m.conditionId,
-        question: m.question,
-        endDate: m.endDate,
-        yesPrice: yes,
-        noPrice: no,
-        spread: ask - bid,
-        liquidity: parseFloat(m.liquidity ?? '0'),
-        platform: 'polymarket' as const,
+      const data = await res.json() as Array<{
+        conditionId: string; question: string; endDate: string;
+        outcomePrices: string[]; liquidity: string; bestBid: string; bestAsk: string;
+      }>
+
+      for (const m of data) {
+        if (seen.has(m.conditionId)) continue
+        seen.add(m.conditionId)
+        const yes = parseFloat(m.outcomePrices?.[0] ?? '0.5')
+        const no  = parseFloat(m.outcomePrices?.[1] ?? '0.5')
+        const bid = parseFloat(m.bestBid ?? '0')
+        const ask = parseFloat(m.bestAsk ?? '1')
+        const liquidity = parseFloat(m.liquidity ?? '0')
+        if (liquidity < 5_000) continue
+        markets.push({
+          conditionId: m.conditionId,
+          question: m.question,
+          endDate: m.endDate,
+          yesPrice: yes,
+          noPrice: no,
+          spread: ask - bid,
+          liquidity,
+          platform: 'polymarket' as const,
+        })
       }
-    }).filter(m => m.liquidity >= 5_000)
-  } catch {
-    return []
-  }
+    } catch { /* skip failed keyword */ }
+  }))
+
+  return markets
 }
 
 export class PolymarketKalshiWeatherStrategy extends BasePipelineStrategy {

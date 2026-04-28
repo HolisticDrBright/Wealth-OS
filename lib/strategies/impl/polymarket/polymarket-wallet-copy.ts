@@ -66,6 +66,7 @@ interface WalletStats {
   maxDD: number        // 0–1
   avgHoldHours: number
   tradeCount: number
+  isEstimated: boolean // true when not from real Dune/historical data
 }
 
 export const walletStatsCache = new Map<string, { stats: WalletStats; cachedAt: number }>()
@@ -74,7 +75,6 @@ const STATS_CACHE_TTL_MS = 30 * 60 * 1000  // 30 min
 function estimateWalletStats(recentTrades: { side: 'buy' | 'sell' | 'YES' | 'NO'; price: number }[]): WalletStats {
   // Simplified stats from available CLOB data — real implementation uses Dune
   const buys  = recentTrades.filter(t => t.side === 'buy' || t.side === 'YES')
-  const sells = recentTrades.filter(t => t.side === 'sell' || t.side === 'NO')
 
   // Estimated win rate: buys at < 0.5 that exited > 0.7 count as wins
   const wins = buys.filter(t => t.price < 0.5).length
@@ -85,6 +85,7 @@ function estimateWalletStats(recentTrades: { side: 'buy' | 'sell' | 'YES' | 'NO'
     maxDD: 0.25,  // conservative default — Dune required for exact
     avgHoldHours: 48,
     tradeCount: recentTrades.length,
+    isEstimated: true,
   }
 }
 
@@ -152,16 +153,24 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
       }
 
       // Wallet performance gate (estimates from CLOB; Dune gated if flag enabled)
-      const cachedStats = walletStatsCache.get(trade.wallet)
+      const cachedEntry = walletStatsCache.get(trade.wallet)
       const tradeSide = trade.side === 'YES' ? 'buy' : 'sell'
-      const stats: WalletStats = cachedStats && Date.now() - cachedStats.cachedAt < STATS_CACHE_TTL_MS
-        ? cachedStats.stats
-        : estimateWalletStats([{ side: tradeSide, price }])
+      let stats: WalletStats
+      if (cachedEntry && Date.now() - cachedEntry.cachedAt < STATS_CACHE_TTL_MS) {
+        stats = cachedEntry.stats
+      } else {
+        stats = estimateWalletStats([{ side: tradeSide, price }])
+        // Cache estimate so later calls within the TTL window avoid redundant computation
+        walletStatsCache.set(trade.wallet, { stats, cachedAt: Date.now() })
+      }
 
-      // Multi-test statistical filter (suislanchez methodology)
-      if (stats.tradeCount < 100) continue
-      const estimatedWins = Math.round(stats.winRate * stats.tradeCount)
-      if (binomialPValue(estimatedWins, stats.tradeCount) > 0.001) continue
+      // suislanchez binomial filter — only meaningful with real historical data (≥100 trades)
+      // Estimated stats have tradeCount=1; skip the strict gate so wallets trade until Dune data arrives
+      if (!stats.isEstimated) {
+        if (stats.tradeCount < 100) continue
+        const estimatedWins = Math.round(stats.winRate * stats.tradeCount)
+        if (binomialPValue(estimatedWins, stats.tradeCount) > 0.001) continue
+      }
       if (stats.maxDD > 0.30) continue
       if (stats.avgHoldHours < 24) continue
       // Pre-resolution timing tell: if stats are estimated only, skip Sybil check
