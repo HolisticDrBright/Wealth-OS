@@ -49,6 +49,7 @@ const navItems = [
   { href: '/opportunities', label: 'Opportunities', icon: Lightbulb },
   { href: '/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/strategies', label: 'Strategies', icon: BarChart2 },
+  { href: '/stocks', label: 'Stocks', icon: TrendingUp },
   { href: '/options', label: 'Options', icon: Sigma },
   // Automation
   { href: '/autopilot', label: 'Autopilot', icon: Zap },
