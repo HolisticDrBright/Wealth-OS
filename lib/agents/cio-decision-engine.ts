@@ -217,7 +217,7 @@ Write a CIO synthesis as JSON:
         decision,
         reasoning: vetoReason ?? `Committee score logged`,
         latency_ms: Date.now() - synthStart,
-      }).then(() => {}).catch(() => {})
+      }).then(() => {}, () => {})
     } catch { /* non-critical */ }
 
     const scores = Object.values(agentScores)

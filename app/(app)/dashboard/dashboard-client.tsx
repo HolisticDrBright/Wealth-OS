@@ -546,7 +546,7 @@ function PaperPositionsCard() {
             <FlaskConical className="h-4 w-4 text-indigo-400" />
             <CardTitle className="text-sm font-medium">Paper Positions</CardTitle>
           </div>
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="default" className="text-xs">
             {loading ? '…' : positions.length} open
           </Badge>
         </div>

@@ -33,19 +33,21 @@ export async function POST(
 
   const client = createVibeTradingClient(supabase, user.id)
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyBody = body as any
   let result
   switch (tool as VibeTradingTool) {
     case 'backtest':
-      result = await client.backtest(body as Parameters<typeof client.backtest>[0])
+      result = await client.backtest(anyBody)
       break
     case 'factor_analysis':
-      result = await client.factorAnalysis(body as Parameters<typeof client.factorAnalysis>[0])
+      result = await client.factorAnalysis(anyBody)
       break
     case 'pattern_recognition':
-      result = await client.patternRecognition(body as Parameters<typeof client.patternRecognition>[0])
+      result = await client.patternRecognition(anyBody)
       break
     case 'analyze_options':
-      result = await client.analyzeOptions(body as Parameters<typeof client.analyzeOptions>[0])
+      result = await client.analyzeOptions(anyBody)
       break
     default:
       return NextResponse.json(

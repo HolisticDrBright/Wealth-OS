@@ -130,7 +130,8 @@ export class VibeTradingClient {
 
   private async _callTool<T>(
     tool: string,
-    params: Record<string, unknown>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    params: any
   ): Promise<VibeTradingResponse<T>> {
     const svc = new FeatureFlagService(this.supabase)
     const gate = await svc.canSpend(this.userId, FEATURE_KEY, TOOL_COST_CENTS)

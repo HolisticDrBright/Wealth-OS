@@ -12,8 +12,7 @@ export async function GET() {
   supabase
     .from('integration_health_log')
     .insert({ integration: 'camofox', status, latency_ms: latencyMs })
-    .then(() => {})
-    .catch(() => {})
+    .then(() => {}, () => {})
 
   return NextResponse.json(
     { integration: 'camofox', status, latencyMs, dockerUrl: process.env.CAMOFOX_URL ?? 'http://localhost:9377' },

@@ -17,8 +17,7 @@ export async function POST(request: NextRequest) {
   await supabase
     .from('user_telemetry_events')
     .insert({ user_id: user?.id ?? null, event: body.event, properties: body.properties ?? {} })
-    .then(() => {})
-    .catch(() => {})
+    .then(() => {}, () => {})
 
   return NextResponse.json({ ok: true })
 }

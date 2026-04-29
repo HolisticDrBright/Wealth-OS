@@ -107,7 +107,8 @@ const HOLD_DAYS: Record<string, number> = {
 async function runStrategyBacktest(
   strategy: { key: string; displayName: string; detectOpportunities: (ctx: OpportunityContext) => Promise<Opportunity[]> },
   days: number,
-  supabase: ReturnType<typeof createClient>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
 ): Promise<BacktestTrade[]> {
   const trades: BacktestTrade[] = []
   const holdDays = HOLD_DAYS[strategy.key] ?? 7

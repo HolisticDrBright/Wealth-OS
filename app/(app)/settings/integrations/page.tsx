@@ -298,7 +298,7 @@ function StatusBadge({ status }: { status: IntegrationHealth['status'] }) {
   if (status === 'ok')      return <Badge className="bg-green-500/20 text-green-400 border-green-500/30"><CheckCircle2 className="h-3 w-3 mr-1" />Online</Badge>
   if (status === 'down')    return <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
   if (status === 'degraded')return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30"><AlertCircle className="h-3 w-3 mr-1" />Degraded</Badge>
-  return <Badge variant="outline" className="text-muted-foreground">Not checked</Badge>
+  return <Badge variant="default" className="text-muted-foreground">Not checked</Badge>
 }
 
 function TypeBadge({ type }: { type: Integration['type'] }) {
@@ -309,7 +309,7 @@ function TypeBadge({ type }: { type: Integration['type'] }) {
     dev_tooling: 'Dev Tooling',
     external_app: 'External App',
   }
-  return <Badge variant="secondary" className="text-xs">{map[type]}</Badge>
+  return <Badge variant="default" className="text-xs">{map[type]}</Badge>
 }
 
 export default function IntegrationsPage() {
@@ -396,8 +396,8 @@ export default function IntegrationsPage() {
                         Check
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" asChild>
-                      <a href={integration.githubUrl} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="ghost">
+                      <a href={integration.githubUrl} target="_blank" rel="noopener noreferrer" className="flex items-center">
                         <ExternalLink className="h-3 w-3 mr-1" />
                         GitHub
                       </a>
@@ -412,7 +412,7 @@ export default function IntegrationsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground">Used by:</span>
                     {integration.enabledInStrategies.map(s => (
-                      <Badge key={s} variant="outline" className="text-xs font-mono">{s}</Badge>
+                      <Badge key={s} variant="default" className="text-xs font-mono">{s}</Badge>
                     ))}
                   </div>
                 )}

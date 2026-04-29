@@ -247,7 +247,7 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
                 >
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     <span className="text-xs font-medium text-foreground truncate">{s.displayName}</span>
-                    <Badge variant="outline" className="text-[10px] shrink-0 text-gray-500 border-gray-600/50">{s.edgeType}</Badge>
+                    <Badge variant="default" className="text-[10px] shrink-0 text-gray-500 border-gray-600/50">{s.edgeType}</Badge>
                     <AiTierBadge tier={s.mirofish} label="MF" icon={<Fish className="h-2.5 w-2.5" />} />
                     <AiTierBadge tier={s.kronos} label="KR" icon={<Atom className="h-2.5 w-2.5" />} />
                   </div>
