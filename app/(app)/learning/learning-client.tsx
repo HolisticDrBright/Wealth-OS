@@ -47,7 +47,7 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
     graded?: number
     max_delta?: number
   } | null>(null)
-  const [backfillResult, setBackfillResult] = useState<{ backfilled: number; skipped: number } | null>(null)
+  const [backfillResult, setBackfillResult] = useState<{ openBackfilled: number; closedBackfilled: number; skipped: number; total: number } | null>(null)
 
   async function backfill() {
     setIsBackfilling(true)
@@ -64,7 +64,7 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
         setPending(statsData.pending_grade)
       }
     } catch {
-      setBackfillResult({ backfilled: 0, skipped: 0 })
+      setBackfillResult({ openBackfilled: 0, closedBackfilled: 0, skipped: 0, total: 0 })
     } finally {
       setIsBackfilling(false)
     }
@@ -138,12 +138,10 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {decisions === 0 && (
-                <Button variant="outline" size="sm" onClick={backfill} disabled={isBackfilling}>
-                  <BarChart2 className={`h-3.5 w-3.5 mr-1.5 ${isBackfilling ? 'animate-pulse' : ''}`} />
-                  {isBackfilling ? 'Backfilling...' : 'Backfill Positions'}
-                </Button>
-              )}
+              <Button variant="outline" size="sm" onClick={backfill} disabled={isBackfilling}>
+                <BarChart2 className={`h-3.5 w-3.5 mr-1.5 ${isBackfilling ? 'animate-pulse' : ''}`} />
+                {isBackfilling ? 'Backfilling...' : 'Backfill History'}
+              </Button>
               <Button onClick={runPass} disabled={isRunning}>
                 <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRunning ? 'animate-spin' : ''}`} />
                 {isRunning ? 'Running...' : 'Run Now'}
@@ -153,10 +151,22 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
           {backfillResult && (
             <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 flex items-center gap-3 mb-4">
               <CheckCircle2 className="h-4 w-4 text-indigo-400 shrink-0" />
-              <p className="text-sm text-indigo-300">
-                Backfilled {backfillResult.backfilled} position{backfillResult.backfilled !== 1 ? 's' : ''} into decision log
-                {backfillResult.skipped > 0 ? ` (${backfillResult.skipped} already logged)` : ''}
-              </p>
+              <div className="text-sm text-indigo-300">
+                <p>Backfilled {backfillResult.total} position{backfillResult.total !== 1 ? 's' : ''} total</p>
+                {backfillResult.closedBackfilled > 0 && (
+                  <p className="text-xs text-indigo-400 mt-0.5">
+                    {backfillResult.closedBackfilled} closed trades → outcome_log (ready to learn from now)
+                  </p>
+                )}
+                {backfillResult.openBackfilled > 0 && (
+                  <p className="text-xs text-indigo-400 mt-0.5">
+                    {backfillResult.openBackfilled} open positions → decision_log (pending grade on close)
+                  </p>
+                )}
+                {backfillResult.skipped > 0 && (
+                  <p className="text-xs text-indigo-400/60 mt-0.5">{backfillResult.skipped} already logged, skipped</p>
+                )}
+              </div>
             </div>
           )}
 
