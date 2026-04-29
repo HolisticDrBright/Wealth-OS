@@ -298,6 +298,35 @@ export class PaperBroker {
         metadata:     { exit_reason: exitReason, pnl_pct: realizedPct, pnl_usd: pnlUsd },
       })
 
+      // Grade the decision immediately using the paper trade's actual outcome.
+      // This bypasses the resolution_due_at horizon and the Yahoo Finance bar
+      // lookup — both of which fail for polymarket/forex symbols.
+      const actualDirection = pnlUsd >= 0 ? 1 : 0
+      supabase
+        .from('decision_log')
+        .select('id, confidence')
+        .eq('paper_position_id', pos.id as string)
+        .eq('outcome_graded', false)
+        .limit(1)
+        .then(async ({ data: decRows }) => {
+          const dec = decRows?.[0]
+          if (!dec) return
+          const brierScore = ((dec.confidence as number) - actualDirection) ** 2
+          await Promise.all([
+            supabase.from('outcome_log').insert({
+              decision_id:         dec.id,
+              user_id:             userId,
+              actual_direction:    actualDirection,
+              actual_return:       realizedPct,
+              alpha_vs_benchmark:  0,  // SPY delta unknown at close; scorer weights this lightly
+              brier_score:         brierScore,
+            }),
+            supabase.from('decision_log')
+              .update({ outcome_graded: true })
+              .eq('id', dec.id as string),
+          ])
+        })
+
       const sign = pnlUsd >= 0 ? '+' : ''
       console.log(
         `[PaperBroker] ✓ closed ${pos.strategy_key as string} ${pos.symbol as string} ` +

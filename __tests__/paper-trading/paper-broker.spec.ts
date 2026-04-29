@@ -199,6 +199,17 @@ describe('PaperBroker', () => {
           }),
         }
       }
+      if (table === 'decision_log') {
+        // Fire-and-forget grading select — return null (no decision_log entry in test)
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          update: vi.fn().mockReturnThis(),
+          then: (resolve: (v: unknown) => void) =>
+            Promise.resolve({ data: [], error: null }).then(resolve),
+        }
+      }
       return { insert: vi.fn().mockResolvedValue({ error: null }) }
     })
 
