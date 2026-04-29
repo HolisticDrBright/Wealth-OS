@@ -189,6 +189,79 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'news-sentiment', ...result })
     }
 
+    // ── Daily combined task (runs all tasks sequentially for Hobby plan) ──────
+    if (task === 'daily') {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const results: Record<string, unknown> = {}
+
+      // 1. Sync crypto prices
+      try {
+        const r = await fetch(`${baseUrl}/api/kraken?action=prices`)
+        results.syncCrypto = r.ok ? 'ok' : `http ${r.status}`
+      } catch { results.syncCrypto = 'error' }
+
+      // 2. Sync forex rates
+      try {
+        const r = await fetch(`${baseUrl}/api/oanda?action=rates`)
+        results.syncForex = r.ok ? 'ok' : `http ${r.status}`
+      } catch { results.syncForex = 'error' }
+
+      // 3. News sentiment for open stock/options positions
+      try {
+        const { data: stockPos } = await supabase
+          .from('paper_positions')
+          .select('symbol, asset_class')
+          .eq('status', 'open')
+          .in('asset_class', ['stocks', 'options'])
+        const tickers = [...new Set((stockPos ?? []).map(p => (p.symbol as string).split(/[-/]/)[0].toUpperCase()))]
+        if (tickers.length) {
+          const { runSyncNewsSentiment } = await import('@/lib/workers/sync-news-sentiment')
+          const sr = await runSyncNewsSentiment(supabase, 'cron', tickers)
+          results.newsSentiment = sr
+        } else {
+          results.newsSentiment = 'skipped (no stock positions)'
+        }
+      } catch (e) { results.newsSentiment = e instanceof Error ? e.message : 'error' }
+
+      // 4. Paper trading (exit stale positions + open new ones for all users)
+      try {
+        const { data: stratRows } = await supabase
+          .from('user_enabled_strategies')
+          .select('user_id, strategy_key')
+          .eq('paper_enabled', true)
+        const byUser = new Map<string, string[]>()
+        for (const row of stratRows ?? []) {
+          const uid = row.user_id as string
+          if (!byUser.has(uid)) byUser.set(uid, [])
+          byUser.get(uid)!.push(row.strategy_key as string)
+        }
+        if (byUser.size > 0) {
+          const { runPaperTradingPass } = await import('@/lib/paper-trading/PaperTradeRunner')
+          const ptResults = await Promise.allSettled(
+            [...byUser.entries()].map(([uid, keys]) => runPaperTradingPass(uid, supabase, keys))
+          )
+          results.paperTrading = {
+            users: byUser.size,
+            summary: ptResults.map((r, i) => ({
+              userId: [...byUser.keys()][i],
+              ...(r.status === 'fulfilled' ? r.value : { error: String(r.reason) }),
+            })),
+          }
+        } else {
+          results.paperTrading = 'skipped (no users with paper enabled)'
+        }
+      } catch (e) { results.paperTrading = e instanceof Error ? e.message : 'error' }
+
+      // 5. Auto-scoring
+      try {
+        const { runAutoScoring } = await import('@/lib/auto-scorer')
+        results.score = await runAutoScoring(10)
+      } catch (e) { results.score = e instanceof Error ? e.message : 'error' }
+
+      return NextResponse.json({ task: 'daily', ...results })
+    }
+
     return NextResponse.json({ error: `Unknown task: ${task}` }, { status: 400 })
   } catch (err) {
     return NextResponse.json(
