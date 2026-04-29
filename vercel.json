@@ -1,16 +1,16 @@
 {
   "crons": [
-    { "path": "/api/cron?task=sync",         "schedule": "0 */6 * * *" },
-    { "path": "/api/cron?task=copy",         "schedule": "*/30 9-16 * * 1-5" },
-    { "path": "/api/cron?task=score",        "schedule": "*/15 * * * *" },
-    { "path": "/api/cron?task=simulate",     "schedule": "*/10 * * * *" },
-    { "path": "/api/cron?task=rebalance",    "schedule": "0 9 * * 1-5" },
-    { "path": "/api/cron?task=harvest-scan", "schedule": "0 20 * * *" },
-    { "path": "/api/cron?task=sync-crypto",  "schedule": "*/5 * * * *" },
-    { "path": "/api/cron?task=sync-forex",     "schedule": "*/1 * * * *" },
-    { "path": "/api/cron?task=paper-trading", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron?task=sync-crypto",    "schedule": "0 7 * * *" },
+    { "path": "/api/cron?task=sync-forex",     "schedule": "0 7 * * *" },
+    { "path": "/api/cron?task=news-sentiment", "schedule": "0 8 * * *" },
+    { "path": "/api/cron?task=sync",           "schedule": "0 8 * * *" },
+    { "path": "/api/cron?task=paper-trading",  "schedule": "0 9 * * *" },
+    { "path": "/api/cron?task=rebalance",      "schedule": "0 9 * * 1" },
+    { "path": "/api/cron?task=copy",           "schedule": "0 10 * * 1-5" },
+    { "path": "/api/cron?task=score",          "schedule": "0 11 * * *" },
+    { "path": "/api/cron?task=simulate",       "schedule": "0 12 * * *" },
+    { "path": "/api/cron?task=harvest-scan",   "schedule": "0 20 * * *" },
     { "path": "/api/cron?task=promote",        "schedule": "0 9 * * 0" },
-    { "path": "/api/cron?task=news-sentiment", "schedule": "0 */2 * * *" },
     { "path": "/api/cron?task=learning",       "schedule": "0 3 * * *" }
   ]
 }

@@ -13,10 +13,66 @@ const SLIPPAGE_BPS: Partial<Record<AssetClass, number>> = {
   'multi-asset': 10,
 }
 
-// Exit thresholds applied per position (overridable via metadata)
+// Global fallback exit thresholds
 const DEFAULT_STOP_LOSS_PCT   = 0.02   // -2%
 const DEFAULT_TAKE_PROFIT_PCT = 0.05   // +5%
 const DEFAULT_MAX_HOLD_HOURS  = 24
+
+type StrategyKey = string
+interface ExitDefaults { sl: number; tp: number; hours: number }
+
+// Per-strategy exit defaults. Each strategy knows its own holding period and
+// risk/reward profile — these replace the one-size-fits-all 2%/5%/24h.
+const STRATEGY_EXIT: Record<StrategyKey, ExitDefaults> = {
+  // ── Polymarket (binary 0 → 1, prices move ±30–60% before resolution) ──
+  polymarket_base_rate:          { sl: 0.10, tp: 0.15, hours:  72 }, // near-certain YES, hold to resolution
+  polymarket_resolution_rules:   { sl: 0.15, tp: 0.25, hours:  72 }, // rules-based near-expiry
+  polymarket_cross_market:       { sl: 0.25, tp: 0.45, hours: 168 }, // structural arb, 7-day horizon
+  polymarket_liquidity_pocket:   { sl: 0.25, tp: 0.40, hours: 120 }, // liquidity entry, 5-day
+  polymarket_event_compression:  { sl: 0.20, tp: 0.35, hours: 120 },
+  polymarket_narrative_fade:     { sl: 0.20, tp: 0.35, hours: 120 },
+  // ── Crypto ───────────────────────────────────────────────────────────
+  dca_halving:          { sl: 0.10, tp: 0.30, hours: 336 }, // 14-day DCA horizon
+  liquidation_hunting:  { sl: 0.02, tp: 0.05, hours:   8 }, // very short cascade play
+  narrative_rotation:   { sl: 0.07, tp: 0.18, hours:  72 },
+  onchain_signal:       { sl: 0.08, tp: 0.20, hours: 120 },
+  defi_yield:           { sl: 0.05, tp: 0.12, hours: 168 },
+  airdrop_farming:      { sl: 0.15, tp: 0.40, hours: 168 },
+  memecoin_bondingcurve:{ sl: 0.20, tp: 0.60, hours:  48 }, // quick pump/dump
+  // ── Forex (smaller moves — every bps counts) ─────────────────────────
+  fx_trendfollowing:    { sl: 0.010, tp: 0.025, hours:  72 },
+  cb_divergence:        { sl: 0.010, tp: 0.020, hours:  48 }, // around CB meeting
+  correlation_divergence:{ sl: 0.015, tp: 0.030, hours: 48 }, // mean reversion
+  ict_smc:              { sl: 0.010, tp: 0.020, hours:  24 },
+  carry_trade:          { sl: 0.020, tp: 0.040, hours: 168 }, // carry accrues over time
+  cot_positioning:      { sl: 0.015, tp: 0.030, hours: 168 }, // COT data is weekly
+  session_breakout:     { sl: 0.008, tp: 0.015, hours:  12 }, // intraday session
+  macro_news_event:     { sl: 0.008, tp: 0.020, hours:  24 },
+  triangular_arb:       { sl: 0.005, tp: 0.008, hours:   4 }, // tight arb
+  // ── Stocks ───────────────────────────────────────────────────────────
+  pead:                 { sl: 0.03, tp: 0.08, hours: 120 }, // PEAD plays out over 5 days
+  autopilot_congressional:{ sl: 0.05, tp: 0.15, hours: 240 }, // congressional hold ~10 days
+  quant_momentum:       { sl: 0.05, tp: 0.12, hours: 120 },
+  qvm_multifactor:      { sl: 0.06, tp: 0.15, hours: 168 },
+  dividend_aristocrat:  { sl: 0.08, tp: 0.15, hours: 504 }, // longer-term income hold
+  sector_rotation:      { sl: 0.05, tp: 0.10, hours: 168 },
+  options_wheel:        { sl: 0.10, tp: 0.20, hours: 336 },
+  gamma_exposure:       { sl: 0.03, tp: 0.08, hours:  48 },
+  merger_arb:           { sl: 0.03, tp: 0.05, hours: 336 }, // merger timeline is long
+  spinoff:              { sl: 0.07, tp: 0.20, hours: 504 },
+  tail_risk_hedging:    { sl: 0.20, tp: 0.40, hours: 168 },
+}
+
+function exitFor(strategyKey: StrategyKey, override?: Opportunity['exit']): ExitDefaults {
+  const base = STRATEGY_EXIT[strategyKey] ?? {
+    sl: DEFAULT_STOP_LOSS_PCT, tp: DEFAULT_TAKE_PROFIT_PCT, hours: DEFAULT_MAX_HOLD_HOURS,
+  }
+  return {
+    sl:    override?.stopLossPct    ?? base.sl,
+    tp:    override?.takeProfitPct  ?? base.tp,
+    hours: override?.maxHoldHours   ?? base.hours,
+  }
+}
 
 // How many calendar days after open to grade the outcome in the learning loop
 const LEARNING_HORIZON_DAYS: Partial<Record<AssetClass, number>> = {
@@ -61,6 +117,7 @@ export class PaperBroker {
     if (fillPrice <= 0) return null
 
     const quantity = size.notionalUsd / fillPrice
+    const exit = exitFor(opp.strategyKey, opp.exit)
 
     const { data: pos, error } = await supabase
       .from('paper_positions')
@@ -74,9 +131,9 @@ export class PaperBroker {
         current_price:   price,
         quantity,
         notional_usd:    size.notionalUsd,
-        stop_loss_pct:   DEFAULT_STOP_LOSS_PCT,
-        take_profit_pct: DEFAULT_TAKE_PROFIT_PCT,
-        max_hold_hours:  DEFAULT_MAX_HOLD_HOURS,
+        stop_loss_pct:   exit.sl,
+        take_profit_pct: exit.tp,
+        max_hold_hours:  exit.hours,
         metadata: {
           opportunityId: opp.id,
           strength:      opp.strength,

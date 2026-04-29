@@ -24,6 +24,13 @@ export interface Opportunity {
   expectedReturn: number
   metadata: Record<string, unknown>
   detectedAt: string
+  /** Optional per-opportunity exit overrides. PaperBroker falls back to
+   *  strategy-class defaults when omitted. */
+  exit?: {
+    stopLossPct?: number
+    takeProfitPct?: number
+    maxHoldHours?: number
+  }
 }
 
 export interface OpportunityContext {
