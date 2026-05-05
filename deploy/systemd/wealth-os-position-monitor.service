@@ -1,0 +1,23 @@
+[Unit]
+Description=Wealth-OS Position Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wealthos
+WorkingDirectory=/opt/wealth-os
+EnvironmentFile=/opt/wealth-os/.env
+ExecStart=/usr/bin/npx tsx lib/workers/position-monitor.ts
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wealth-os-position-monitor
+
+# Prevent runaway restarts
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

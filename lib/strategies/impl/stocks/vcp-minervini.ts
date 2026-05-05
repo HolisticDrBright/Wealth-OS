@@ -10,7 +10,7 @@
 
 import type { PriceBar } from '@/lib/backtester'
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
-import type { Opportunity, OpportunityContext } from '../../pipeline-types'
+import type { Opportunity, OpportunityContext, OpenPosition, PriceTick, ManageAction } from '../../pipeline-types'
 import { randomUUID } from 'crypto'
 
 // ─── Price helpers ─────────────────────────────────────────────────────────────
@@ -76,6 +76,11 @@ export class VcpMinerviniStrategy extends BasePipelineStrategy {
     const strength = volAvg50 > 0 ? Math.min(1, lastVol / volAvg50 / 2) : 0
     const expectedReturn = (last.close - sma(bars, 50)) / sma(bars, 50) * 0.5  // 50% of distance to MA
 
+    // Bracket: -8% stop (broker-side), +10% TP1. Last third trailed via manageOpenPosition.
+    const entryPrice = last.close
+    const stopPrice  = entryPrice * 0.92   // -8%
+    const tp1Price   = entryPrice * 1.10   // +10%
+
     return [{
       id: randomUUID(),
       strategyKey: this.key,
@@ -84,8 +89,54 @@ export class VcpMinerviniStrategy extends BasePipelineStrategy {
       assetClass: this.assetClass,
       strength,
       expectedReturn: Math.abs(expectedReturn),
-      metadata: { ma50, ma200, volRatio: volAvg50 > 0 ? lastVol / volAvg50 : 0, range10, range20 },
+      metadata: { ma50, ma200, volRatio: volAvg50 > 0 ? lastVol / volAvg50 : 0, range10, range20, entryPrice },
       detectedAt: new Date().toISOString(),
+      bracket: {
+        stopPrice,
+        takeProfitPrice: tp1Price,
+      },
     }]
+  }
+
+  /**
+   * Dynamic trailing: once position is up >10% (TP1 hit), trail last 1/3 on the 10-DMA.
+   * Position monitor calls this; broker bracket already handles the -8% stop and initial TP1.
+   */
+  async manageOpenPosition(
+    position: OpenPosition,
+    tick: PriceTick
+  ): Promise<ManageAction> {
+    const pnlPct = position.entryPrice > 0
+      ? (tick.price - position.entryPrice) / position.entryPrice
+      : 0
+
+    // If below entry by 8% and broker stop failed (latency), close immediately
+    if (pnlPct <= -0.08) {
+      return { type: 'close', reason: 'stop-loss -8% (broker-side backup)' }
+    }
+
+    // Trail stop logic: once TP1 level exceeded, trail on 10-DMA approximation
+    // We approximate 10-DMA as a rolling price reference stored in metadata.
+    // A real implementation reads historical bars; here we use entry * 1.05 as proxy
+    // until the position monitor wires in bar data.
+    if (pnlPct >= 0.10) {
+      const trailStop = position.entryPrice * 1.05  // minimum trail: breakeven + 5%
+      if (tick.price < trailStop) {
+        return { type: 'close', reason: `trailing 10-DMA stop at ${trailStop.toFixed(2)}` }
+      }
+      // Adjust the active stop upward
+      const newStop = tick.price * 0.94  // trail at -6% of current price
+      if (position.metadata.trailStop == null || (position.metadata.trailStop as number) < newStop) {
+        return { type: 'adjustStop', newStop, reason: `VCP trail stop raised to ${newStop.toFixed(2)}` }
+      }
+    }
+
+    // Hard timeout: 90 calendar days
+    const holdDays = (Date.now() - position.openedAt) / 86_400_000
+    if (holdDays >= 90) {
+      return { type: 'close', reason: '90-day VCP timeout' }
+    }
+
+    return { type: 'hold' }
   }
 }

@@ -1,0 +1,16 @@
+[Unit]
+Description=Wealth-OS Strategy Scan (one-shot)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=wealthos
+WorkingDirectory=/opt/wealth-os
+EnvironmentFile=/opt/wealth-os/.env
+ExecStart=/usr/bin/curl -s -X POST \
+  -H "Authorization: Bearer ${WEALTH_OS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  "${NEXT_PUBLIC_SITE_URL}/api/internal/scan-all"
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wealth-os-scan

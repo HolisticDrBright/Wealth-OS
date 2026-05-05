@@ -18,6 +18,9 @@ import type {
   OpportunityContext,
   RedTeamVerdict,
   AllVerdicts,
+  OpenPosition,
+  PriceTick,
+  ManageAction,
   PositionSize,
 } from '../../pipeline-types'
 import {
@@ -284,5 +287,47 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
       notionalUsd,
       rationale: `2% risk cap, QK=${(qk * 100).toFixed(1)}%, portfolio=$${portfolio.toFixed(0)}`,
     }
+  }
+
+  /**
+   * Exit when:
+   *  - Position drawdown exceeds -30% (AUTO_EXIT_DD)
+   *  - Market has resolved (price at 0 or 1)
+   *  - 14-day hard timeout (polymarket positions rarely benefit from longer holds)
+   *
+   * NOTE: Pre-armed take-profit limit is placed broker-side via placeBracketOrder.
+   * This handler covers drawdown and resolution events the broker cannot detect.
+   */
+  async manageOpenPosition(
+    position: OpenPosition,
+    tick: PriceTick
+  ): Promise<ManageAction> {
+    // Drawdown vs entry: for polymarket YES positions, price falls = loss
+    const pnlPct = position.entryPrice > 0
+      ? (tick.price - position.entryPrice) / position.entryPrice
+      : 0
+
+    const direction = position.direction
+    const effectivePnl = direction === 'long' ? pnlPct : -pnlPct
+
+    if (effectivePnl <= -AUTO_EXIT_DD) {
+      return {
+        type: 'close',
+        reason: `wallet-copy drawdown ${(effectivePnl * 100).toFixed(1)}% exceeded -${AUTO_EXIT_DD * 100}% limit`,
+      }
+    }
+
+    // Market resolved: price at or near 0 or 1 means the event settled
+    if (tick.price >= 0.97 || tick.price <= 0.03) {
+      return { type: 'close', reason: `market resolved (price ${tick.price.toFixed(3)})` }
+    }
+
+    // Hard timeout: 14 days (polymarket positions degrade after source wallet exits)
+    const holdDays = (Date.now() - position.openedAt) / 86_400_000
+    if (holdDays >= 14) {
+      return { type: 'close', reason: 'wallet-copy 14-day timeout' }
+    }
+
+    return { type: 'hold' }
   }
 }

@@ -130,3 +130,7 @@ for (const s of ALL_STRATEGIES) {
 
 export { strategyRegistry }
 export { ALL_STRATEGIES }
+
+export function getAllPipelineStrategies() {
+  return ALL_STRATEGIES
+}

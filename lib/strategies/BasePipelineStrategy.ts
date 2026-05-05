@@ -19,6 +19,7 @@ import {
   type Jurisdiction,
 } from '@/lib/brokers/asset-broker-routing'
 import { getBroker, type BrokerCache } from '@/lib/brokers/BrokerFactory'
+import type { BracketParams } from '@/lib/broker-adapters/types'
 import {
   getStrategyConfig,
   type StrategyKey,
@@ -38,6 +39,9 @@ import type {
   PositionSize,
   ExecutionResult,
   Decision,
+  OpenPosition,
+  PriceTick,
+  ManageAction,
 } from './pipeline-types'
 import type { TradeContext } from '@/lib/agents/types'
 
@@ -281,6 +285,34 @@ export abstract class BasePipelineStrategy {
     const { broker } = selectBroker({ assetClass: brokerAC, userJurisdiction: jurisdiction })
     const adapter = await getBroker(broker, userId, supabase, cache)
 
+    // Place bracket order if the opportunity specifies one
+    if (opp.bracket) {
+      const entryPrice = (opp.metadata.entryPrice as number | undefined) ?? 0
+      const b = opp.bracket
+      const bracketParams: BracketParams = {
+        symbol: opp.symbol,
+        asset_class: opp.assetClass,
+        side: opp.direction === 'short' ? 'sell' : 'buy',
+        notional_usd: size.notionalUsd,
+        stop_price: b.stopPrice ?? (entryPrice > 0 && b.stopLossPct
+          ? entryPrice * (opp.direction === 'long' ? 1 - b.stopLossPct : 1 + b.stopLossPct)
+          : undefined),
+        take_profit_price: b.takeProfitPrice ?? (entryPrice > 0 && b.takeProfitPct
+          ? entryPrice * (opp.direction === 'long' ? 1 + b.takeProfitPct : 1 - b.takeProfitPct)
+          : undefined),
+        trail_pct: b.trailPct,
+        time_in_force: 'gtc',
+        jurisdiction,
+      }
+      const result = await adapter.placeBracketOrder(bracketParams)
+      return {
+        status: result.status === 'submitted' ? 'submitted' : result.status === 'skipped' ? 'skipped' : 'failed',
+        broker,
+        brokerOrderId: result.parent_order_id,
+        error: result.error,
+      }
+    }
+
     const result = await adapter.execute({
       symbol: opp.symbol,
       asset_class: opp.assetClass,
@@ -294,6 +326,20 @@ export abstract class BasePipelineStrategy {
       : 'failed'
 
     return { status, broker, brokerOrderId: result.broker_order_id, error: result.error }
+  }
+
+  /**
+   * Called by PositionMonitor on each price tick for every open position belonging
+   * to this strategy. Static stops/targets are handled broker-side via bracket orders;
+   * this method handles DYNAMIC exit logic (e.g. trailing, regime change, signal reversal).
+   *
+   * Default: hold. Strategies override when dynamic exit logic is required.
+   */
+  async manageOpenPosition(
+    _position: OpenPosition,
+    _tick: PriceTick
+  ): Promise<ManageAction> {
+    return { type: 'hold' }
   }
 
   // ── Stage 9: Audit ───────────────────────────────────────────────────────────

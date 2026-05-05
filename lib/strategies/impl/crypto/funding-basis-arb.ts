@@ -22,6 +22,9 @@ import type {
   AllVerdicts,
   PositionSize,
   ExecutionResult,
+  OpenPosition,
+  PriceTick,
+  ManageAction,
 } from '../../pipeline-types'
 import { getRiskControl, getPortfolioUsd, quarterKelly } from '../../risk-controls'
 import { getFundingRate } from '@/lib/market-data/funding-rates'
@@ -66,8 +69,9 @@ async function getBookDepthUsd(symbol: string): Promise<number | null> {
 }
 
 // ─── Minutes to next funding settlement (00:00, 08:00, 16:00 UTC) ────────────
+// Exported so tests can vi.mock this module and override for deterministic results.
 
-function minutesToNextFundingSettlement(): number {
+export function minutesToNextFundingSettlement(): number {
   const now = new Date()
   const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes()
   const settlements = [0, 480, 960, 1440]
@@ -253,5 +257,55 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
       brokerOrderId: [spotResult.broker_order_id, perpResult.broker_order_id].filter(Boolean).join(','),
       error: spotResult.error ?? perpResult.error,
     }
+  }
+
+  /**
+   * Exit when:
+   *  - Funding rate flips negative (carry reverses, exit immediately)
+   *  - Annualised basis compressed below 5% APR (no longer worthwhile)
+   *  - Max hold (liquidation buffer): 2x the perp margin cycle (48h default)
+   */
+  async manageOpenPosition(
+    position: OpenPosition,
+    _tick: PriceTick
+  ): Promise<ManageAction> {
+    const symbol = (position.metadata.symbol as string | undefined) ?? 'BTC'
+    const openAnnualised = (position.metadata.annualisedCarry as number | undefined) ?? 0
+
+    let currentFunding: Awaited<ReturnType<typeof getFundingRate>> | null = null
+    try {
+      currentFunding = await getFundingRate(symbol)
+    } catch {
+      return { type: 'hold' }  // data unavailable, hold and retry next tick
+    }
+
+    if (currentFunding.source === 'unavailable') return { type: 'hold' }
+
+    // Funding flipped negative: reverse of carry -- exit both legs
+    if (currentFunding.rate < 0) {
+      return { type: 'close', reason: `funding flipped negative (${(currentFunding.rate * 100).toFixed(4)}%/8h)` }
+    }
+
+    // Basis compressed below 5% APR: no longer economic net of fees
+    const BASIS_FLOOR_APR = 0.05
+    if (currentFunding.annualised < BASIS_FLOOR_APR) {
+      return {
+        type: 'close',
+        reason: `basis compressed to ${(currentFunding.annualised * 100).toFixed(1)}% APR < 5% floor`,
+      }
+    }
+
+    // Alert-only: carry degraded >70% from entry (no close -- still positive, just weaker)
+    if (openAnnualised > 0 && currentFunding.annualised < openAnnualised * 0.30) {
+      console.log(`[funding_basis_arb] ${symbol} carry degraded ${(currentFunding.annualised * 100).toFixed(1)}% vs entry ${(openAnnualised * 100).toFixed(1)}% -- monitoring`)
+    }
+
+    // Hard timeout: 14 days (2x 8h settlement cycle buffer)
+    const holdDays = (Date.now() - position.openedAt) / 86_400_000
+    if (holdDays >= 14) {
+      return { type: 'close', reason: '14-day funding basis arb timeout' }
+    }
+
+    return { type: 'hold' }
   }
 }

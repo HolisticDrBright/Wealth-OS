@@ -31,6 +31,18 @@ export interface Opportunity {
     takeProfitPct?: number
     maxHoldHours?: number
   }
+  /**
+   * Optional broker-side bracket parameters. When set, BasePipelineStrategy.execute()
+   * calls adapter.placeBracketOrder() instead of adapter.execute().
+   * stopLossPct and takeProfitPct are fractions of the entry price.
+   */
+  bracket?: {
+    stopLossPct?: number
+    stopPrice?: number
+    takeProfitPct?: number
+    takeProfitPrice?: number
+    trailPct?: number
+  }
 }
 
 export interface OpportunityContext {
@@ -104,3 +116,50 @@ export interface Decision {
   reason?: string
   size?: PositionSize
 }
+
+// ─── Position Monitor types ────────────────────────────────────────────────────
+
+/** Snapshot of an open paper or live position passed to manageOpenPosition(). */
+export interface OpenPosition {
+  id: string
+  strategyKey: string
+  symbol: string
+  assetClass: AssetClass
+  direction: 'long' | 'short' | 'neutral'
+  entryPrice: number
+  currentPrice: number
+  quantity: number
+  notionalUsd: number
+  stopLossPct: number
+  takeProfitPct: number
+  maxHoldHours: number
+  /** Unix ms timestamp of when the position was opened. */
+  openedAt: number
+  metadata: Record<string, unknown>
+  /** Broker-side order IDs for cancellation/modification. */
+  bracketIds?: {
+    parentOrderId?: string
+    stopOrderId?: string
+    takeProfitOrderId?: string
+  }
+}
+
+/** A single price tick from a market data feed or polling loop. */
+export interface PriceTick {
+  symbol: string
+  price: number
+  timestamp: number
+  bid?: number
+  ask?: number
+  volume?: number
+}
+
+/**
+ * Action returned by manageOpenPosition(). Broker-side stops handle static exits;
+ * this covers dynamic adjustments the position monitor must execute.
+ */
+export type ManageAction =
+  | { type: 'hold' }
+  | { type: 'close'; reason: string }
+  | { type: 'adjustStop'; newStop: number; reason: string }
+  | { type: 'adjustTarget'; newTarget: number; reason: string }

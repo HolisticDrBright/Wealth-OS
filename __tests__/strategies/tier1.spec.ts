@@ -347,7 +347,14 @@ describe('DcaHalving', () => {
 // ─── FundingBasisArb ──────────────────────────────────────────────────────────
 
 describe('FundingBasisArb', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Fix time at noon UTC — 4h from any funding settlement (00/08/16) so the
+    // 30-min pre-settlement guard never fires and makes tests timing-dependent.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T12:00:00Z'))
+  })
+  afterEach(() => vi.useRealTimers())
 
   it('9. returns [] when funding rate is below threshold', async () => {
     vi.mocked(fundingRatesModule.getFundingRate).mockResolvedValue({
