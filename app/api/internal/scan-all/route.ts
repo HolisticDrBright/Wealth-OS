@@ -61,7 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let opportunities: import('@/lib/strategies/pipeline-types').Opportunity[] = []
 
     try {
-      opportunities = await strategy.detectOpportunities(ctx)
+      opportunities = await strategy.detectWithConfluence(ctx)
     } catch (err) {
       console.error(`[scan-all] ${strategy.key} detectOpportunities error:`, err)
       results[strategy.key] = { opportunities: 0, executed: 0, blocked: 0, errors: 1 }

@@ -77,6 +77,42 @@ export abstract class BasePipelineStrategy {
     return []
   }
 
+  /**
+   * Wrapper around detectOpportunities() that auto-registers every opportunity
+   * into the ConfluenceRegistry. Use this instead of detectOpportunities() in
+   * the scan-all runner so signals are available for cross-strategy consensus.
+   */
+  async detectWithConfluence(ctx: OpportunityContext): Promise<Opportunity[]> {
+    const opps = await this.detectOpportunities(ctx)
+    if (opps.length === 0) return opps
+
+    const { confluenceRegistry } = await import('@/lib/strategies/confluence-registry')
+    for (const opp of opps) {
+      confluenceRegistry.register({
+        fromStrategyKey: this.key,
+        symbol: opp.symbol,
+        direction: opp.direction === 'neutral' ? 'neutral' : opp.direction,
+        strength: opp.strength,
+        reasoning: (opp.metadata?.reasoning as string | undefined),
+        timestamp: Date.now(),
+      })
+      if (ctx.supabase) {
+        confluenceRegistry.persistSignal(
+          {
+            fromStrategyKey: this.key,
+            symbol: opp.symbol,
+            direction: opp.direction === 'neutral' ? 'neutral' : opp.direction,
+            strength: opp.strength,
+            reasoning: (opp.metadata?.reasoning as string | undefined),
+            timestamp: Date.now(),
+          },
+          ctx.supabase
+        )
+      }
+    }
+    return opps
+  }
+
   // ── Stage 2: Classify ────────────────────────────────────────────────────────
 
   async classifyEdge(opp: Opportunity): Promise<PipelineEdgeClassification> {
@@ -253,7 +289,8 @@ export abstract class BasePipelineStrategy {
   async sizePosition(
     _opp: Opportunity,
     verdicts: AllVerdicts,
-    _userId: string
+    _userId: string,
+    _supabase?: SupabaseClient
   ): Promise<PositionSize> {
     let fraction = verdicts.risk.kellyFraction
     if (verdicts.mirofish) fraction *= verdicts.mirofish.score / 100

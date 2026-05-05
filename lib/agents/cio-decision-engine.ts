@@ -348,8 +348,27 @@ Write a CIO synthesis as JSON:
       return decision
     }
 
-    // Execute
-    const size = await strat.sizePosition(opp, verdicts, userId)
+    // Confluence boost/penalty: registered signals from other strategies
+    const { confluenceRegistry } = await import('@/lib/strategies/confluence-registry')
+    const cons = confluenceRegistry.consensus(opp.symbol)
+    let confluenceMultiplier = 1.0
+    if (cons.direction === opp.direction) {
+      if (cons.agreementCount >= 3) confluenceMultiplier = 1.5
+      else if (cons.agreementCount >= 2) confluenceMultiplier = 1.25
+    }
+    if (cons.disagreementCount >= 1) confluenceMultiplier *= 0.5
+
+    // Execute with confluence-adjusted size
+    const rawSize = await strat.sizePosition(opp, verdicts, userId, supabase)
+    const size: import('@/lib/strategies/pipeline-types').PositionSize = confluenceMultiplier === 1.0
+      ? rawSize
+      : {
+          ...rawSize,
+          fraction:    rawSize.fraction    * confluenceMultiplier,
+          notionalUsd: rawSize.notionalUsd * confluenceMultiplier,
+          rationale: `${rawSize.rationale} | confluence x${confluenceMultiplier.toFixed(2)} (agree=${cons.agreementCount}, disagree=${cons.disagreementCount})`,
+        }
+
     const decision = { action: 'execute' as const, size }
     await strat.logAudit(opp, decision, verdicts, supabase)
     // In paper mode the caller (PaperTradeRunner) handles the fill — skip real broker
