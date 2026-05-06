@@ -16,6 +16,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAllPipelineStrategies } from '@/lib/strategies/all-pipeline-strategies'
 import type { OpportunityContext } from '@/lib/strategies/pipeline-types'
+import { loadUserProfile, getEffectiveStrategies } from '@/lib/strategies/profile-params'
+import type { StrategyKey } from '@/lib/strategies/strategy-registry'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -72,9 +74,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let blocked = 0
     let errors = 0
 
+    // Cache profiles for this scan run (one DB round-trip per user, not per opportunity)
+    const profileCache = new Map<string, Set<StrategyKey>>()
+    const getEffective = async (uid: string): Promise<Set<StrategyKey>> => {
+      if (profileCache.has(uid)) return profileCache.get(uid)!
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const up = await loadUserProfile(supabase as any, uid)
+      const eff = getEffectiveStrategies(up)
+      profileCache.set(uid, eff)
+      return eff
+    }
+
     for (const opp of opportunities) {
       for (const userId of userIds) {
         try {
+          // Profile gate — skip if this strategy is not in the user's effective set
+          const effective = await getEffective(userId)
+          if (!effective.has(strategy.key as StrategyKey)) {
+            blocked++
+            continue
+          }
+
           // Run the standard pipeline stages for this user
           const [edge, mf, kronos, redTeam, risk] = await Promise.allSettled([
             strategy.classifyEdge(opp),

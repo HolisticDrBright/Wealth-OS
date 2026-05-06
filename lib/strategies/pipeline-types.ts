@@ -102,6 +102,8 @@ export interface PositionSize {
   fraction: number
   notionalUsd: number
   rationale: string
+  /** Multiplier applied to strategy stop-loss distance. Sourced from user risk profile. */
+  stopLossMultiplier?: number
 }
 
 export interface ExecutionResult {

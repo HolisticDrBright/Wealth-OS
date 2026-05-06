@@ -290,6 +290,21 @@ Write a CIO synthesis as JSON:
     const { strategyRegistry } = await import('@/lib/strategies/all-pipeline-strategies')
     const strat = strategyRegistry.get(opp.strategyKey)
 
+    // ── Profile gate ──────────────────────────────────────────────────────────
+    const { loadUserProfile, loadProfileParams, getEffectiveStrategies, getEffectiveParams } =
+      await import('@/lib/strategies/profile-params')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as any
+    const userProfile = await loadUserProfile(db, userId)
+    const profileBase = await loadProfileParams(db, userProfile.profileKey)
+    const effectiveParams = getEffectiveParams(profileBase, userProfile)
+    const effectiveStrategies = getEffectiveStrategies(userProfile)
+
+    if (!effectiveStrategies.has(opp.strategyKey as import('@/lib/strategies/strategy-registry').StrategyKey)) {
+      const decision = { action: 'block' as const, reason: `strategy ${opp.strategyKey} not enabled for profile ${userProfile.profileKey}` }
+      return decision
+    }
+
     const edge     = await strat.classifyEdge(opp)
     const mirofish = await strat.runMiroFishConfluence(opp, userId, supabase)
     const kronos   = await strat.runKronosConfluence(opp, userId, supabase)
@@ -352,9 +367,15 @@ Write a CIO synthesis as JSON:
     const { confluenceRegistry } = await import('@/lib/strategies/confluence-registry')
     const cons = confluenceRegistry.consensus(opp.symbol)
     let confluenceMultiplier = 1.0
+    const cThresh = effectiveParams.confluenceThreshold
     if (cons.direction === opp.direction) {
-      if (cons.agreementCount >= 3) confluenceMultiplier = 1.5
-      else if (cons.agreementCount >= 2) confluenceMultiplier = 1.25
+      if (effectiveParams.confluenceStrengthOverride !== null) {
+        confluenceMultiplier = cons.agreementCount >= cThresh
+          ? effectiveParams.confluenceStrengthOverride : 1.0
+      } else {
+        if (cons.agreementCount >= cThresh + 1) confluenceMultiplier = 1.5
+        else if (cons.agreementCount >= cThresh) confluenceMultiplier = 1.25
+      }
     }
     if (cons.disagreementCount >= 1) confluenceMultiplier *= 0.5
 
@@ -416,6 +437,11 @@ Write a CIO synthesis as JSON:
       currentBook
     )
 
+    // Apply profile position cap
+    const profileCapPct = effectiveParams.positionCapPct
+    const profileCapped = corr.notionalUsd / portfolioUsd > profileCapPct
+    const profileCappedNotional = profileCapped ? profileCapPct * portfolioUsd : corr.notionalUsd
+
     const rationale = [
       rawSize.rationale,
       confluenceMultiplier !== 1.0 ? `confluence x${confluenceMultiplier.toFixed(2)}` : null,
@@ -423,13 +449,15 @@ Write a CIO synthesis as JSON:
       tailHedgeOverride !== null ? `hedge override ${(tailHedgeOverride * 100).toFixed(1)}%` : null,
       regimeHaircut < 1.0 ? `RISK_OFF haircut ${(regimeHaircut * 100).toFixed(0)}%` : null,
       corr.capApplied ? `${corr.capApplied} cap applied` : null,
+      profileCapped ? `profile cap ${(profileCapPct * 100).toFixed(0)}%` : null,
     ].filter(Boolean).join(' | ')
 
     const size: import('@/lib/strategies/pipeline-types').PositionSize = {
       ...rawSize,
-      fraction:    portfolioUsd > 0 ? corr.notionalUsd / portfolioUsd : 0,
-      notionalUsd: corr.notionalUsd,
+      fraction:    portfolioUsd > 0 ? profileCappedNotional / portfolioUsd : 0,
+      notionalUsd: profileCappedNotional,
       rationale,
+      stopLossMultiplier: effectiveParams.stopLossMultiplier,
     }
 
     const decision = { action: 'execute' as const, size }
