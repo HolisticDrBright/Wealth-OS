@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     getTransactions(),
     getNetWorthHistory(),
     getUserRiskProfile().catch(() => null),
-    getAssetRiskProfileData('all').catch(() => null),
+    getAssetRiskProfileData('all').catch(() => ({ profiles: [], userProfile: null, strategyDefs: [], migrationApplied: false })),
   ])
 
   const assets = assetsData.length > 0 ? assetsData : mockAssets
@@ -36,17 +36,15 @@ export default async function DashboardPage() {
         subtitle="Financial Overview"
         badge={<ProfileBadge profile={profileKey} />}
       />
-      {riskData && (
-        <div className="px-6 pt-4 pb-2 max-w-4xl">
-          <AssetRiskProfile
-            assetClass="all"
-            profiles={riskData.profiles}
-            userProfile={riskData.userProfile}
-            strategyDefs={riskData.strategyDefs}
-            migrationApplied={riskData.migrationApplied}
-          />
-        </div>
-      )}
+      <div className="px-6 pt-4 pb-2 max-w-4xl">
+        <AssetRiskProfile
+          assetClass="all"
+          profiles={riskData.profiles}
+          userProfile={riskData.userProfile}
+          strategyDefs={riskData.strategyDefs}
+          migrationApplied={riskData.migrationApplied}
+        />
+      </div>
       <DashboardClient
         assets={assets}
         transactions={transactions}

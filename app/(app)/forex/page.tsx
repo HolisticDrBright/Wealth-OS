@@ -7,22 +7,20 @@ export default async function ForexPage() {
   const [rates, positions, riskData] = await Promise.all([
     getForexRates(),
     getForexPositions(),
-    getAssetRiskProfileData('forex').catch(() => null),
+    getAssetRiskProfileData('forex').catch(() => ({ profiles: [], userProfile: null, strategyDefs: [], migrationApplied: false })),
   ])
 
   return (
     <div className="space-y-0">
-      {riskData && (
-        <div className="px-4 pt-6 max-w-4xl mx-auto">
-          <AssetRiskProfile
-            assetClass="forex"
-            profiles={riskData.profiles}
-            userProfile={riskData.userProfile}
-            strategyDefs={riskData.strategyDefs}
-            migrationApplied={riskData.migrationApplied}
-          />
-        </div>
-      )}
+      <div className="px-4 pt-6 max-w-4xl mx-auto">
+        <AssetRiskProfile
+          assetClass="forex"
+          profiles={riskData.profiles}
+          userProfile={riskData.userProfile}
+          strategyDefs={riskData.strategyDefs}
+          migrationApplied={riskData.migrationApplied}
+        />
+      </div>
       <ForexClient initialRates={rates} initialPositions={positions} />
     </div>
   )

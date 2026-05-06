@@ -2,8 +2,10 @@ import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
 import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
 
+const EMPTY_RISK_DATA = { profiles: [], userProfile: null, strategyDefs: [], migrationApplied: false }
+
 export default async function StocksPage() {
-  const riskData = await getAssetRiskProfileData('stocks').catch(() => null)
+  const riskData = await getAssetRiskProfileData('stocks').catch(() => EMPTY_RISK_DATA)
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -14,15 +16,13 @@ export default async function StocksPage() {
         </p>
       </div>
 
-      {riskData && (
-        <AssetRiskProfile
-          assetClass="stocks"
-          profiles={riskData.profiles}
-          userProfile={riskData.userProfile}
-          strategyDefs={riskData.strategyDefs}
-          migrationApplied={riskData.migrationApplied}
-        />
-      )}
+      <AssetRiskProfile
+        assetClass="stocks"
+        profiles={riskData.profiles}
+        userProfile={riskData.userProfile}
+        strategyDefs={riskData.strategyDefs}
+        migrationApplied={riskData.migrationApplied}
+      />
 
       <AssetStrategyPanel assetClasses={['stocks']} />
     </div>

@@ -24,10 +24,10 @@ export default async function PolymarketPage() {
       getPortfolio(),
       getSettings(),
       Promise.resolve(getCircuitState()),
-      getAssetRiskProfileData('polymarket').catch(() => null),
+      getAssetRiskProfileData('polymarket').catch(() => ({ profiles: [], userProfile: null, strategyDefs: [], migrationApplied: false })),
     ])
 
-  const riskPanel = riskData ? (
+  const riskPanel = (
     <div className="px-4 pt-6 pb-2 max-w-4xl mx-auto">
       <AssetRiskProfile
         assetClass="polymarket"
@@ -37,7 +37,7 @@ export default async function PolymarketPage() {
         migrationApplied={riskData.migrationApplied}
       />
     </div>
-  ) : null
+  )
 
   if (!healthRes.ok) {
     return (
