@@ -11,10 +11,12 @@ import {
 import { PolymarketClient } from './polymarket-client'
 import { Topbar } from '@/components/layout/topbar'
 import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
+import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
+import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
 import { Terminal, ExternalLink } from 'lucide-react'
 
 export default async function PolymarketPage() {
-  const [healthRes, marketsRes, signalsRes, portfolioRes, settingsRes, circuit] =
+  const [healthRes, marketsRes, signalsRes, portfolioRes, settingsRes, circuit, riskData] =
     await Promise.all([
       getHealth(),
       getActiveMarkets({ limit: 100 }),
@@ -22,24 +24,45 @@ export default async function PolymarketPage() {
       getPortfolio(),
       getSettings(),
       Promise.resolve(getCircuitState()),
+      getAssetRiskProfileData('polymarket').catch(() => null),
     ])
 
+  const riskPanel = riskData ? (
+    <div className="px-4 pt-6 pb-2 max-w-4xl mx-auto">
+      <AssetRiskProfile
+        assetClass="polymarket"
+        profiles={riskData.profiles}
+        userProfile={riskData.userProfile}
+        strategyDefs={riskData.strategyDefs}
+        migrationApplied={riskData.migrationApplied}
+      />
+    </div>
+  ) : null
+
   if (!healthRes.ok) {
-    return <SetupGuide errorCode={healthRes.error.code} errorMessage={healthRes.error.message} />
+    return (
+      <div className="flex flex-col">
+        {riskPanel}
+        <SetupGuide errorCode={healthRes.error.code} errorMessage={healthRes.error.message} />
+      </div>
+    )
   }
 
   return (
-    <PolymarketClient
-      initialHealth={healthRes.value}
-      initialMarkets={marketsRes.ok ? marketsRes.value : []}
-      initialSignals={signalsRes.ok ? signalsRes.value.signals : []}
-      initialPositions={portfolioRes.ok ? portfolioRes.value.positions.positions : []}
-      initialStats={portfolioRes.ok ? portfolioRes.value.stats : null}
-      initialSettings={settingsRes.ok ? settingsRes.value : null}
-      circuitFailures={circuit.failures}
-      circuitOpen={circuit.open}
-      circuitRetriesInMs={circuit.retriesInMs}
-    />
+    <div className="flex flex-col">
+      {riskPanel}
+      <PolymarketClient
+        initialHealth={healthRes.value}
+        initialMarkets={marketsRes.ok ? marketsRes.value : []}
+        initialSignals={signalsRes.ok ? signalsRes.value.signals : []}
+        initialPositions={portfolioRes.ok ? portfolioRes.value.positions.positions : []}
+        initialStats={portfolioRes.ok ? portfolioRes.value.stats : null}
+        initialSettings={settingsRes.ok ? settingsRes.value : null}
+        circuitFailures={circuit.failures}
+        circuitOpen={circuit.open}
+        circuitRetriesInMs={circuit.retriesInMs}
+      />
+    </div>
   )
 }
 

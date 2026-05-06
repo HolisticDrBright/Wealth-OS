@@ -5,6 +5,8 @@ import { getTransactions } from '@/lib/actions/transactions'
 import { getNetWorthHistory } from '@/lib/actions/networth'
 import { getUserRiskProfile } from '@/lib/actions/risk-profile'
 import { ProfileBadge } from '@/components/risk-profile/ProfileBadge'
+import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
+import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
 import {
   mockNetWorthHistory,
   mockAssets,
@@ -13,14 +15,14 @@ import {
 import type { ProfileKey } from '@/lib/strategies/profile-params'
 
 export default async function DashboardPage() {
-  const [assetsData, transactionsData, netWorthData, riskProfile] = await Promise.all([
+  const [assetsData, transactionsData, netWorthData, riskProfile, riskData] = await Promise.all([
     getAssets(),
     getTransactions(),
     getNetWorthHistory(),
     getUserRiskProfile().catch(() => null),
+    getAssetRiskProfileData('all').catch(() => null),
   ])
 
-  // Fall back to mock data if the user has no data yet
   const assets = assetsData.length > 0 ? assetsData : mockAssets
   const transactions = transactionsData.length > 0 ? transactionsData : mockTransactions
   const netWorthHistory = netWorthData.length > 0 ? netWorthData : mockNetWorthHistory
@@ -34,6 +36,17 @@ export default async function DashboardPage() {
         subtitle="Financial Overview"
         badge={<ProfileBadge profile={profileKey} />}
       />
+      {riskData && (
+        <div className="px-6 pt-4 pb-2 max-w-4xl">
+          <AssetRiskProfile
+            assetClass="all"
+            profiles={riskData.profiles}
+            userProfile={riskData.userProfile}
+            strategyDefs={riskData.strategyDefs}
+            migrationApplied={riskData.migrationApplied}
+          />
+        </div>
+      )}
       <DashboardClient
         assets={assets}
         transactions={transactions}

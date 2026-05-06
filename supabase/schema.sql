@@ -1237,5 +1237,143 @@ CREATE TABLE IF NOT EXISTS strategy_paper_trades (
   metadata        jsonb
 );
 CREATE INDEX IF NOT EXISTS spt_strategy_status_idx ON strategy_paper_trades(strategy_id, status, exit_time DESC);
+
+-- ─── Risk Profile System ──────────────────────────────────────────────────────
+-- Safe to run multiple times (CREATE IF NOT EXISTS + ON CONFLICT DO UPDATE)
+
+CREATE TABLE IF NOT EXISTS risk_profiles (
+  profile_key                     text PRIMARY KEY,
+  display_name                    text NOT NULL,
+  description                     text NOT NULL,
+  confluence_threshold            int  NOT NULL DEFAULT 2,
+  confluence_strength_override    int  NULL,
+  position_cap_pct                numeric NOT NULL DEFAULT 0.05,
+  max_concurrent_positions        int  NOT NULL DEFAULT 8,
+  hedge_sleeve_pct_target         numeric NOT NULL DEFAULT 3,
+  stop_loss_multiplier            numeric NOT NULL DEFAULT 1.0,
+  auto_retirement_brier_threshold numeric NOT NULL DEFAULT 0.25,
+  alloc_stocks                    numeric NOT NULL DEFAULT 0.45,
+  alloc_options                   numeric NOT NULL DEFAULT 0.15,
+  alloc_crypto                    numeric NOT NULL DEFAULT 0.20,
+  alloc_forex                     numeric NOT NULL DEFAULT 0.10,
+  alloc_polymarket                numeric NOT NULL DEFAULT 0.05,
+  alloc_multi_asset               numeric NOT NULL DEFAULT 0.05,
+  sort_order                      int  NOT NULL DEFAULT 0
+);
+
+INSERT INTO risk_profiles VALUES
+  ('vault',        'Vault',        'Capital preservation. Low volatility, low drawdown. For investors who cannot afford losses.',
+   3, NULL, 0.02, 3,  5, 0.50, 0.20, 0.60, 0.20, 0.10, 0.05, 0.00, 0.05, 1),
+  ('conservative', 'Conservative', 'Steady, low-risk income and modest growth. Standard diversification.',
+   2, NULL, 0.03, 5,  4, 0.75, 0.22, 0.55, 0.15, 0.15, 0.10, 0.00, 0.05, 2),
+  ('balanced',     'Balanced',     'Equal emphasis on growth and protection. The default for most investors.',
+   2, NULL, 0.05, 8,  3, 1.00, 0.25, 0.45, 0.15, 0.20, 0.10, 0.05, 0.05, 3),
+  ('growth',       'Growth',       'Prioritise capital appreciation. Higher volatility accepted for higher returns.',
+   1, NULL, 0.08, 12, 2, 1.25, 0.28, 0.35, 0.10, 0.30, 0.10, 0.10, 0.05, 4),
+  ('speculative',  'Speculative',  'Maximise upside. Full strategy access. Only for experienced traders with risk capital.',
+   1, 1,    0.15, 20, 1, 1.50, 0.35, 0.25, 0.10, 0.35, 0.05, 0.20, 0.05, 5)
+ON CONFLICT (profile_key) DO UPDATE SET
+  display_name                    = EXCLUDED.display_name,
+  description                     = EXCLUDED.description,
+  confluence_threshold            = EXCLUDED.confluence_threshold,
+  confluence_strength_override    = EXCLUDED.confluence_strength_override,
+  position_cap_pct                = EXCLUDED.position_cap_pct,
+  max_concurrent_positions        = EXCLUDED.max_concurrent_positions,
+  hedge_sleeve_pct_target         = EXCLUDED.hedge_sleeve_pct_target,
+  stop_loss_multiplier            = EXCLUDED.stop_loss_multiplier,
+  auto_retirement_brier_threshold = EXCLUDED.auto_retirement_brier_threshold,
+  alloc_stocks                    = EXCLUDED.alloc_stocks,
+  alloc_options                   = EXCLUDED.alloc_options,
+  alloc_crypto                    = EXCLUDED.alloc_crypto,
+  alloc_forex                     = EXCLUDED.alloc_forex,
+  alloc_polymarket                = EXCLUDED.alloc_polymarket,
+  alloc_multi_asset               = EXCLUDED.alloc_multi_asset,
+  sort_order                      = EXCLUDED.sort_order;
+
+CREATE TABLE IF NOT EXISTS strategy_definitions (
+  strategy_key              text PRIMARY KEY,
+  layman_name               text NOT NULL,
+  plain_english_description text NOT NULL,
+  enabled_in_profiles       text[] NOT NULL DEFAULT '{}',
+  asset_class               text NOT NULL,
+  requires_advanced_warning boolean NOT NULL DEFAULT false
+);
+
+INSERT INTO strategy_definitions VALUES
+  ('rwa_yield_stack','Real-World Asset Yield','Earns income by lending tokenised real-world assets like US Treasuries or real estate on-chain.',ARRAY['vault','conservative','balanced','growth','speculative'],'crypto',false),
+  ('dividend_aristocrat','Dividend Income','Buys shares in companies with 25+ consecutive years of rising dividends for reliable income.',ARRAY['vault','conservative','balanced','growth','speculative'],'stocks',false),
+  ('dca_halving','Bitcoin Cycle Buy','Accumulates Bitcoin systematically around halving cycles using a disciplined cost-averaging schedule.',ARRAY['vault','conservative','balanced','growth','speculative'],'crypto',false),
+  ('defi_yield','DeFi Yield Farming','Deposits crypto into lending protocols to earn interest, similar to a savings account but on-chain.',ARRAY['vault','conservative','balanced','growth','speculative'],'crypto',false),
+  ('options_wheel','Covered Options Income','Sells put and call options on stable assets to collect premium income each week.',ARRAY['vault','conservative','balanced','growth','speculative'],'options',false),
+  ('etf_basis_arb','ETF Fair-Value Trade','Exploits small price gaps between an ETF and its underlying basket before the market closes them.',ARRAY['vault','conservative','balanced','growth','speculative'],'multi-asset',false),
+  ('sector_rotation','Sector Momentum Shift','Rotates between stock sectors (e.g. tech vs utilities) based on which are in favour with the market.',ARRAY['conservative','balanced','growth','speculative'],'stocks',false),
+  ('qvm_multifactor','Quality & Value Screen','Buys stocks that score well on quality (profits), value (cheap price) and momentum (rising price).',ARRAY['conservative','balanced','growth','speculative'],'stocks',false),
+  ('funding_basis_arb','Crypto Funding Rate Arb','Earns the spread between perpetual futures funding rates and spot, capturing consistent yield.',ARRAY['conservative','balanced','growth','speculative'],'crypto',false),
+  ('cot_positioning','Institutional Flow Tracker','Follows commitments-of-traders data to trade in the same direction as large commercial hedgers.',ARRAY['conservative','balanced','growth','speculative'],'multi-asset',false),
+  ('carry_trade','Currency Carry','Borrows low-interest-rate currencies and invests in higher-rate ones to earn the interest differential.',ARRAY['conservative','balanced','growth','speculative'],'forex',false),
+  ('lst_basis_arb','Liquid Staking Basis','Captures the discount/premium between liquid staking tokens (like stETH) and underlying ETH.',ARRAY['conservative','balanced','growth','speculative'],'crypto',false),
+  ('quant_momentum','Momentum Stock Screen','Buys the best-performing stocks of the past 6-12 months, betting that strong momentum continues.',ARRAY['balanced','growth','speculative'],'stocks',false),
+  ('fx_trendfollowing','FX Trend Rider','Follows multi-week currency trends using systematic moving-average signals.',ARRAY['balanced','growth','speculative'],'forex',false),
+  ('onchain_signal','On-Chain Smart Money','Tracks large wallet movements and on-chain metrics to anticipate crypto price moves.',ARRAY['balanced','growth','speculative'],'crypto',false),
+  ('narrative_rotation','Crypto Narrative Surf','Rides thematic waves in crypto (e.g. AI tokens, memecoins) by detecting early sentiment shifts.',ARRAY['balanced','growth','speculative'],'stocks',false),
+  ('pead','Earnings Drift Capture','Buys (or shorts) stocks after earnings surprises, exploiting the slow drift that follows.',ARRAY['balanced','growth','speculative'],'stocks',false),
+  ('polymarket_wallet_copy','Smart Bettor Follow','Copies the bets of historically profitable Polymarket wallets in real time.',ARRAY['balanced','growth','speculative'],'polymarket',false),
+  ('polymarket_info_lag','News Arbitrage','Bets on prediction markets before they update to reflect newly published information.',ARRAY['balanced','growth','speculative'],'polymarket',false),
+  ('buyback_announcement_momentum','Buyback Momentum','Trades stocks that have just announced large share buyback programmes, which tend to outperform.',ARRAY['balanced','growth','speculative'],'stocks',false),
+  ('polymarket_no_trade','No-Trade Signal','Identifies prediction markets where the expected value is negative and avoids them.',ARRAY['balanced','growth','speculative'],'polymarket',false),
+  ('london_4pm_fix_endmonth','Month-End FX Fix','Trades the well-documented London 4pm FX benchmark fixing flow at month-end.',ARRAY['balanced','growth','speculative'],'forex',false),
+  ('vcp_minervini','VCP Breakout','Identifies stocks contracting in volatility before a breakout, following the Minervini method.',ARRAY['growth','speculative'],'stocks',false),
+  ('ict_smc','Smart Money Concepts','Trades forex using ICT/Smart Money Concepts: order blocks, fair value gaps, and liquidity grabs.',ARRAY['growth','speculative'],'forex',false),
+  ('session_breakout','Session Open Breakout','Trades the initial breakout range during the London and New York session opens.',ARRAY['growth','speculative'],'forex',false),
+  ('liquidation_hunting','Liquidation Cascade','Anticipates forced liquidations in crypto perpetuals and positions ahead of the cascade.',ARRAY['growth','speculative'],'crypto',false),
+  ('polymarket_cross_market','Cross-Market Arb','Finds prices inconsistent across correlated Polymarket markets and arbitrages the gap.',ARRAY['growth','speculative'],'polymarket',false),
+  ('activist_13d_insider_cluster','Activist & Insider Cluster','Buys after a cluster of 13D activist filings and insider purchases signal a potential catalyst.',ARRAY['growth','speculative'],'stocks',false),
+  ('macro_news_event','Macro Event Trader','Trades assets around high-impact macro events (CPI, FOMC, NFP) based on positioning and consensus.',ARRAY['growth','speculative'],'multi-asset',false),
+  ('cb_divergence','Central Bank Divergence','Trades currency pairs where two central banks are moving interest rates in opposite directions.',ARRAY['growth','speculative'],'forex',false),
+  ('polymarket_crypto_binary_5min','Crypto 5-Minute Binary','Short-duration binary bets on crypto price direction in Polymarket 5-minute markets.',ARRAY['growth','speculative'],'polymarket',false),
+  ('polymarket_kalshi_weather','Weather Prediction Markets','Arbitrages pricing gaps between Polymarket and Kalshi on weather-related prediction markets.',ARRAY['growth','speculative'],'polymarket',false),
+  ('polymarket_resolution_rules','Resolution Rules Edge','Identifies markets where the official resolution rules favour one outcome over current pricing.',ARRAY['growth','speculative'],'polymarket',false),
+  ('polymarket_base_rate','Base Rate Betting','Bets on prediction markets that are mispriced relative to historical base rates.',ARRAY['growth','speculative'],'polymarket',false),
+  ('polymarket_event_compression','Event Compression','Trades prediction markets where implied volatility is too high ahead of a scheduled event.',ARRAY['growth','speculative'],'polymarket',false),
+  ('autopilot_congressional','Congressional Trade Follow','Mirrors publicly disclosed trades by US Congress members, who have historically outperformed.',ARRAY['growth','speculative'],'stocks',false),
+  ('memecoin_bondingcurve','Meme Coin Launch Sniper','Buys newly launched memecoins on bonding curves before they reach mainstream attention.',ARRAY['speculative'],'crypto',true),
+  ('cex_latency_arb','Exchange Speed Arb','Exploits millisecond price discrepancies between centralised exchanges using co-located servers.',ARRAY['speculative'],'crypto',true),
+  ('triangular_arb','Triangle Arbitrage','Trades three currency or crypto pairs simultaneously to profit from circular pricing inconsistencies.',ARRAY['speculative'],'crypto',true),
+  ('swap_point_arbitrage','FX Swap Point Arb','Captures mispricing in FX forward swap points, primarily for institutional-scale capital.',ARRAY['speculative'],'forex',true),
+  ('prediction_market_sportsbook_arb','Sportsbook vs Prediction Market','Arbitrages pricing differences between licensed sportsbooks and crypto prediction markets.',ARRAY['speculative'],'polymarket',true),
+  ('polymarket_triangle_arb','Prediction Market Triangle Arb','Finds three-way pricing loops across Polymarket and Kalshi that sum to more than 100%.',ARRAY['speculative'],'polymarket',false),
+  ('airdrop_farming','Airdrop Farming','Interacts with protocols likely to launch tokens, positioning to receive free airdrop allocations.',ARRAY['speculative'],'crypto',false),
+  ('polymarket_liquidity_pocket','Liquidity Pocket Sniper','Identifies thin Polymarket order books and places large bets to move prices advantageously.',ARRAY['speculative'],'polymarket',false),
+  ('polymarket_narrative_fade','Narrative Fade','Bets against over-hyped prediction market narratives that have been priced too aggressively.',ARRAY['speculative'],'polymarket',false),
+  ('gamma_exposure','Gamma Exposure Trade','Trades around dealer gamma exposure levels where hedging flows create predictable price magnets.',ARRAY['speculative'],'options',true),
+  ('merger_arb','Merger Arbitrage','Buys acquisition targets and hedges the acquirer to capture the deal spread at announcement.',ARRAY['speculative'],'stocks',false),
+  ('spinoff','Spinoff Event Capture','Buys corporate spinoffs where forced selling by index funds creates a temporary mispricing.',ARRAY['speculative'],'stocks',false),
+  ('tail_risk_hedging','Tail Risk Hedge','Buys cheap options and volatility instruments to protect the portfolio against rare market crashes.',ARRAY['speculative'],'options',false),
+  ('correlation_divergence','Correlation Breakdown Trade','Trades pairs of assets that have historically moved together but have temporarily diverged.',ARRAY['speculative'],'multi-asset',false),
+  ('polymarket_market_maker','Prediction Market Making','Provides two-sided liquidity on Polymarket, earning the bid-ask spread continuously.',ARRAY['speculative'],'polymarket',true)
+ON CONFLICT (strategy_key) DO UPDATE SET
+  layman_name               = EXCLUDED.layman_name,
+  plain_english_description = EXCLUDED.plain_english_description,
+  enabled_in_profiles       = EXCLUDED.enabled_in_profiles,
+  asset_class               = EXCLUDED.asset_class,
+  requires_advanced_warning = EXCLUDED.requires_advanced_warning;
+
+CREATE TABLE IF NOT EXISTS user_risk_profile (
+  user_id                   uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  profile_key               text NOT NULL DEFAULT 'balanced' REFERENCES risk_profiles(profile_key),
+  ui_mode                   text NOT NULL DEFAULT 'basic' CHECK (ui_mode IN ('basic', 'advanced')),
+  custom_strategy_overrides jsonb NOT NULL DEFAULT '{}',
+  custom_param_overrides    jsonb NOT NULL DEFAULT '{}',
+  asset_class_overrides     jsonb NOT NULL DEFAULT '{}',
+  auto_execute_threshold_usd numeric,
+  onboarded_at              timestamptz,
+  last_changed_at           timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE user_risk_profile ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "users manage own profile" ON user_risk_profile;
+CREATE POLICY "users manage own profile"
+  ON user_risk_profile FOR ALL USING (auth.uid() = user_id);
 CREATE INDEX IF NOT EXISTS spt_entry_time_idx ON strategy_paper_trades(strategy_id, entry_time DESC);
 -- No RLS — paper trades are system-level, not per-user
