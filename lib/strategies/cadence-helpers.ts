@@ -68,6 +68,69 @@ export function isFridayEod(): boolean { return isFridayEt() && isAfterNyClose()
 /** Friday after 5pm ET (CFTC publishes COT mid-afternoon, safe after 5pm). */
 export function isFridayAfter5pmEt(): boolean { return isFridayEt() && hourEt() >= 17 }
 
+/** After 4pm ET (US market closed). Alias for isAfterNyClose. */
+export function isAfterMarketClose(): boolean { return hourEt() >= 16 }
+
+/**
+ * True on the last business day (Mon–Fri) of the current month.
+ * "Last business day" = the day such that the next business day is in a different month.
+ */
+export function isLastBusinessDayOfMonth(): boolean {
+  const now = etNow()
+  const dow = dowEt()
+  if (dow === 0 || dow === 6) return false  // never fires on weekend
+  const tomorrow = new Date(now)
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+  // Skip weekend — next business day
+  let nextBiz = new Date(tomorrow)
+  while (nextBiz.getUTCDay() === 0 || nextBiz.getUTCDay() === 6) {
+    nextBiz = new Date(nextBiz.getTime() + 86_400_000)
+  }
+  return nextBiz.getUTCMonth() !== now.getUTCMonth()
+}
+
+/**
+ * True during the 30-min window before the overnight forex roll (17:00–17:30 ET).
+ * Most brokers apply swap points at 17:00 ET.
+ */
+export function isPreOvernightRoll(): boolean {
+  const h = hourEt()
+  const m = minuteEt()
+  const totalMin = h * 60 + m
+  return totalMin >= 16 * 60 + 30 && totalMin < 17 * 60
+}
+
+/**
+ * Returns the current UTC hour as a decimal (e.g. 14h30m = 14.5).
+ * Useful for London fix window checks.
+ */
+export function utcHourDecimal(): number {
+  const now = new Date()
+  return now.getUTCHours() + now.getUTCMinutes() / 60
+}
+
+/**
+ * True within a given UTC hour window (inclusive start, exclusive end).
+ */
+export function inUtcHourWindow(startH: number, endH: number): boolean {
+  const h = utcHourDecimal()
+  return h >= startH && h < endH
+}
+
+/**
+ * Check whether today is likely an NFP week (first Friday of month within 7 days).
+ */
+export function isNfpWeek(): boolean {
+  const dow = dowEt()
+  const dom = domEt()
+  // First Friday of month: Friday where day <= 7
+  if (dow === 5 && dom <= 7) return true
+  // Mon–Thu before that Friday
+  const daysToFirstFriday = (5 - dow + 7) % 7  // days until next Friday
+  const nextFridayDom = dom + daysToFirstFriday
+  return nextFridayDom <= 7
+}
+
 // ─── London open ──────────────────────────────────────────────────────────────
 
 /**
@@ -215,6 +278,15 @@ export const STRATEGY_CADENCE: Record<string, StrategyCadenceMeta> = {
   polymarket_info_lag:            { cadence: 'Continuous', windowDescription: 'Every run',  nextWindowHint: 'Next paper pass' },
   polymarket_crypto_binary_5min:  { cadence: 'Continuous', windowDescription: 'Every run',  nextWindowHint: 'Next paper pass' },
   polymarket_wallet_copy:         { cadence: 'Continuous', windowDescription: 'Every run',  nextWindowHint: 'Next paper pass' },
+  // Tier 3
+  activist_13d_insider_cluster:         { cadence: 'Daily EOD',       windowDescription: 'After 4pm ET, non-earnings window', nextWindowHint: 'Today 4pm ET' },
+  buyback_announcement_momentum:        { cadence: 'Daily EOD',       windowDescription: 'After 4pm ET or pre-market',        nextWindowHint: 'Today 4pm ET' },
+  etf_basis_arb:                        { cadence: 'Continuous',      windowDescription: 'Every run — fires on ETF/perp gap', nextWindowHint: 'Next paper pass' },
+  lst_basis_arb:                        { cadence: 'Continuous',      windowDescription: 'Every run — fires on LST discount', nextWindowHint: 'Next paper pass' },
+  rwa_yield_stack:                      { cadence: 'Weekly Monday',   windowDescription: 'Monday — RWA yield vs T-bill',      nextWindowHint: 'Next Monday' },
+  london_4pm_fix_endmonth:              { cadence: 'Monthly (London)', windowDescription: 'Last business day of month, London 14:00–16:30 UTC', nextWindowHint: 'Last business day of this month' },
+  swap_point_arbitrage:                 { cadence: 'Daily pre-roll',  windowDescription: '16:30–17:00 ET (pre-overnight roll)', nextWindowHint: 'Today 4:30pm ET' },
+  prediction_market_sportsbook_arb:     { cadence: 'Continuous',      windowDescription: 'Every run — fires on PM/SB margin', nextWindowHint: 'Next paper pass' },
 }
 
 /** Return cadence metadata for a strategy key, with live in-window status. */
@@ -251,6 +323,12 @@ function isCurrentlyInWindow(key: string): boolean {
     case 'cb_divergence':            return true   // checked inside strategy
     case 'pead':                     return true   // checked inside strategy (earnings calendar)
     case 'onchain_signal':           return true   // hourly, always in window
+    // Tier 3
+    case 'activist_13d_insider_cluster':
+    case 'buyback_announcement_momentum':  return isAfterMarketClose()
+    case 'rwa_yield_stack':                return isMondayEt()
+    case 'london_4pm_fix_endmonth':        return isLastBusinessDayOfMonth() && inUtcHourWindow(14, 16.5)
+    case 'swap_point_arbitrage':           return isPreOvernightRoll()
     // continuous strategies
     default:                         return true
   }

@@ -51,6 +51,15 @@ export type StrategyKey =
   | 'cex_latency_arb'
   | 'polymarket_market_maker'
   | 'polymarket_kalshi_weather'
+  // ── TIER 3 strategies ──────────────────────────────────────────────────────
+  | 'activist_13d_insider_cluster'
+  | 'buyback_announcement_momentum'
+  | 'etf_basis_arb'
+  | 'lst_basis_arb'
+  | 'rwa_yield_stack'
+  | 'london_4pm_fix_endmonth'
+  | 'swap_point_arbitrage'
+  | 'prediction_market_sportsbook_arb'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -276,6 +285,48 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'medium', kronos: 'skip',
     edgeType: 'information', defaultBroker: 'polymarket', assetClass: 'polymarket',
     optionalEnv: ['KALSHI_API_KEY', 'KALSHI_API_SECRET'],
+  },
+
+  // ── TIER 3 strategies (all default-disabled in user_enabled_strategies) ──────
+
+  activist_13d_insider_cluster: {
+    mirofish: 'medium', kronos: 'skip',
+    edgeType: 'flow', defaultBroker: 'alpaca', assetClass: 'stocks',
+    optionalEnv: ['POLYGON_API_KEY'],
+  },
+  buyback_announcement_momentum: {
+    mirofish: 'medium', kronos: 'medium',
+    edgeType: 'event', defaultBroker: 'alpaca', assetClass: 'stocks',
+    optionalEnv: ['POLYGON_API_KEY'],
+  },
+  etf_basis_arb: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'alpaca', assetClass: 'multi-asset',
+  },
+  lst_basis_arb: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'coinbase', assetClass: 'crypto',
+  },
+  rwa_yield_stack: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'fundamental', defaultBroker: 'coinbase', assetClass: 'crypto',
+    optionalEnv: ['FRED_API_KEY'],
+  },
+  london_4pm_fix_endmonth: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'flow', defaultBroker: 'oanda', assetClass: 'forex',
+    optionalEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
+  },
+  swap_point_arbitrage: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'oanda', assetClass: 'forex',
+    optionalEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
+    // Warning: uneconomic at retail spreads for most users
+  },
+  prediction_market_sportsbook_arb: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'polymarket', assetClass: 'polymarket',
+    optionalEnv: ['PINNACLE_API_KEY'],
   },
 }
 

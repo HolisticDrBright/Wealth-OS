@@ -29,6 +29,22 @@ import { FundingBasisArbStrategy } from './impl/crypto/funding-basis-arb'
 import { DcaHalvingStrategy } from './impl/crypto/dca-halving'
 import { CexLatencyArbStrategy } from './impl/crypto/cex-latency-arb'
 
+// ── TIER 3: Stocks ────────────────────────────────────────────────────────────
+import { Activist13dInsiderClusterStrategy } from './impl/stocks/activist-13d-insider-cluster'
+import { BuybackAnnouncementMomentumStrategy } from './impl/stocks/buyback-announcement-momentum'
+
+// ── TIER 3: Crypto ────────────────────────────────────────────────────────────
+import { EtfBasisArbStrategy } from './impl/crypto/etf-basis-arb'
+import { LstBasisArbStrategy } from './impl/crypto/lst-basis-arb'
+import { RwaYieldStackStrategy } from './impl/crypto/rwa-yield-stack'
+
+// ── TIER 3: Forex ─────────────────────────────────────────────────────────────
+import { London4pmFixEndmonthStrategy } from './impl/forex/london-4pm-fix-endmonth'
+import { SwapPointArbitrageStrategy } from './impl/forex/swap-point-arbitrage'
+
+// ── TIER 3: Polymarket ────────────────────────────────────────────────────────
+import { PredictionMarketSportsbookArbStrategy } from './impl/polymarket/prediction-market-sportsbook-arb'
+
 // ── Crypto stubs ──────────────────────────────────────────────────────────────
 import {
   OnchainSignalStrategy,
@@ -108,6 +124,16 @@ const ALL_STRATEGIES = [
   new MacroNewsEventStrategy(),
   new TriangularArbStrategy(),
   new CorrelationDivergenceStrategy(),
+
+  // TIER 3 (all default-disabled in user_enabled_strategies)
+  new Activist13dInsiderClusterStrategy(),
+  new BuybackAnnouncementMomentumStrategy(),
+  new EtfBasisArbStrategy(),
+  new LstBasisArbStrategy(),
+  new RwaYieldStackStrategy(),
+  new London4pmFixEndmonthStrategy(),
+  new SwapPointArbitrageStrategy(),
+  new PredictionMarketSportsbookArbStrategy(),
 
   // Polymarket (9)
   new PolymarketResolutionRulesStrategy(),
