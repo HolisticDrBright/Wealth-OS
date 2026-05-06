@@ -36,8 +36,8 @@ async function compute90dSharpe(
 ): Promise<number | null> {
   const since = new Date(Date.now() - 90 * 86_400_000).toISOString()
   const { data } = await supabase
-    .from('outcome_records')
-    .select('actual_return, decision:decision_records!inner(strategy, created_at)')
+    .from('outcome_log')
+    .select('actual_return, decision:decision_log!inner(strategy, created_at)')
     .eq('decision.strategy', strategyKey)
     .gte('decision.created_at', since) as { data: Array<{ actual_return: number }> | null }
 
@@ -60,8 +60,8 @@ async function compute30dBrier(
 ): Promise<number | null> {
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
   const { data } = await supabase
-    .from('outcome_records')
-    .select('brier_score, decision:decision_records!inner(strategy, created_at)')
+    .from('outcome_log')
+    .select('brier_score, decision:decision_log!inner(strategy, created_at)')
     .eq('decision.strategy', strategyKey)
     .gte('decision.created_at', since) as { data: Array<{ brier_score: number }> | null }
 

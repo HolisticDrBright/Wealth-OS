@@ -60,15 +60,15 @@ export async function POST() {
         new Date(p.opened_at as string).getTime() + horizonDays * 86_400_000
       ).toISOString()
       return {
-        user_id:           user.id,
-        strategy:          p.strategy_key as string,
-        symbol:            p.symbol as string,
-        confidence:        DEFAULT_CONFIDENCE,
-        direction:         p.direction as string,
-        horizon_days:      horizonDays,
-        resolution_due_at: resolutionDue,
-        outcome_graded:    false,
-        paper_position_id: p.id as string,
+        user_id:             user.id,
+        strategy:            p.strategy_key as string,
+        symbol:              p.symbol as string,
+        confidence:          DEFAULT_CONFIDENCE,
+        predicted_direction: (p.direction as string) === 'long' ? 1 : 0,
+        horizon_days:        horizonDays,
+        resolution_due_at:   resolutionDue,
+        outcome_graded:      false,
+        paper_position_id:   p.id as string,
       }
     })
     const { error } = await supabase.from('decision_log').insert(rows)
@@ -92,11 +92,11 @@ export async function POST() {
         strategy:          p.strategy_key as string,
         symbol:            p.symbol as string,
         confidence:        DEFAULT_CONFIDENCE,
-        direction:         p.direction as string,
-        horizon_days:      horizonDays,
-        resolution_due_at: closedAt,
-        outcome_graded:    true,
-        paper_position_id: p.id as string,
+        predicted_direction: (p.direction as string) === 'long' ? 1 : 0,
+        horizon_days:        horizonDays,
+        resolution_due_at:   closedAt,
+        outcome_graded:      true,
+        paper_position_id:   p.id as string,
       })
       .select('id')
       .single()

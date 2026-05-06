@@ -29,7 +29,7 @@ export async function getRollingBrier(
 ): Promise<RollingBrierResult | null> {
   const since = new Date(Date.now() - windowDays * 86_400_000).toISOString()
 
-  // Join decision_records with outcome_records via decision_id
+  // Join decision_log with outcome_log via decision_id
   const { data, error } = await (supabase as unknown as {
     from: (t: string) => {
       select: (s: string) => {
@@ -39,8 +39,8 @@ export async function getRollingBrier(
       }
     }
   })
-    .from('outcome_records')
-    .select('brier_score, decision:decision_records!inner(strategy, created_at)')
+    .from('outcome_log')
+    .select('brier_score, decision:decision_log!inner(strategy, created_at)')
     .eq('decision.strategy', strategyKey)
     .gte('decision.created_at', since)
 

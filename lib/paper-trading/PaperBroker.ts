@@ -172,15 +172,15 @@ export class PaperBroker {
       const horizonDays = LEARNING_HORIZON_DAYS[opp.assetClass] ?? 5
       const resolutionDue = new Date(Date.now() + horizonDays * 86_400_000).toISOString()
       supabase.from('decision_log').insert({
-        user_id:            userId,
-        strategy:           opp.strategyKey,
-        symbol:             opp.symbol,
-        confidence:         Math.min(1, Math.max(0, opp.strength)),
-        direction:          opp.direction,
-        horizon_days:       horizonDays,
-        resolution_due_at:  resolutionDue,
-        outcome_graded:     false,
-        paper_position_id:  pos.id,
+        user_id:             userId,
+        strategy:            opp.strategyKey,
+        symbol:              opp.symbol,
+        confidence:          Math.min(1, Math.max(0, opp.strength)),
+        predicted_direction: opp.direction === 'long' ? 1 : 0,
+        horizon_days:        horizonDays,
+        resolution_due_at:   resolutionDue,
+        outcome_graded:      false,
+        paper_position_id:   pos.id,
       }).then(({ error: e }) => {
         if (e) console.warn('[PaperBroker] decision_log insert error:', e.message)
       })
