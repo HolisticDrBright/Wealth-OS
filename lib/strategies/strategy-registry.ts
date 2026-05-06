@@ -60,6 +60,8 @@ export type StrategyKey =
   | 'london_4pm_fix_endmonth'
   | 'swap_point_arbitrage'
   | 'prediction_market_sportsbook_arb'
+  // ── TIER 4 strategies ──────────────────────────────────────────────────────
+  | 'polymarket_triangle_arb'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -327,6 +329,11 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'polymarket', assetClass: 'polymarket',
     optionalEnv: ['PINNACLE_API_KEY'],
+  },
+  polymarket_triangle_arb: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'polymarket', assetClass: 'polymarket',
+    optionalEnv: ['PINNACLE_API_KEY', 'KALSHI_API_KEY'],
   },
 }
 

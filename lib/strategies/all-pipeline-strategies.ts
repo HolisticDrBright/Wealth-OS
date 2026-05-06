@@ -86,6 +86,9 @@ import {
   PolymarketNoTradeStrategy,
 } from './impl/polymarket/stubs'
 
+// ── TIER 4: Polymarket ────────────────────────────────────────────────────────
+import { PolymarketTriangleArbStrategy } from './impl/polymarket/polymarket-triangle-arb'
+
 // ─── Registration ──────────────────────────────────────────────────────────────
 
 const ALL_STRATEGIES = [
@@ -148,6 +151,9 @@ const ALL_STRATEGIES = [
   new PolymarketCryptoBinary5MinStrategy(),
   new PolymarketMarketMakerStrategy(),
   new PolymarketKalshiWeatherStrategy(),
+
+  // TIER 4 (all default-disabled in user_enabled_strategies)
+  new PolymarketTriangleArbStrategy(),
 ]
 
 for (const s of ALL_STRATEGIES) {

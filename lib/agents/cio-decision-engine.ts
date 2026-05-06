@@ -358,16 +358,79 @@ Write a CIO synthesis as JSON:
     }
     if (cons.disagreementCount >= 1) confluenceMultiplier *= 0.5
 
-    // Execute with confluence-adjusted size
+    // T4.1 — Adaptive sizing via rolling Brier score
+    const { getRollingBrier } = await import('@/lib/learning/rolling-brier')
+    const brierResult = await getRollingBrier(supabase, opp.strategyKey, 30)
+    const brierMultiplier = brierResult?.sizingMultiplier ?? 1.0
+
+    // T4.5 — Anti-correlation hedge: dynamically size tail_risk_hedging
+    let tailHedgeOverride: number | null = null
+    if (opp.strategyKey === 'tail_risk_hedging') {
+      const { data: openPositions } = await supabase
+        .from('user_copied_positions')
+        .select('size_fraction, strategy_key')
+        .eq('user_id', userId)
+        .eq('status', 'open')
+      const positions = (openPositions ?? []) as Array<{ size_fraction: number; strategy_key: string }>
+      const totalDirectionalDelta = positions
+        .filter(p => p.strategy_key !== 'tail_risk_hedging')
+        .reduce((s, p) => s + (p.size_fraction ?? 0), 0)
+      tailHedgeOverride = Math.min(0.15, 0.02 + totalDirectionalDelta * 0.06)
+    }
+
+    // Execute with confluence + brier adjusted size
     const rawSize = await strat.sizePosition(opp, verdicts, userId, supabase)
-    const size: import('@/lib/strategies/pipeline-types').PositionSize = confluenceMultiplier === 1.0
-      ? rawSize
-      : {
-          ...rawSize,
-          fraction:    rawSize.fraction    * confluenceMultiplier,
-          notionalUsd: rawSize.notionalUsd * confluenceMultiplier,
-          rationale: `${rawSize.rationale} | confluence x${confluenceMultiplier.toFixed(2)} (agree=${cons.agreementCount}, disagree=${cons.disagreementCount})`,
-        }
+
+    let adjustedFraction = rawSize.fraction * confluenceMultiplier * brierMultiplier
+    let adjustedNotional  = rawSize.notionalUsd * confluenceMultiplier * brierMultiplier
+
+    if (tailHedgeOverride !== null) {
+      const portfolio = rawSize.notionalUsd / Math.max(rawSize.fraction, 0.001)
+      adjustedFraction = tailHedgeOverride
+      adjustedNotional = tailHedgeOverride * portfolio
+    }
+
+    // Apply regime haircut from detectWithConfluence metadata
+    const regimeHaircut = (opp.metadata?.regimeHaircut as number | undefined) ?? 1.0
+    adjustedFraction *= regimeHaircut
+    adjustedNotional *= regimeHaircut
+
+    // T4.4 — Correlation-aware sizing caps (fetch current book)
+    const { applyCorrelationCaps } = await import('@/lib/risk/correlation-aware-sizing')
+    const { data: bookRows } = await supabase
+      .from('user_copied_positions')
+      .select('strategy_key, size_notional_usd')
+      .eq('user_id', userId)
+      .eq('status', 'open')
+    const portfolioUsd = rawSize.fraction > 0 ? rawSize.notionalUsd / rawSize.fraction : 10_000
+    const currentBook = (bookRows ?? []).map((r: Record<string, unknown>) => ({
+      strategyKey: r.strategy_key as import('@/lib/strategies/strategy-registry').StrategyKey,
+      assetClass: strat.assetClass,
+      notionalUsd: (r.size_notional_usd as number) ?? 0,
+    }))
+    const corr = applyCorrelationCaps(
+      opp.strategyKey,
+      strat.assetClass,
+      adjustedNotional,
+      portfolioUsd,
+      currentBook
+    )
+
+    const rationale = [
+      rawSize.rationale,
+      confluenceMultiplier !== 1.0 ? `confluence x${confluenceMultiplier.toFixed(2)}` : null,
+      brierMultiplier !== 1.0 ? `brier x${brierMultiplier.toFixed(2)} (score=${brierResult?.brierScore.toFixed(3)})` : null,
+      tailHedgeOverride !== null ? `hedge override ${(tailHedgeOverride * 100).toFixed(1)}%` : null,
+      regimeHaircut < 1.0 ? `RISK_OFF haircut ${(regimeHaircut * 100).toFixed(0)}%` : null,
+      corr.capApplied ? `${corr.capApplied} cap applied` : null,
+    ].filter(Boolean).join(' | ')
+
+    const size: import('@/lib/strategies/pipeline-types').PositionSize = {
+      ...rawSize,
+      fraction:    portfolioUsd > 0 ? corr.notionalUsd / portfolioUsd : 0,
+      notionalUsd: corr.notionalUsd,
+      rationale,
+    }
 
     const decision = { action: 'execute' as const, size }
     await strat.logAudit(opp, decision, verdicts, supabase)

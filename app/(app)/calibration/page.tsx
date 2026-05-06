@@ -11,8 +11,30 @@
 import { createClient } from '@/lib/supabase/server'
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { StrategyKey } from '@/lib/strategies/strategy-registry'
+import { detectRegime, CrossAssetRegime } from '@/lib/regime/cross-asset-regime'
+import { getRollingBrier } from '@/lib/learning/rolling-brier'
 
 // ─── Data fetching ─────────────────────────────────────────────────────────────
+
+interface BrierRow {
+  strategyKey: StrategyKey
+  brier30d: number | null
+  sizingMultiplier: number
+}
+
+async function getBrierRows(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Map<StrategyKey, BrierRow>> {
+  const result = new Map<StrategyKey, BrierRow>()
+  const keys = Object.keys(STRATEGY_REGISTRY_CONFIG) as StrategyKey[]
+  await Promise.all(keys.map(async key => {
+    const b = await getRollingBrier(supabase as Parameters<typeof getRollingBrier>[0], key, 30)
+    result.set(key, {
+      strategyKey: key,
+      brier30d: b?.brierScore ?? null,
+      sizingMultiplier: b?.sizingMultiplier ?? 1.0,
+    })
+  }))
+  return result
+}
 
 interface CalibrationRow {
   strategyKey: StrategyKey
@@ -144,20 +166,56 @@ function brierColor(n: number | null): string {
 
 export const metadata = { title: 'AI Calibration — Wealth OS' }
 
+function multiplierBadge(m: number): { label: string; cls: string } {
+  if (m > 1.0) return { label: `${m.toFixed(2)}×`, cls: 'bg-green-900 text-green-300' }
+  if (m < 1.0) return { label: `${m.toFixed(2)}×`, cls: 'bg-red-900 text-red-300' }
+  return { label: '1.00×', cls: 'bg-gray-800 text-gray-400' }
+}
+
+function regimeBadge(regime: CrossAssetRegime): { label: string; cls: string } {
+  switch (regime) {
+    case CrossAssetRegime.RISK_ON:  return { label: 'RISK ON',  cls: 'bg-green-900 text-green-300' }
+    case CrossAssetRegime.NEUTRAL:  return { label: 'NEUTRAL',  cls: 'bg-gray-800 text-gray-300' }
+    case CrossAssetRegime.RISK_OFF: return { label: 'RISK OFF', cls: 'bg-yellow-900 text-yellow-300' }
+    case CrossAssetRegime.CRISIS:   return { label: 'CRISIS',   cls: 'bg-red-900 text-red-300' }
+  }
+}
+
 export default async function CalibrationPage() {
-  const rows = await getCalibrationData()
+  const supabase = await createClient()
+  const [rows, brierMap, regimeReading] = await Promise.all([
+    getCalibrationData(),
+    getBrierRows(supabase),
+    detectRegime().catch(() => ({ regime: CrossAssetRegime.NEUTRAL, vix: null, hyOas: null, resolvedAt: Date.now() })),
+  ])
 
   const assetGroups = ['stocks', 'options', 'crypto', 'forex', 'polymarket', 'multi-asset']
+  const rb = regimeBadge(regimeReading.regime)
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold">AI Confluence Calibration</h1>
-          <p className="text-gray-400 mt-1 text-sm">
-            Last 90 days · Brier score (lower = better) · Lift in basis points after AI costs
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">AI Confluence Calibration</h1>
+              <p className="text-gray-400 mt-1 text-sm">
+                Last 90 days · Brier score (lower = better) · Lift in basis points after AI costs
+              </p>
+            </div>
+            {/* Regime indicator */}
+            <div className="shrink-0 text-right space-y-1">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Market Regime</p>
+              <span className={`inline-block text-sm font-bold px-3 py-1 rounded ${rb.cls}`}>
+                {rb.label}
+              </span>
+              <div className="text-xs text-gray-600 space-x-3">
+                {regimeReading.vix !== null && <span>VIX {regimeReading.vix.toFixed(1)}</span>}
+                {regimeReading.hyOas !== null && <span>HY OAS {regimeReading.hyOas.toFixed(0)}bps</span>}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Legend */}
@@ -165,6 +223,8 @@ export default async function CalibrationPage() {
           <span><span className="text-green-400">green lift</span> = AI layer is earning</span>
           <span><span className="text-red-400">red lift</span> = AI layer is costing more than it earns</span>
           <span><span className="text-gray-400">—</span> = insufficient data (&lt;5 trades)</span>
+          <span><span className="text-green-300">1.25×</span> = well-calibrated Brier → size up</span>
+          <span><span className="text-red-300">0.50×</span> = poor Brier → size down</span>
         </div>
 
         {assetGroups.map(asset => {
@@ -184,6 +244,8 @@ export default async function CalibrationPage() {
                       <th className="text-left py-2 pr-4 font-medium">Edge</th>
                       <th className="text-center py-2 pr-4 font-medium">MiroFish</th>
                       <th className="text-center py-2 pr-4 font-medium">Kronos</th>
+                      <th className="text-right py-2 pr-4 font-medium">30d Brier</th>
+                      <th className="text-center py-2 pr-4 font-medium">Sz×</th>
                       <th className="text-right py-2 pr-4 font-medium">Brier</th>
                       <th className="text-right py-2 pr-4 font-medium">+MF bps</th>
                       <th className="text-right py-2 pr-4 font-medium">−MF bps</th>
@@ -219,6 +281,23 @@ export default async function CalibrationPage() {
                         <td className={`py-2 pr-4 text-right font-mono ${brierColor(r.brierScore)}`}>
                           {fmt(r.brierScore, 3)}
                         </td>
+                        {/* T4.1 — 30d Brier + sizing multiplier */}
+                        {(() => {
+                          const b = brierMap.get(r.strategyKey)
+                          const mb = b ? multiplierBadge(b.sizingMultiplier) : null
+                          return (
+                            <>
+                              <td className={`py-2 pr-4 text-right font-mono ${brierColor(b?.brier30d ?? null)}`}>
+                                {b?.brier30d !== null && b?.brier30d !== undefined ? fmt(b.brier30d, 3) : '—'}
+                              </td>
+                              <td className="py-2 pr-4 text-center">
+                                {mb ? (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded font-mono ${mb.cls}`}>{mb.label}</span>
+                                ) : <span className="text-gray-600 text-xs">—</span>}
+                              </td>
+                            </>
+                          )
+                        })()}
                         <td className="py-2 pr-4 text-right font-mono text-gray-300">
                           {fmt(r.avgPnlWithMiroFish)}
                           <span className="text-gray-600 ml-1">({r.nWithMiroFish})</span>

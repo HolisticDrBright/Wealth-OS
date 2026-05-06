@@ -83,8 +83,35 @@ export abstract class BasePipelineStrategy {
    * the scan-all runner so signals are available for cross-strategy consensus.
    */
   async detectWithConfluence(ctx: OpportunityContext): Promise<Opportunity[]> {
-    const opps = await this.detectOpportunities(ctx)
+    // T4.3 — time-of-day guard: skip strategies during low-liquidity windows
+    const { isTimeOfDayAllowed } = await import('@/lib/cadence/time-of-day-guards')
+    if (!isTimeOfDayAllowed(this.assetClass, this.key)) return []
+
+    // T4.2 — cross-asset regime gate
+    const { detectRegime, CrossAssetRegime } = await import('@/lib/regime/cross-asset-regime')
+    const regimeReading = await detectRegime()
+
+    // CRISIS: block everything except tail_risk_hedging
+    if (regimeReading.regime === CrossAssetRegime.CRISIS && this.key !== 'tail_risk_hedging') {
+      return []
+    }
+
+    let opps = await this.detectOpportunities(ctx)
     if (opps.length === 0) return opps
+
+    // RISK_OFF: apply 50% size haircut to directional opportunities
+    if (regimeReading.regime === CrossAssetRegime.RISK_OFF) {
+      opps = opps.map(opp =>
+        opp.direction === 'neutral' ? opp : {
+          ...opp,
+          metadata: {
+            ...opp.metadata,
+            regimeHaircut: 0.5,
+            reasoning: `${opp.metadata?.reasoning ?? ''} [RISK_OFF haircut 50%]`.trim(),
+          },
+        }
+      )
+    }
 
     const { confluenceRegistry } = await import('@/lib/strategies/confluence-registry')
     for (const opp of opps) {
