@@ -4,6 +4,8 @@
  * Closed-loop pipeline:
  *  1. Grade any unresolved decisions whose horizon has passed (fetch real prices)
  *  2. Query all resolved outcomes joined with their decision records
+ *     → Fallback: if outcome_log is empty, score directly from closed paper_positions
+ *       (works before the decision_log migration is applied)
  *  3. Score each strategy: Brier + hit rate + alpha vs benchmark
  *  4. Softmax → normalized target weights
  *  5. Clamp evolution (max 8% change per cycle) + per-strategy floors
@@ -13,7 +15,7 @@
  */
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBarsReal, normaliseSymbolForGrading } from '@/lib/market-data'
-import { scoreStrategies, type StrategyScore } from './scorer'
+import { scoreStrategies, type StrategyScore, type ScoringRow } from './scorer'
 import {
   loadWeightsForUser,
   saveWeightsForUser,
@@ -29,13 +31,15 @@ export interface LearningPassResult {
   weights?: Record<string, number>
   scores?: StrategyScore[]
   max_delta?: number
+  source?: 'outcome_log' | 'paper_positions'
 }
 
 // ─── Outcome grader ───────────────────────────────────────────────────────────
 
 /**
- * Find ungraded decisions whose resolution_due_at has passed,
- * fetch actual price data, and write outcome records.
+ * Find ungraded decisions and write outcome records.
+ * Pass 1: closed positions linked via paper_position_id — uses realized P&L, no price bars needed.
+ * Pass 2: past-horizon decisions without a position link — fetches real price bars.
  * Returns the number of newly graded decisions.
  */
 async function gradeOutcomes(userId: string): Promise<number> {
@@ -44,9 +48,8 @@ async function gradeOutcomes(userId: string): Promise<number> {
   let graded = 0
 
   // ── Pass 1: grade decisions linked to CLOSED positions using realized P&L ──
-  // This fires immediately when a position closes — no need to wait for the
-  // resolution horizon or fetch price bars. Covers cases where the inline
-  // grader in PaperBroker.checkAndExitPositions() failed silently.
+  // Fires immediately when a position closes — no horizon wait, no price bars.
+  // Rescues cases where PaperBroker's inline grader failed silently.
   const { data: linkedPending } = await admin
     .from('decision_log')
     .select('id, confidence, paper_position_id')
@@ -70,7 +73,7 @@ async function gradeOutcomes(userId: string): Promise<number> {
       if (!pos) continue
       const actualDirection: 0 | 1 = (pos.realized_pnl_usd as number) >= 0 ? 1 : 0
       const brierScore = ((dec.confidence as number) - actualDirection) ** 2
-      const [, err2] = await Promise.all([
+      const [{ error: outErr }] = await Promise.all([
         admin.from('outcome_log').insert({
           decision_id:        dec.id,
           user_id:            userId,
@@ -80,13 +83,13 @@ async function gradeOutcomes(userId: string): Promise<number> {
           brier_score:        brierScore,
         }),
         admin.from('decision_log').update({ outcome_graded: true }).eq('id', dec.id as string),
-      ]).then(([r1, r2]) => [r1.error, r2.error])
-      if (!err2) graded++
+      ])
+      if (!outErr) graded++
     }
   }
 
-  // ── Pass 2: grade decisions past their horizon using real price bars ────────
-  // Only runs on decisions without a paper_position_id (legacy / non-position signals).
+  // ── Pass 2: grade past-horizon decisions using real price bars ────────────
+  // Only for decisions without a paper_position_id (legacy/non-position signals).
   const { data: pending } = await admin
     .from('decision_log')
     .select('id, symbol, asset_class, confidence, created_at, horizon_days')
@@ -154,37 +157,69 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
     // Step 1: grade any pending decisions
     const graded = await gradeOutcomes(userId)
 
-    // Step 2: fetch all resolved outcomes with their decision context
     const admin = createAdminClient()
+
+    // Step 2a: primary source — outcome_log joined with decision_log
     const { data: outcomes } = await admin
       .from('outcome_log')
       .select('actual_direction, actual_return, alpha_vs_benchmark, decision:decision_log(strategy, confidence)')
       .eq('user_id', userId)
 
-    if (!outcomes?.length) {
-      return { updated: false, reason: 'no outcome data yet', graded }
+    let rows: ScoringRow[] = []
+    let source: LearningPassResult['source'] = 'outcome_log'
+
+    if (outcomes?.length) {
+      rows = outcomes
+        .filter((o): o is typeof o & { decision: { strategy: string; confidence: number } } =>
+          o.decision != null
+        )
+        .map(o => ({
+          strategy:           o.decision.strategy,
+          confidence:         o.decision.confidence,
+          actual_direction:   o.actual_direction as number,
+          actual_return:      o.actual_return as number,
+          alpha_vs_benchmark: o.alpha_vs_benchmark as number,
+        }))
     }
 
-    const rows = outcomes
-      .filter((o): o is typeof o & { decision: { strategy: string; confidence: number } } =>
-        o.decision != null
-      )
-      .map(o => ({
-        strategy: o.decision.strategy,
-        confidence: o.decision.confidence,
-        actual_direction: o.actual_direction as number,
-        actual_return: o.actual_return as number,
-        alpha_vs_benchmark: o.alpha_vs_benchmark as number,
+    // Step 2b: fallback — score directly from closed paper_positions.
+    // Works before the decision_log migration is applied and any time outcome_log
+    // hasn't caught up with the position history.
+    if (!rows.length) {
+      source = 'paper_positions'
+      const { data: closed } = await admin
+        .from('paper_positions')
+        .select('strategy_key, realized_pnl_pct, realized_pnl_usd')
+        .eq('user_id', userId)
+        .eq('status', 'closed')
+        .neq('asset_class', 'polymarket')
+        .not('realized_pnl_usd', 'is', null)
+
+      if (!closed?.length) {
+        return { updated: false, reason: 'no closed positions yet — keep paper trading', graded }
+      }
+
+      rows = closed.map(p => ({
+        strategy:           p.strategy_key as string,
+        confidence:         0.6,  // default prior, same as backfill
+        actual_direction:   (p.realized_pnl_usd as number) >= 0 ? 1 : 0,
+        actual_return:      (p.realized_pnl_pct as number) ?? 0,
+        alpha_vs_benchmark: 0,
       }))
+    }
 
     // Step 3: compute per-strategy scores
     const scores = scoreStrategies(rows)
 
     if (!scores.length) {
+      const counts = new Map<string, number>()
+      for (const r of rows) counts.set(r.strategy, (counts.get(r.strategy) ?? 0) + 1)
+      const maxCount = counts.size ? Math.max(...counts.values()) : 0
       return {
         updated: false,
-        reason: `not enough data — need ${MIN_SAMPLES}+ resolved outcomes per strategy`,
+        reason: `not enough trades per strategy — need ${MIN_SAMPLES}+, most have ${maxCount}`,
         graded,
+        source,
       }
     }
 
@@ -204,7 +239,7 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
     )
 
     if (maxDelta < 0.01) {
-      return { updated: false, reason: 'no material change (max delta < 1%)', graded, scores }
+      return { updated: false, reason: 'no material change (max delta < 1%)', graded, scores, source }
     }
 
     await saveWeightsForUser(userId, evolved)
@@ -216,6 +251,7 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
       weights: evolved,
       scores,
       max_delta: maxDelta,
+      source,
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
