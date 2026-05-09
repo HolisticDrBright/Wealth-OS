@@ -1,6 +1,9 @@
 {
   "crons": [
-    { "path": "/api/cron?task=daily",    "schedule": "0 9 * * *" },
-    { "path": "/api/cron?task=learning", "schedule": "0 3 * * *" }
+    { "path": "/api/cron?task=daily",         "schedule": "0 9 * * *"   },
+    { "path": "/api/cron?task=paper-trading", "schedule": "30 14 * * 1-5" },
+    { "path": "/api/cron?task=paper-trading", "schedule": "0 21 * * 1-5"  },
+    { "path": "/api/cron?task=paper-trading", "schedule": "0 22 * * 0"    },
+    { "path": "/api/cron?task=learning",      "schedule": "0 3 * * *"   }
   ]
 }
