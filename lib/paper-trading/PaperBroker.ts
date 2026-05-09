@@ -309,23 +309,29 @@ export class PaperBroker {
         .eq('paper_position_id', pos.id as string)
         .eq('outcome_graded', false)
         .limit(1)
-        .then(async ({ data: decRows }) => {
+        .then(async ({ data: decRows, error: selErr }) => {
+          if (selErr) {
+            console.warn('[PaperBroker] decision_log lookup error:', selErr.message)
+            return
+          }
           const dec = decRows?.[0]
           if (!dec) return
           const brierScore = ((dec.confidence as number) - actualDirection) ** 2
-          await Promise.all([
+          const [{ error: outErr }, { error: decErr }] = await Promise.all([
             supabase.from('outcome_log').insert({
               decision_id:         dec.id,
               user_id:             userId,
               actual_direction:    actualDirection,
               actual_return:       realizedPct,
-              alpha_vs_benchmark:  0,  // SPY delta unknown at close; scorer weights this lightly
+              alpha_vs_benchmark:  0,
               brier_score:         brierScore,
             }),
             supabase.from('decision_log')
               .update({ outcome_graded: true })
               .eq('id', dec.id as string),
           ])
+          if (outErr) console.warn('[PaperBroker] outcome_log insert error:', outErr.message)
+          if (decErr) console.warn('[PaperBroker] decision_log grade error:', decErr.message)
         })
 
       const sign = pnlUsd >= 0 ? '+' : ''

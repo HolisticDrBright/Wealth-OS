@@ -153,14 +153,14 @@ export async function GET(req: NextRequest) {
     if (task === 'learning') {
       const { createAdminClient } = await import('@/lib/supabase/admin')
       const supabase = createAdminClient()
-      // Run for every user who has at least one open paper position
+      // Run for every user who has any paper position (open or closed) — closed positions
+      // still have decision_log entries that may need grading or outcome data to learn from.
       const { data: rows } = await supabase
         .from('paper_positions')
         .select('user_id')
-        .eq('status', 'open')
       const userIds = [...new Set((rows ?? []).map(r => r.user_id as string))]
       if (!userIds.length) {
-        return NextResponse.json({ task: 'learning', users: 0, message: 'No users with open positions' })
+        return NextResponse.json({ task: 'learning', users: 0, message: 'No users with paper positions' })
       }
       const { runLearningPass } = await import('@/lib/learning/loop')
       const results = await Promise.allSettled(userIds.map(uid => runLearningPass(uid)))

@@ -1063,6 +1063,7 @@ CREATE TABLE IF NOT EXISTS decision_log (
   user_id             uuid REFERENCES auth.users(id) NOT NULL,
   strategy            text NOT NULL,
   symbol              text NOT NULL,
+  asset_class         text,
   confidence          numeric NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   predicted_direction smallint NOT NULL CHECK (predicted_direction IN (0, 1)),
   predicted_return    numeric,
@@ -1070,6 +1071,7 @@ CREATE TABLE IF NOT EXISTS decision_log (
   horizon_days        integer NOT NULL DEFAULT 7,
   resolution_due_at   timestamptz NOT NULL,
   outcome_graded      boolean NOT NULL DEFAULT false,
+  paper_position_id   uuid REFERENCES paper_positions(id) ON DELETE SET NULL,
   metadata            jsonb
 );
 ALTER TABLE decision_log ENABLE ROW LEVEL SECURITY;

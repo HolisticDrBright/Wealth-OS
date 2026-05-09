@@ -41,32 +41,69 @@ export interface LearningPassResult {
 async function gradeOutcomes(userId: string): Promise<number> {
   const admin = createAdminClient()
   const now = new Date().toISOString()
+  let graded = 0
 
+  // ── Pass 1: grade decisions linked to CLOSED positions using realized P&L ──
+  // This fires immediately when a position closes — no need to wait for the
+  // resolution horizon or fetch price bars. Covers cases where the inline
+  // grader in PaperBroker.checkAndExitPositions() failed silently.
+  const { data: linkedPending } = await admin
+    .from('decision_log')
+    .select('id, confidence, paper_position_id')
+    .eq('user_id', userId)
+    .eq('outcome_graded', false)
+    .not('paper_position_id', 'is', null)
+    .limit(100)
+
+  if (linkedPending?.length) {
+    const posIds = linkedPending.map(d => d.paper_position_id as string)
+    const { data: closedPos } = await admin
+      .from('paper_positions')
+      .select('id, realized_pnl_pct, realized_pnl_usd, status')
+      .in('id', posIds)
+      .eq('status', 'closed')
+
+    const closedMap = new Map((closedPos ?? []).map(p => [p.id as string, p]))
+
+    for (const dec of linkedPending) {
+      const pos = closedMap.get(dec.paper_position_id as string)
+      if (!pos) continue
+      const actualDirection: 0 | 1 = (pos.realized_pnl_usd as number) >= 0 ? 1 : 0
+      const brierScore = ((dec.confidence as number) - actualDirection) ** 2
+      const [, err2] = await Promise.all([
+        admin.from('outcome_log').insert({
+          decision_id:        dec.id,
+          user_id:            userId,
+          actual_direction:   actualDirection,
+          actual_return:      pos.realized_pnl_pct as number,
+          alpha_vs_benchmark: 0,
+          brier_score:        brierScore,
+        }),
+        admin.from('decision_log').update({ outcome_graded: true }).eq('id', dec.id as string),
+      ]).then(([r1, r2]) => [r1.error, r2.error])
+      if (!err2) graded++
+    }
+  }
+
+  // ── Pass 2: grade decisions past their horizon using real price bars ────────
+  // Only runs on decisions without a paper_position_id (legacy / non-position signals).
   const { data: pending } = await admin
     .from('decision_log')
     .select('id, symbol, asset_class, confidence, created_at, horizon_days')
     .eq('user_id', userId)
     .eq('outcome_graded', false)
+    .is('paper_position_id', null)
     .lte('resolution_due_at', now)
-    .limit(50)  // grade in batches
+    .limit(50)
 
-  if (!pending?.length) return 0
-
-  let graded = 0
-
-  for (const decision of pending) {
+  for (const decision of pending ?? []) {
     try {
-      const start = decision.created_at.slice(0, 10)
+      const start = (decision.created_at as string).slice(0, 10)
       const end = new Date().toISOString().slice(0, 10)
-
-      if (start === end) continue  // can't grade same-day
+      if (start === end) continue
 
       const assetClass = (decision.asset_class as string) ?? 'stocks'
-
-      // Normalise symbol to Yahoo format (BTC→BTC-USD, EURUSD→EURUSD=X)
-      const gradingSymbol = normaliseSymbolForGrading(decision.symbol, assetClass)
-
-      // Benchmark: stocks/options → SPY; crypto → BTC-USD; forex → no alpha (skip bench)
+      const gradingSymbol = normaliseSymbolForGrading(decision.symbol as string, assetClass)
       const benchSymbol =
         assetClass === 'crypto' ? 'BTC-USD'
         : assetClass === 'forex' ? null
@@ -77,20 +114,18 @@ async function gradeOutcomes(userId: string): Promise<number> {
         benchSymbol ? getBarsReal(benchSymbol, start, end) : Promise.resolve([]),
       ])
 
-      // Skip if no real price data — never grade with synthetic numbers
       if (assetBars.length < 2) continue
       if (benchSymbol && benchBars.length < 2) continue
 
       const entryPrice = assetBars[0].close
-      const exitPrice = assetBars[assetBars.length - 1].close
-
+      const exitPrice  = assetBars[assetBars.length - 1].close
       const actual_return = (exitPrice - entryPrice) / entryPrice
-      const bench_return = benchBars.length >= 2
+      const bench_return  = benchBars.length >= 2
         ? (benchBars[benchBars.length - 1].close - benchBars[0].close) / benchBars[0].close
         : 0
       const alpha_vs_benchmark = actual_return - bench_return
       const actual_direction: 0 | 1 = actual_return >= 0 ? 1 : 0
-      const brier_score = (decision.confidence - actual_direction) ** 2
+      const brier_score = ((decision.confidence as number) - actual_direction) ** 2
 
       await Promise.all([
         admin.from('outcome_log').insert({
@@ -101,14 +136,11 @@ async function gradeOutcomes(userId: string): Promise<number> {
           alpha_vs_benchmark,
           brier_score,
         }),
-        admin.from('decision_log')
-          .update({ outcome_graded: true })
-          .eq('id', decision.id),
+        admin.from('decision_log').update({ outcome_graded: true }).eq('id', decision.id as string),
       ])
-
       graded++
     } catch {
-      // Skip if price data unavailable — decision stays ungraded
+      // No real price data available — decision stays pending
     }
   }
 
