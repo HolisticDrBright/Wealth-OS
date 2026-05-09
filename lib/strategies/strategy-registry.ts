@@ -62,6 +62,15 @@ export type StrategyKey =
   | 'prediction_market_sportsbook_arb'
   // ── TIER 4 strategies ──────────────────────────────────────────────────────
   | 'polymarket_triangle_arb'
+  // ── Weekly Review 2026-05-09 ───────────────────────────────────────────────
+  | 'pead_microcap_text'
+  | 'vix_term_structure'
+  | 'funding_basis_arb_hyperliquid'
+  | 'pendle_pt_fixed_yield'
+  | 'month_end_fix'
+  | 'jpy_intervention_fade'
+  | 'cross_platform_sports_arb'
+  | 'polymarket_theta_decay'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -388,6 +397,51 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     edgeType: 'structural', defaultBroker: 'polymarket', assetClass: 'polymarket',
     optionalEnv: ['PINNACLE_API_KEY', 'KALSHI_API_KEY'],
     enabledInProfiles: ['speculative'],
+  },
+
+  // ── Weekly Review 2026-05-09 — default-disabled scaffolds ──────────────────
+  pead_microcap_text: {
+    mirofish: 'medium', kronos: 'medium',
+    edgeType: 'event', defaultBroker: 'alpaca', assetClass: 'stocks',
+    enabledInProfiles: ['growth', 'speculative'],
+  },
+  vix_term_structure: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'tastyfx', assetClass: 'options',
+    enabledInProfiles: ['balanced', 'growth'],
+  },
+  funding_basis_arb_hyperliquid: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'binance_us', assetClass: 'crypto',
+    enabledInProfiles: ['conservative', 'balanced', 'growth', 'speculative'],
+  },
+  pendle_pt_fixed_yield: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'coinbase', assetClass: 'crypto',
+    enabledInProfiles: ['vault', 'conservative', 'balanced', 'growth'],
+  },
+  month_end_fix: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'flow', defaultBroker: 'oanda', assetClass: 'forex',
+    optionalEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
+    enabledInProfiles: ['vault', 'conservative', 'balanced', 'growth', 'speculative'],
+  },
+  jpy_intervention_fade: {
+    mirofish: 'medium', kronos: 'medium',
+    edgeType: 'macro', defaultBroker: 'oanda', assetClass: 'forex',
+    optionalEnv: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
+    enabledInProfiles: ['balanced', 'growth', 'speculative'],
+  },
+  cross_platform_sports_arb: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'polymarket', assetClass: 'polymarket',
+    optionalEnv: ['KALSHI_API_KEY'],
+    enabledInProfiles: ['vault', 'conservative', 'balanced', 'growth', 'speculative'],
+  },
+  polymarket_theta_decay: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'polymarket', assetClass: 'polymarket',
+    enabledInProfiles: ['balanced', 'growth', 'speculative'],
   },
 }
 

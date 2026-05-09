@@ -10,17 +10,17 @@ const mk = (overrides: Partial<UserRiskProfile> = {}): UserRiskProfile => ({
 })
 
 describe('Integration smoke — getEffectiveStrategies', () => {
-  it('vault: only 6 base strategies enabled', () => {
+  it('vault: only base strategies enabled', () => {
     const s = getEffectiveStrategies(mk({ profileKey: 'vault' }))
-    expect(s.size).toBe(6)
+    expect(s.size).toBe(9)  // 6 original + pendle_pt_fixed_yield, month_end_fix, cross_platform_sports_arb
     expect(s.has('dividend_aristocrat')).toBe(true)
     expect(s.has('memecoin_bondingcurve')).toBe(false)
     expect(s.has('vcp_minervini')).toBe(false)
   })
 
-  it('speculative: all 51 strategies enabled', () => {
+  it('speculative: all strategies enabled', () => {
     const s = getEffectiveStrategies(mk({ profileKey: 'speculative' }))
-    expect(s.size).toBe(51)
+    expect(s.size).toBe(57)  // 51 original + 6 new speculative-eligible strategies
     expect(s.has('memecoin_bondingcurve')).toBe(true)
     expect(s.has('polymarket_triangle_arb')).toBe(true)
   })

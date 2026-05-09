@@ -89,6 +89,16 @@ import {
 // ── TIER 4: Polymarket ────────────────────────────────────────────────────────
 import { PolymarketTriangleArbStrategy } from './impl/polymarket/polymarket-triangle-arb'
 
+// ── Weekly Review 2026-05-09 scaffolds (default-disabled) ─────────────────────
+import { PeadMicrocapTextStrategy } from './impl/stocks/pead-microcap-text'
+import { VixTermStructureStrategy } from './impl/stocks/vix-term-structure'
+import { FundingBasisArbHyperliquidStrategy } from './impl/crypto/funding-basis-arb-hyperliquid'
+import { PendlePtFixedYieldStrategy } from './impl/crypto/pendle-pt-fixed-yield'
+import { MonthEndFixStrategy } from './impl/forex/month-end-fix'
+import { JpyInterventionFadeStrategy } from './impl/forex/jpy-intervention-fade'
+import { CrossPlatformSportsArbStrategy } from './impl/polymarket/cross-platform-sports-arb'
+import { PolymarketThetaDecayStrategy } from './impl/polymarket/polymarket-theta-decay'
+
 // ─── Registration ──────────────────────────────────────────────────────────────
 
 const ALL_STRATEGIES = [
@@ -154,6 +164,16 @@ const ALL_STRATEGIES = [
 
   // TIER 4 (all default-disabled in user_enabled_strategies)
   new PolymarketTriangleArbStrategy(),
+
+  // Weekly Review 2026-05-09 scaffolds
+  new PeadMicrocapTextStrategy(),
+  new VixTermStructureStrategy(),
+  new FundingBasisArbHyperliquidStrategy(),
+  new PendlePtFixedYieldStrategy(),
+  new MonthEndFixStrategy(),
+  new JpyInterventionFadeStrategy(),
+  new CrossPlatformSportsArbStrategy(),
+  new PolymarketThetaDecayStrategy(),
 ]
 
 for (const s of ALL_STRATEGIES) {
