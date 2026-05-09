@@ -172,6 +172,44 @@ export async function getBars(
 }
 
 /**
+ * Normalise a symbol to Yahoo Finance format based on asset class.
+ * Used by the learning loop so grading fetches real data, not synthetic.
+ *   crypto:  BTC       → BTC-USD
+ *   forex:   EURUSD    → EURUSD=X
+ *   stocks/options/multi-asset: pass through unchanged
+ */
+export function normaliseSymbolForGrading(symbol: string, assetClass: string): string {
+  const s = symbol.toUpperCase()
+  if (assetClass === 'crypto') {
+    // Already suffixed (e.g. BTC-USD) → leave alone; otherwise append -USD
+    return s.includes('-') ? s : `${s}-USD`
+  }
+  if (assetClass === 'forex') {
+    // Already suffixed (e.g. EURUSD=X) → leave alone; otherwise append =X
+    return s.endsWith('=X') ? s : `${s}=X`
+  }
+  return s
+}
+
+/**
+ * Like getBars but never returns synthetic data — returns [] if real data unavailable.
+ * Use this for learning-loop grading to avoid polluting scores with random numbers.
+ */
+export async function getBarsReal(
+  symbol: string,
+  startDate: string,
+  endDate: string
+): Promise<PriceBar[]> {
+  const alpacaBars = await fetchAlpacaBars(symbol, startDate, endDate)
+  if (alpacaBars.length > 10) return alpacaBars
+
+  const yahooBars = await fetchHistoricalBars(symbol, startDate, endDate)
+  if (yahooBars.length > 10) return yahooBars
+
+  return []
+}
+
+/**
  * Get bars for multiple symbols — tries real data first, fills missing with synthetic.
  */
 export async function getBarsForSymbols(

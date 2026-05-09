@@ -177,6 +177,7 @@ export class PaperBroker {
         symbol:              opp.symbol,
         confidence:          Math.min(1, Math.max(0, opp.strength)),
         predicted_direction: opp.direction === 'long' ? 1 : 0,
+        asset_class:         opp.assetClass,
         horizon_days:        horizonDays,
         resolution_due_at:   resolutionDue,
         outcome_graded:      false,

@@ -12,7 +12,7 @@
  * Never throws — if the pass fails, caller keeps using current weights.
  */
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getBars } from '@/lib/market-data'
+import { getBarsReal, normaliseSymbolForGrading } from '@/lib/market-data'
 import { scoreStrategies, type StrategyScore } from './scorer'
 import {
   loadWeightsForUser,
@@ -44,7 +44,7 @@ async function gradeOutcomes(userId: string): Promise<number> {
 
   const { data: pending } = await admin
     .from('decision_log')
-    .select('id, symbol, confidence, created_at, horizon_days')
+    .select('id, symbol, asset_class, confidence, created_at, horizon_days')
     .eq('user_id', userId)
     .eq('outcome_graded', false)
     .lte('resolution_due_at', now)
@@ -61,20 +61,33 @@ async function gradeOutcomes(userId: string): Promise<number> {
 
       if (start === end) continue  // can't grade same-day
 
+      const assetClass = (decision.asset_class as string) ?? 'stocks'
+
+      // Normalise symbol to Yahoo format (BTC→BTC-USD, EURUSD→EURUSD=X)
+      const gradingSymbol = normaliseSymbolForGrading(decision.symbol, assetClass)
+
+      // Benchmark: stocks/options → SPY; crypto → BTC-USD; forex → no alpha (skip bench)
+      const benchSymbol =
+        assetClass === 'crypto' ? 'BTC-USD'
+        : assetClass === 'forex' ? null
+        : 'SPY'
+
       const [assetBars, benchBars] = await Promise.all([
-        getBars(decision.symbol, start, end),
-        getBars('SPY', start, end),
+        getBarsReal(gradingSymbol, start, end),
+        benchSymbol ? getBarsReal(benchSymbol, start, end) : Promise.resolve([]),
       ])
 
-      if (assetBars.length < 2 || benchBars.length < 2) continue
+      // Skip if no real price data — never grade with synthetic numbers
+      if (assetBars.length < 2) continue
+      if (benchSymbol && benchBars.length < 2) continue
 
       const entryPrice = assetBars[0].close
       const exitPrice = assetBars[assetBars.length - 1].close
-      const benchEntry = benchBars[0].close
-      const benchExit = benchBars[benchBars.length - 1].close
 
       const actual_return = (exitPrice - entryPrice) / entryPrice
-      const bench_return = (benchExit - benchEntry) / benchEntry
+      const bench_return = benchBars.length >= 2
+        ? (benchBars[benchBars.length - 1].close - benchBars[0].close) / benchBars[0].close
+        : 0
       const alpha_vs_benchmark = actual_return - bench_return
       const actual_direction: 0 | 1 = actual_return >= 0 ? 1 : 0
       const brier_score = (decision.confidence - actual_direction) ** 2
