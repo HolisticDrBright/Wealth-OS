@@ -104,6 +104,23 @@ Standalone desktop app. **Not in the monorepo.** Install separately alongside We
 
 **Wealth OS** = autonomous execution. **Fincept Terminal** = manual research. Use both.
 
+## Developer R&D Loop
+
+Wealth OS ships an opt-in [TradingView MCP](docs/tradingview-mcp-workflow.md) integration for validating indicator logic against TradingView's Pine Script engine during development.
+
+```bash
+# 1. Enable in .mcp.json (local only, never commit)
+#    Set "disabled": false in the tradingview-mcp entry
+
+# 2. Restart Claude Code — MCP tools appear automatically
+
+# 3. Ask Claude to pull bars, run Pine Script, compare to lib/indicators/ output
+
+# 4. Commit the vitest fixture, revert .mcp.json
+```
+
+See `docs/tradingview-mcp-workflow.md` for full instructions.
+
 ## Database Migrations
 
 Run in Supabase SQL editor in order:

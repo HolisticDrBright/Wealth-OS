@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tradingview-mcp": {
+      "command": "npx",
+      "args": ["-y", "tradingview-mcp"],
+      "env": {},
+      "disabled": true,
+      "notes": "Opt-in R&D tool. Enable locally by setting disabled=false. See docs/tradingview-mcp-workflow.md."
+    }
+  }
+}
