@@ -196,6 +196,12 @@ export class NarrativeRotationStrategy extends BasePipelineStrategy {
   readonly assetClass = 'crypto' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    // TODO: pull topMovers('24h') from CryptoPanic, filter score > 70 and polarity > 0.4,
+    // cross-reference price/volume from CCXT (fetchTicker + fetchOHLCV), fire entry signal.
+    // import { topMovers } from '@/lib/integrations/cryptopanic/mcp-config'
+    // import { buildClient } from '@/lib/integrations/ccxt/mcp-config'
+    // Enable cryptopanic-mcp + ccxt-mcp in .mcp.json to activate.
+
     if (!isMondayEt()) return []
     const opportunities: Opportunity[] = []
 
@@ -453,6 +459,11 @@ export class MemecoinBondingcurveStrategy extends BasePipelineStrategy {
   readonly assetClass = 'crypto' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
+    // TODO: enhance with Uniswap PoolSpy MCP to detect new Uniswap V3 pools
+    // alongside the DexScreener boost signal.
+    // import { getNewPools } from '@/lib/integrations/uniswap-poolspy/mcp-config'
+    // Enable uniswap-poolspy-mcp in .mcp.json to activate.
+
     try {
       const boostRes = await fetch(
         'https://api.dexscreener.com/token-boosts/top/v1',
