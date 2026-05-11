@@ -104,6 +104,19 @@ Standalone desktop app. **Not in the monorepo.** Install separately alongside We
 
 **Wealth OS** = autonomous execution. **Fincept Terminal** = manual research. Use both.
 
+## MCP Integrations
+
+Wealth OS wires four crypto MCP servers. See [`docs/mcp-servers.md`](docs/mcp-servers.md) for the full reference.
+
+| MCP | State | Purpose |
+|---|---|---|
+| `ccxt-mcp` | **Active** | Multi-exchange read-only data (tickers, OHLCV, funding rates) |
+| `cryptopanic-mcp` | **Active** | Crypto news + narrative heat scores for `narrative_rotation` |
+| `aave-mcp` | Gated | Aave reserve APY data — enable when `pendle_pt_fixed_yield` is implemented |
+| `uniswap-poolspy-mcp` | Gated | New Uniswap pools — enable when `memecoin_bondingcurve` is implemented |
+
+Write-capable MCPs (`uniswap-trader-mcp`, `mcp-cryptowallet-evm`) are explicitly blocked — all execution goes through `lib/broker-adapters/`.
+
 ## Developer R&D Loop
 
 Wealth OS ships an opt-in [TradingView MCP](docs/tradingview-mcp-workflow.md) integration for validating indicator logic against TradingView's Pine Script engine during development.

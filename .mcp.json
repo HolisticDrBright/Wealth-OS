@@ -1,5 +1,33 @@
 {
   "mcpServers": {
+    "ccxt-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@lazy-dinosaur/ccxt-mcp"],
+      "env": {}
+    },
+    "cryptopanic-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@kukapay/cryptopanic-mcp-server"],
+      "env": { "CRYPTOPANIC_API_KEY": "${CRYPTOPANIC_API_KEY}" }
+    },
+    "aave-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@junct-bot/aave-mcp"],
+      "env": {},
+      "disabled": true,
+      "comment": "Enable when defi_yield_stack or pendle-pt-fixed-yield is implemented"
+    },
+    "uniswap-poolspy-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@kukapay/uniswap-poolspy-mcp"],
+      "env": {},
+      "disabled": true,
+      "comment": "Enable when memecoin-bonding-curve is implemented"
+    },
     "tradingview-mcp": {
       "command": "npx",
       "args": ["-y", "tradingview-mcp"],
