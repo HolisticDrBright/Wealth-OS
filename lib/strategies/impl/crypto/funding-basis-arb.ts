@@ -35,7 +35,7 @@ import { randomUUID } from 'crypto'
 
 // ─── Thresholds (per vault recipe) ────────────────────────────────────────────
 
-const HIGH_FUNDING_THRESHOLD  = 0.0003    // 0.03%/8h = ~13% annualised
+const HIGH_FUNDING_THRESHOLD  = 0.0002    // 0.02%/8h = ~9% annualised
 const MIN_SPREAD_BPS          = 5         // minimum basis to execute
 const BOOK_CAP_PCT            = 0.25      // max 25% of top-of-book depth
 const MAX_NOTIONAL_USD        = 50_000    // hard cap per position

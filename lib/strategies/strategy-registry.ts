@@ -242,7 +242,7 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
   },
   narrative_rotation: {
     mirofish: 'high', kronos: 'medium',
-    edgeType: 'sentiment', defaultBroker: 'alpaca', assetClass: 'stocks',
+    edgeType: 'sentiment', defaultBroker: 'coinbase', assetClass: 'crypto',
     enabledInProfiles: ['balanced', 'growth', 'speculative'],
   },
   merger_arb: {

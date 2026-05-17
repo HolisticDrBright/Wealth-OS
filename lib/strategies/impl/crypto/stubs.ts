@@ -328,14 +328,14 @@ export class LiquidationHuntingStrategy extends BasePipelineStrategy {
         if (isNaN(ratio)) continue
 
         // Too many longs → liquidation cascade downward
-        if (ratio > 1.8) {
+        if (ratio > 1.65) {
           opportunities.push({
             id: randomUUID(),
             strategyKey: this.key,
             symbol: sym,
             direction: 'short',
             assetClass: this.assetClass,
-            strength: Math.min(1, 0.50 + (ratio - 1.8) / 0.8),
+            strength: Math.min(1, 0.50 + (ratio - 1.65) / 0.8),
             expectedReturn: 0.025,
             metadata: {
               symbol: sym,
@@ -348,14 +348,14 @@ export class LiquidationHuntingStrategy extends BasePipelineStrategy {
           })
 
         // Too many shorts → short squeeze upward
-        } else if (ratio < 0.55) {
+        } else if (ratio < 0.62) {
           opportunities.push({
             id: randomUUID(),
             strategyKey: this.key,
             symbol: sym,
             direction: 'long',
             assetClass: this.assetClass,
-            strength: Math.min(1, 0.50 + (0.55 - ratio) / 0.35),
+            strength: Math.min(1, 0.50 + (0.62 - ratio) / 0.35),
             expectedReturn: 0.025,
             metadata: {
               symbol: sym,

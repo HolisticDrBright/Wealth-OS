@@ -36,7 +36,6 @@ const MVRV_OVERBOUGHT       = 3.5    // MVRV Z-score above this → no new buys
 const TRADE_RISK_PCT        = 0.01   // 1% per trade (accumulation phase)
 const WEEKLY_DCA_PCT        = 0.0025 // 0.25% weekly base DCA
 const EXPANSION_RISK_PCT    = 0.005  // halve risk in expansion phase
-const DISTRIBUTION_BLOCK    = true   // block new buys in distribution
 
 // ─── Price data ───────────────────────────────────────────────────────────────
 
@@ -136,7 +135,7 @@ function phaseRiskMultiplier(phase: HalvingPhase): number {
     case 'accumulation': return 1.0
     case 'contraction':  return 0.8   // build position but cautiously
     case 'expansion':    return 0.5   // half size — let momentum run
-    case 'distribution': return 0.0   // no new buys
+    case 'distribution': return 0.4   // reduce signals only — trim on strength
   }
 }
 
@@ -152,15 +151,11 @@ export class DcaHalvingStrategy extends BasePipelineStrategy {
     const cycleState = getHalvingCycleState()
     const { phase, daysSinceHalving, daysToNextHalving, cycleProgressPct } = cycleState
 
-    // Block new buys in distribution phase entirely
-    if (phase === 'distribution' && DISTRIBUTION_BLOCK) return []
-
-    // Fetch MVRV — if available and overbought, block
+    // Fetch MVRV — if available and overbought, block new longs (still allow reduces)
     const mvrv = await getMvrvZScore()
-    if (mvrv !== null && mvrv > MVRV_OVERBOUGHT) return []
+    if (mvrv !== null && mvrv > MVRV_OVERBOUGHT && phase !== 'distribution') return []
 
     const phaseMultiplier = phaseRiskMultiplier(phase)
-    if (phaseMultiplier === 0) return []
 
     // Process BTC and ETH
     const assets: Array<{ id: string; label: string; fetchFn: () => Promise<{ currentPrice: number; ninetyDayHigh: number } | null> }> = [
