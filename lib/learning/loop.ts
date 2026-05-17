@@ -171,7 +171,7 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
     if (outcomes?.length) {
       rows = outcomes
         .filter((o): o is typeof o & { decision: { strategy: string; confidence: number } } =>
-          o.decision != null
+          o.decision != null && typeof o.decision === 'object'
         )
         .map(o => ({
           strategy:           o.decision.strategy,
@@ -180,11 +180,17 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
           actual_return:      o.actual_return as number,
           alpha_vs_benchmark: o.alpha_vs_benchmark as number,
         }))
+      // If the FK join dropped a significant fraction of outcomes (orphaned rows),
+      // fall through to the paper_positions fallback which has the full history.
+      if (rows.length < outcomes.length * 0.5) {
+        rows = []
+      }
     }
 
     // Step 2b: fallback — score directly from closed paper_positions.
-    // Works before the decision_log migration is applied and any time outcome_log
-    // hasn't caught up with the position history.
+    // Activates when outcome_log is empty (migration not yet run, or backfill not done).
+    // Includes all asset classes — realized_pnl_usd comes from the position record
+    // directly, not from price bars, so polymarket and forex are safe to include.
     if (!rows.length) {
       source = 'paper_positions'
       const { data: closed } = await admin
@@ -192,8 +198,7 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
         .select('strategy_key, realized_pnl_pct, realized_pnl_usd')
         .eq('user_id', userId)
         .eq('status', 'closed')
-        .neq('asset_class', 'polymarket')
-        .not('realized_pnl_usd', 'is', null)
+        .limit(5000)
 
       if (!closed?.length) {
         return { updated: false, reason: 'no closed positions yet — keep paper trading', graded }
@@ -202,8 +207,9 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
       rows = closed.map(p => ({
         strategy:           p.strategy_key as string,
         confidence:         0.6,  // default prior, same as backfill
-        actual_direction:   (p.realized_pnl_usd as number) >= 0 ? 1 : 0,
-        actual_return:      (p.realized_pnl_pct as number) ?? 0,
+        // null realized_pnl_usd (timeout close where price update failed) treated as breakeven
+        actual_direction:   ((p.realized_pnl_usd as number | null) ?? 0) >= 0 ? 1 : 0,
+        actual_return:      (p.realized_pnl_pct as number | null) ?? 0,
         alpha_vs_benchmark: 0,
       }))
     }
@@ -214,10 +220,12 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
     if (!scores.length) {
       const counts = new Map<string, number>()
       for (const r of rows) counts.set(r.strategy, (counts.get(r.strategy) ?? 0) + 1)
-      const maxCount = counts.size ? Math.max(...counts.values()) : 0
+      const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1])
+      const top5 = sorted.slice(0, 5).map(([s, n]) => `${s}:${n}`).join(', ')
+      const maxCount = sorted[0]?.[1] ?? 0
       return {
         updated: false,
-        reason: `not enough trades per strategy — need ${MIN_SAMPLES}+, most have ${maxCount}`,
+        reason: `not enough trades per strategy — need ${MIN_SAMPLES}+, max is ${maxCount} (top: ${top5})`,
         graded,
         source,
       }

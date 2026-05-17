@@ -32,7 +32,7 @@ export const MAX_WEIGHT = 0.50
 export const MAX_CHANGE_PER_CYCLE = 0.08
 
 /** Minimum resolved outcomes before adjusting a strategy's weight */
-export const MIN_SAMPLES = 5
+export const MIN_SAMPLES = 3
 
 /** Softmax temperature: lower = more concentrated on top performers */
 export const SOFTMAX_TEMPERATURE = 0.5
