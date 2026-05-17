@@ -39,16 +39,16 @@ const STRATEGY_EXIT: Record<StrategyKey, ExitDefaults> = {
   defi_yield:           { sl: 0.05, tp: 0.12, hours: 168 },
   airdrop_farming:      { sl: 0.15, tp: 0.40, hours: 168 },
   memecoin_bondingcurve:{ sl: 0.20, tp: 0.60, hours:  48 }, // quick pump/dump
-  // ── Forex (smaller moves — every bps counts) ─────────────────────────
-  fx_trendfollowing:    { sl: 0.010, tp: 0.025, hours:  72 },
-  cb_divergence:        { sl: 0.010, tp: 0.020, hours:  48 }, // around CB meeting
-  correlation_divergence:{ sl: 0.015, tp: 0.030, hours: 48 }, // mean reversion
-  ict_smc:              { sl: 0.010, tp: 0.020, hours:  24 },
-  carry_trade:          { sl: 0.020, tp: 0.040, hours: 168 }, // carry accrues over time
-  cot_positioning:      { sl: 0.015, tp: 0.030, hours: 168 }, // COT data is weekly
-  session_breakout:     { sl: 0.008, tp: 0.015, hours:  12 }, // intraday session
-  macro_news_event:     { sl: 0.008, tp: 0.020, hours:  24 },
-  triangular_arb:       { sl: 0.005, tp: 0.008, hours:   4 }, // tight arb
+  // ── Forex — 1:3 R/R with hold times scaled to signal horizon ────────────
+  fx_trendfollowing:    { sl: 0.007, tp: 0.021, hours: 120 }, // 5d — trend needs time
+  cb_divergence:        { sl: 0.007, tp: 0.021, hours:  72 }, // 3d around CB meeting
+  correlation_divergence:{ sl: 0.010, tp: 0.030, hours: 72 }, // 3d mean-reversion
+  ict_smc:              { sl: 0.006, tp: 0.018, hours:  48 }, // 2d — SMC runs intraday→swing
+  carry_trade:          { sl: 0.015, tp: 0.045, hours: 336 }, // 2 weeks — carry accrues
+  cot_positioning:      { sl: 0.012, tp: 0.036, hours: 240 }, // 10d — COT is slow-moving
+  session_breakout:     { sl: 0.005, tp: 0.015, hours:  48 }, // 2d — breakout needs follow-through
+  macro_news_event:     { sl: 0.006, tp: 0.018, hours:  24 }, // 24h — momentum fades fast
+  triangular_arb:       { sl: 0.003, tp: 0.009, hours:   6 }, // 6h — arb or nothing
   // ── Stocks ───────────────────────────────────────────────────────────
   pead:                 { sl: 0.03, tp: 0.08, hours: 120 }, // PEAD plays out over 5 days
   autopilot_congressional:{ sl: 0.05, tp: 0.15, hours: 240 }, // congressional hold ~10 days

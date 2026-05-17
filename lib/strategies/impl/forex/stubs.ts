@@ -137,10 +137,10 @@ export class IctSmcStrategy extends BasePipelineStrategy {
 
 // ─── 2. CarryTradeStrategy ────────────────────────────────────────────────────
 
-// Approximate G10 real rates (nominal rate − CPI). Update quarterly.
+// Approximate G10 real rates (nominal rate − CPI). Updated Q2 2026.
 const G10_REAL_RATES: Record<string, number> = {
-  USD: 1.8, EUR: 0.5, JPY: -1.2, GBP: 1.2, CHF: -0.3,
-  CAD: 1.5, AUD: 1.3, NZD: 1.4, SEK: 0.2, NOK: 1.6,
+  USD: 1.5, EUR: 0.8, JPY: -0.8, GBP: 1.6, CHF: -0.2,
+  CAD: 1.1, AUD: 0.9, NZD: 1.1, SEK: 0.3, NOK: 1.2,
 }
 
 // OANDA instrument for long_ccy/short_ccy pair (only tradeable combos)
@@ -658,13 +658,12 @@ export class CorrelationDivergenceStrategy extends BasePipelineStrategy {
 
         const currentRatio = closesA.at(-1)! / closesB.at(-1)!
         const z = (currentRatio - ratioMean) / ratioStdev
-        if (Math.abs(z) < 1.5 || Math.abs(z) > 3.0) continue
+        if (Math.abs(z) < 1.8 || Math.abs(z) > 3.0) continue
 
-        // Floor strength at 0.60 — any signal passing the z≥1.5 gate has real statistical edge
-        const strength = Math.max(0.60, Math.min(1, (Math.abs(z) - 1.5) / 1.5))
+        const strength = Math.max(0.40, Math.min(1, (Math.abs(z) - 1.5) / 1.5))
         const meta = { z: +z.toFixed(2), corr: +corr.toFixed(2), ratioMean, ratioStdev, reasoning: `${pairA}/${pairB} z=${z.toFixed(2)}, corr=${corr.toFixed(2)}` }
 
-        const [dirA, dirB]: Array<'long' | 'short'> = z > 1.5 ? ['short', 'long'] : ['long', 'short']
+        const [dirA, dirB]: Array<'long' | 'short'> = z > 0 ? ['short', 'long'] : ['long', 'short']
 
         results.push(
           { id: randomUUID(), strategyKey: this.key, symbol: pairA, direction: dirA, assetClass: this.assetClass, strength, expectedReturn: 0.025, metadata: meta, detectedAt: new Date().toISOString() },
