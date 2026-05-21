@@ -14,7 +14,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveOnboardedProfile } from '@/lib/actions/risk-profile'
+import { saveOnboardedProfile, saveStateOfResidence } from '@/lib/actions/risk-profile'
 import type { ProfileKey } from '@/lib/strategies/profile-params'
 
 const PROFILES: ProfileKey[] = ['vault', 'conservative', 'balanced', 'growth', 'speculative']
@@ -43,6 +43,7 @@ interface WizardState {
   adjustment: number
   excludedAssets: Set<AssetClass>
   autoExecuteUsd: number | null
+  stateOfResidence: string | null
 }
 
 function computeRecommendation(state: WizardState): ProfileKey {
@@ -67,6 +68,7 @@ export default function RiskProfileWizard() {
     adjustment: 0,
     excludedAssets: new Set(),
     autoExecuteUsd: null,
+    stateOfResidence: null,
   })
   const [confirmed, setConfirmed] = useState(false)
 
@@ -109,7 +111,10 @@ export default function RiskProfileWizard() {
         ASSET_OPTIONS.map(a => [a.key, !state.excludedAssets.has(a.key)])
       )
       void assetClassOverrides // will be saved separately after onboarding
-      await saveOnboardedProfile(recommended, state.autoExecuteUsd ?? undefined)
+      await Promise.all([
+        saveOnboardedProfile(recommended, state.autoExecuteUsd ?? undefined),
+        state.stateOfResidence ? saveStateOfResidence(state.stateOfResidence) : Promise.resolve({}),
+      ])
       setConfirmed(true)
       setTimeout(() => router.push('/settings/risk-profile'), 1500)
     })
@@ -132,7 +137,7 @@ export default function RiskProfileWizard() {
       <div className="w-full max-w-lg space-y-8">
         {/* Progress */}
         <div className="flex gap-2">
-          {[1, 2, 3, 4, 5].map(n => (
+          {[1, 2, 3, 4, 5, 6].map(n => (
             <div
               key={n}
               className={`h-1 flex-1 rounded-full ${
@@ -265,6 +270,7 @@ export default function RiskProfileWizard() {
                   onClick={() => {
                     setState(s => ({ ...s, autoExecuteUsd: opt.value || null, step: 6 }))
                   }}
+                  // step 6 = state-of-residence; final recommendation at step >= 7
                   className="w-full text-left px-5 py-4 rounded-xl border border-gray-700 hover:border-white hover:bg-gray-900 transition-colors"
                 >
                   {opt.label}
@@ -274,8 +280,49 @@ export default function RiskProfileWizard() {
           </div>
         )}
 
+        {/* Step 6: State of residence */}
+        {state.step === 6 && (
+          <div className="space-y-6">
+            <h1 className="text-2xl font-bold">What US state do you live in?</h1>
+            <p className="text-gray-400 text-sm">
+              Some prediction market venues are restricted by state law. We use this to
+              automatically disable unavailable strategies. Optional — skip if outside the US.
+            </p>
+            <select
+              value={state.stateOfResidence ?? ''}
+              onChange={e => setState(s => ({ ...s, stateOfResidence: e.target.value || null }))}
+              className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white focus:border-white outline-none"
+            >
+              <option value="">— Select state / Not in US —</option>
+              {[
+                ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],
+                ['CA','California'],['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],
+                ['FL','Florida'],['GA','Georgia'],['HI','Hawaii'],['ID','Idaho'],
+                ['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],['KS','Kansas'],
+                ['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],['MD','Maryland'],
+                ['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],['MS','Mississippi'],
+                ['MO','Missouri'],['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],
+                ['NH','New Hampshire'],['NJ','New Jersey'],['NM','New Mexico'],['NY','New York'],
+                ['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],['OK','Oklahoma'],
+                ['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],
+                ['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],['UT','Utah'],
+                ['VT','Vermont'],['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],
+                ['WI','Wisconsin'],['WY','Wyoming'],
+              ].map(([code, name]) => (
+                <option key={code} value={code}>{name}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setState(s => ({ ...s, step: 7 }))}
+              className="w-full py-3 rounded-xl bg-white text-black font-semibold hover:bg-gray-100 transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
         {/* Final: Recommendation */}
-        {state.step >= 6 && (
+        {state.step >= 7 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">Your recommended profile</h1>
             <div className="rounded-2xl border border-white/20 bg-gray-900 p-6 space-y-3">
@@ -301,7 +348,7 @@ export default function RiskProfileWizard() {
               {isPending ? 'Saving&#8230;' : 'Confirm and continue'}
             </button>
             <button
-              onClick={() => setState(s => ({ ...s, step: 1, adjustment: 0, baseIndex: 2 }))}
+              onClick={() => setState(s => ({ ...s, step: 1, adjustment: 0, baseIndex: 2, stateOfResidence: null }))}
               className="w-full py-3 text-gray-400 text-sm hover:text-white transition-colors"
             >
               Start over

@@ -200,6 +200,19 @@ export async function updateAutoExecuteThreshold(
   return error ? { error: error.message } : {}
 }
 
+export async function saveStateOfResidence(state: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ state_of_residence: state || null })
+    .eq('id', user.id)
+
+  return error ? { error: error.message } : {}
+}
+
 export async function saveOnboardedProfile(
   profileKey: ProfileKey,
   autoExecuteThresholdUsd?: number

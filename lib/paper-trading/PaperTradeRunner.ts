@@ -3,6 +3,8 @@ import { ALL_STRATEGIES } from '@/lib/strategies/all-pipeline-strategies'
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
 import { PaperBroker } from './PaperBroker'
 import type { PaperRunResult } from './types'
+import { getUserStateOfResidence, isVenueAllowedInState } from '@/lib/risk-profile/state-gate'
+import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 
 const engine = new CIODecisionEngine()
 const broker = new PaperBroker()
@@ -31,6 +33,9 @@ export async function runPaperTradingPass(
   const positionsClosed = await broker.checkAndExitPositions(supabase, userId)
   await broker.markToMarket(supabase, userId)
 
+  // Load user state once; used for venue gating below
+  const userState = await getUserStateOfResidence(supabase, userId)
+
   // All strategy keys are enabled in paper mode (including default-disabled ones like cex_latency_arb)
   const allStrategyKeys = ALL_STRATEGIES.map(s => s.key as string)
 
@@ -49,6 +54,19 @@ export async function runPaperTradingPass(
 
   // Step 3–5 — detect → decide → fill
   for (const strategy of strategiesToRun) {
+    // Gate venue-banned strategies (e.g. polymarket/kalshi in MN)
+    if (userState) {
+      const cfg = STRATEGY_REGISTRY_CONFIG[strategy.key as keyof typeof STRATEGY_REGISTRY_CONFIG]
+      const venue = cfg?.assetClass === 'polymarket' ? cfg.defaultBroker : null
+      if (venue && venue !== 'alpaca') {
+        const allowed = await isVenueAllowedInState(supabase, venue, userState)
+        if (!allowed) {
+          errors.push(`${strategy.key}: skipped — venue ${venue} banned in ${userState}`)
+          continue
+        }
+      }
+    }
+
     let opps: Awaited<ReturnType<typeof strategy.detectOpportunities>> = []
     try {
       opps = await strategy.detectOpportunities(ctx)

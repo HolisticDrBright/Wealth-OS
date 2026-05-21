@@ -13,9 +13,27 @@ import { Topbar } from '@/components/layout/topbar'
 import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
 import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
-import { Terminal, ExternalLink } from 'lucide-react'
+import { Terminal, ExternalLink, AlertTriangle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { getUserStateOfResidence, isVenueAllowedInState } from '@/lib/risk-profile/state-gate'
 
 export default async function PolymarketPage() {
+  // Check state-of-residence ban before fetching live data
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  let stateBanned = false
+  let userStateName: string | null = null
+  if (user) {
+    const stateCode = await getUserStateOfResidence(supabase, user.id)
+    if (stateCode) {
+      const allowed = await isVenueAllowedInState(supabase, 'polymarket', stateCode)
+      if (!allowed) {
+        stateBanned = true
+        userStateName = stateCode
+      }
+    }
+  }
+
   const [healthRes, marketsRes, signalsRes, portfolioRes, settingsRes, circuit, riskData] =
     await Promise.all([
       getHealth(),
@@ -39,10 +57,21 @@ export default async function PolymarketPage() {
     </div>
   )
 
+  const stateBanBanner = stateBanned ? (
+    <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+      <span>
+        Prediction markets are not available in <strong>{userStateName}</strong>. Polymarket
+        strategies have been disabled in your paper-trading runner.
+      </span>
+    </div>
+  ) : null
+
   if (!healthRes.ok) {
     return (
       <div className="flex flex-col">
         {riskPanel}
+        {stateBanBanner}
         <SetupGuide errorCode={healthRes.error.code} errorMessage={healthRes.error.message} />
       </div>
     )
@@ -51,6 +80,7 @@ export default async function PolymarketPage() {
   return (
     <div className="flex flex-col">
       {riskPanel}
+      {stateBanBanner}
       <PolymarketClient
         initialHealth={healthRes.value}
         initialMarkets={marketsRes.ok ? marketsRes.value : []}
