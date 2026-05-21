@@ -71,6 +71,7 @@ export type StrategyKey =
   | 'jpy_intervention_fade'
   | 'cross_platform_sports_arb'
   | 'polymarket_theta_decay'
+  | 'odte_strangle_hedged'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -442,6 +443,11 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'polymarket', assetClass: 'polymarket',
     enabledInProfiles: ['balanced', 'growth', 'speculative'],
+  },
+  odte_strangle_hedged: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'tastyfx', assetClass: 'options',
+    enabledInProfiles: ['growth', 'speculative'],
   },
 }
 

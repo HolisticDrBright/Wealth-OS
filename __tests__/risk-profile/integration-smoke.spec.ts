@@ -20,7 +20,7 @@ describe('Integration smoke — getEffectiveStrategies', () => {
 
   it('speculative: all strategies enabled', () => {
     const s = getEffectiveStrategies(mk({ profileKey: 'speculative' }))
-    expect(s.size).toBe(57)  // 51 original + 6 new speculative-eligible strategies
+    expect(s.size).toBe(58)  // 51 original + 7 new speculative-eligible strategies
     expect(s.has('memecoin_bondingcurve')).toBe(true)
     expect(s.has('polymarket_triangle_arb')).toBe(true)
   })

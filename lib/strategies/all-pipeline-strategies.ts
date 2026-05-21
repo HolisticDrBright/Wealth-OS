@@ -98,6 +98,7 @@ import { MonthEndFixStrategy } from './impl/forex/month-end-fix'
 import { JpyInterventionFadeStrategy } from './impl/forex/jpy-intervention-fade'
 import { CrossPlatformSportsArbStrategy } from './impl/polymarket/cross-platform-sports-arb'
 import { PolymarketThetaDecayStrategy } from './impl/polymarket/polymarket-theta-decay'
+import { OdteStrangleHedgedStrategy } from './impl/stocks/odte-strangle-hedged'
 
 // ─── Registration ──────────────────────────────────────────────────────────────
 
@@ -174,6 +175,7 @@ const ALL_STRATEGIES = [
   new JpyInterventionFadeStrategy(),
   new CrossPlatformSportsArbStrategy(),
   new PolymarketThetaDecayStrategy(),
+  new OdteStrangleHedgedStrategy(),
 ]
 
 for (const s of ALL_STRATEGIES) {
