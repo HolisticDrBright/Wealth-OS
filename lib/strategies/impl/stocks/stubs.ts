@@ -5,6 +5,7 @@
 import { BasePipelineStrategy } from '../../BasePipelineStrategy'
 import type { Opportunity, OpportunityContext } from '../../pipeline-types'
 import { randomUUID } from 'crypto'
+import { computeColorDecaySchedule } from '@/lib/indicators/color-decay'
 import { getSentimentScore, applySentimentToStrength } from '@/lib/market-data/news-sentiment'
 import {
   isFirstBusinessDayOfQuarter,
@@ -460,15 +461,25 @@ export class GammaExposureStrategy extends BasePipelineStrategy {
         return []
       }
 
+      // Color (∂Γ/∂t): use VIX deviation from neutral (20) as a gamma proxy.
+      // Positive → market long gamma (mean-reversion flow expected).
+      const netGammaProxy = (currentVix - 20) * 1_000
+      const colorSchedule = computeColorDecaySchedule(netGammaProxy)
+
       return [{
         id: randomUUID(),
         strategyKey: this.key,
         symbol: 'VIX',
         direction,
         assetClass: this.assetClass,
-        strength: Math.min(1, strength),
+        strength: Math.min(1, strength * (1 + colorSchedule.confidence * 0.2)),
         expectedReturn,
-        metadata: { currentVix, vixSma20, vixPercentile },
+        metadata: {
+          currentVix, vixSma20, vixPercentile,
+          colorNextHedgeWindow: colorSchedule.nextHedgeWindow,
+          colorFlowDirection: colorSchedule.expectedFlowDirection,
+          colorConfidence: colorSchedule.confidence,
+        },
         detectedAt: new Date().toISOString(),
       }]
     } catch {
