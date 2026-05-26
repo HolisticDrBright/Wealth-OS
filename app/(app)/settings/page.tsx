@@ -1,6 +1,8 @@
+import Link from 'next/link'
 import { Topbar } from '@/components/layout/topbar'
 import { SettingsClient } from './settings-client'
 import { getUserSettings, getBrokerStatus, getAIFeatureData } from '@/lib/actions/settings'
+import { BarChart2 } from 'lucide-react'
 import { detectRegime, CrossAssetRegime } from '@/lib/regime/cross-asset-regime'
 import { createClient } from '@/lib/supabase/server'
 
@@ -94,6 +96,18 @@ export default async function SettingsPage() {
       <Topbar title="Settings" subtitle="Brokers, risk profile, and preferences" />
       <RegimeHealthCard />
       <HedgeSleeveCard />
+      <div className="mx-6 mb-4 max-w-3xl">
+        <Link
+          href="/admin/paper-trading-stats"
+          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-300 hover:bg-white/10 transition-colors"
+        >
+          <BarChart2 className="h-4 w-4 text-indigo-400" />
+          <div>
+            <p className="font-medium text-white">View Paper-Trading Stats</p>
+            <p className="text-xs text-gray-500">Trades, P&amp;L, open positions, and exit-reason breakdown (last 7 days)</p>
+          </div>
+        </Link>
+      </div>
       <SettingsClient settings={settings} brokerStatus={brokerStatus} aiData={aiData} />
     </div>
   )
