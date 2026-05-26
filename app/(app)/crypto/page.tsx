@@ -23,7 +23,7 @@ export default async function CryptoPage() {
           migrationApplied={riskData.migrationApplied}
         />
       </div>
-      <CryptoClient initialPortfolio={portfolio} initialPrices={prices} />
+      <CryptoClient initialPortfolio={portfolio} initialPrices={prices} userProfileKey={(riskData.userProfile?.profile_key as import('@/lib/strategies/strategy-registry').ProfileKey) ?? undefined} />
     </div>
   )
 }

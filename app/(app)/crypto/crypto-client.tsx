@@ -6,13 +6,15 @@ import type { CryptoPortfolioPosition, CryptoPrice } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Bitcoin, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
 import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
+import type { ProfileKey } from '@/lib/strategies/strategy-registry'
 
 interface Props {
   initialPortfolio: CryptoPortfolioPosition[]
   initialPrices: CryptoPrice[]
+  userProfileKey?: ProfileKey
 }
 
-export function CryptoClient({ initialPortfolio, initialPrices }: Props) {
+export function CryptoClient({ initialPortfolio, initialPrices, userProfileKey }: Props) {
   const [portfolio, setPortfolio] = useState(initialPortfolio)
   const [prices] = useState(initialPrices)
   const [syncing, startTransition] = useTransition()
@@ -160,7 +162,7 @@ export function CryptoClient({ initialPortfolio, initialPrices }: Props) {
       </div>
 
       {/* Strategies */}
-      <AssetStrategyPanel assetClasses={['crypto']} />
+      <AssetStrategyPanel assetClasses={['crypto']} userProfileKey={userProfileKey} />
     </div>
   )
 }

@@ -21,7 +21,7 @@ export default async function ForexPage() {
           migrationApplied={riskData.migrationApplied}
         />
       </div>
-      <ForexClient initialRates={rates} initialPositions={positions} />
+      <ForexClient initialRates={rates} initialPositions={positions} userProfileKey={(riskData.userProfile?.profile_key as import('@/lib/strategies/strategy-registry').ProfileKey) ?? undefined} />
     </div>
   )
 }

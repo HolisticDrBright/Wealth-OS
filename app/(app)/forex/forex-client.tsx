@@ -6,13 +6,15 @@ import type { ForexRate, ForexPosition } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Globe, RefreshCw } from 'lucide-react'
 import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
+import type { ProfileKey } from '@/lib/strategies/strategy-registry'
 
 interface Props {
   initialRates: ForexRate[]
   initialPositions: ForexPosition[]
+  userProfileKey?: ProfileKey
 }
 
-export function ForexClient({ initialRates, initialPositions }: Props) {
+export function ForexClient({ initialRates, initialPositions, userProfileKey }: Props) {
   const [rates] = useState(initialRates)
   const [positions] = useState(initialPositions)
   const [syncing, startTransition] = useTransition()
@@ -98,7 +100,7 @@ export function ForexClient({ initialRates, initialPositions }: Props) {
       </div>
 
       {/* Strategies */}
-      <AssetStrategyPanel assetClasses={['forex', 'multi-asset']} />
+      <AssetStrategyPanel assetClasses={['forex', 'multi-asset']} userProfileKey={userProfileKey} />
     </div>
   )
 }

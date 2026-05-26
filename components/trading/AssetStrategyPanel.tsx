@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Play, RefreshCw, TrendingUp, TrendingDown, Clock, FlaskConical, Zap, Fish, Atom, AlertTriangle, Info } from 'lucide-react'
-import type { StrategyKey, AssetClass, MiroFishTier, KronosTier } from '@/lib/strategies/strategy-registry'
+import type { StrategyKey, AssetClass, MiroFishTier, KronosTier, ProfileKey } from '@/lib/strategies/strategy-registry'
 import type { PaperSummary } from '@/lib/paper-trading/types'
 
 interface StrategyRow {
@@ -15,6 +15,7 @@ interface StrategyRow {
   mirofish: MiroFishTier
   kronos: KronosTier
   paperEnabled: boolean
+  enabledInProfiles: ProfileKey[]
   missingRequired: string[]
   missingOptional: string[]
 }
@@ -38,6 +39,8 @@ interface Position {
 
 interface Props {
   assetClasses: AssetClass[]
+  /** When set, hides strategies not enabled for this profile and shows a filter banner. */
+  userProfileKey?: ProfileKey
 }
 
 function pnlColor(v: number | null) {
@@ -104,7 +107,7 @@ function PaperToggle({ enabled, onChange, disabled }: { enabled: boolean; onChan
   )
 }
 
-export function AssetStrategyPanel({ assetClasses }: Props) {
+export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
   const [mode, setMode] = useState<'paper' | 'live'>('paper')
   const [strategies, setStrategies] = useState<StrategyRow[]>([])
   const [openPos, setOpenPos] = useState<Position[]>([])
@@ -182,7 +185,13 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
     }
   }
 
-  const enabledCount = strategies.filter(s => s.paperEnabled).length
+  // Profile-aware filtering: hide strategies not in the current profile
+  const visibleStrategies = userProfileKey
+    ? strategies.filter(s => s.enabledInProfiles?.includes(userProfileKey) ?? true)
+    : strategies
+  const hiddenCount = strategies.length - visibleStrategies.length
+
+  const enabledCount = visibleStrategies.filter(s => s.paperEnabled).length
   const totalPnl = summary?.totalPnlUsd ?? 0
 
   return (
@@ -218,6 +227,19 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
         </div>
       ) : (
         <>
+          {/* Profile filter banner */}
+          {userProfileKey && hiddenCount > 0 && (
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-gray-400 flex items-center justify-between">
+              <span>
+                Showing <strong className="text-white">{visibleStrategies.length}</strong> of {strategies.length} strategies available in your{' '}
+                <strong className="text-white capitalize">{userProfileKey}</strong> profile.
+              </span>
+              <a href="/settings/risk-profile" className="text-indigo-400 hover:text-indigo-300 shrink-0 ml-2">
+                Change profile →
+              </a>
+            </div>
+          )}
+
           {/* Strategy toggles */}
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -240,7 +262,7 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
               </Button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {strategies.map(s => (
+              {visibleStrategies.map(s => (
                 <div
                   key={s.strategyKey}
                   className={`flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${s.paperEnabled ? 'bg-accent-cyan/5 border border-accent-cyan/20' : 'bg-white/5 border border-transparent'}`}
@@ -261,7 +283,7 @@ export function AssetStrategyPanel({ assetClasses }: Props) {
                   </div>
                 </div>
               ))}
-              {strategies.length === 0 && (
+              {visibleStrategies.length === 0 && strategies.length === 0 && (
                 <p className="text-xs text-gray-500 col-span-2 py-2">Loading…</p>
               )}
             </div>

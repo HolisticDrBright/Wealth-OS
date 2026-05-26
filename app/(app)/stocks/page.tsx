@@ -24,7 +24,7 @@ export default async function StocksPage() {
         migrationApplied={riskData.migrationApplied}
       />
 
-      <AssetStrategyPanel assetClasses={['stocks']} />
+      <AssetStrategyPanel assetClasses={['stocks']} userProfileKey={(riskData.userProfile?.profile_key as import('@/lib/strategies/strategy-registry').ProfileKey) ?? undefined} />
     </div>
   )
 }
