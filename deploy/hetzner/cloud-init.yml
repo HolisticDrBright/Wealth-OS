@@ -1,0 +1,59 @@
+#cloud-config
+# Wealth OS — Position Monitor cloud-init for Hetzner CX22 (Ubuntu 24.04 LTS)
+# Usage: paste this into Hetzner "User data" field when creating the server.
+# After boot (~3 min), SSH in and run: nano /opt/wealth-os/.env
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - git
+  - curl
+  - ufw
+
+runcmd:
+  # ── Firewall ──────────────────────────────────────────────────────────────
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+  - ufw --force enable
+
+  # ── Node.js 20 LTS ────────────────────────────────────────────────────────
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  - npm install -g pm2
+
+  # ── Service user ──────────────────────────────────────────────────────────
+  - useradd -m -s /bin/bash wealthos || true
+
+  # ── Clone repository ──────────────────────────────────────────────────────
+  - mkdir -p /opt/wealth-os
+  - git clone https://github.com/HolisticDrBright/Wealth-OS /opt/wealth-os
+
+  # ── Install dependencies ──────────────────────────────────────────────────
+  - cd /opt/wealth-os && npm ci --omit=dev
+
+  # ── Create env file (operator must fill in credentials) ───────────────────
+  - cp /opt/wealth-os/deploy/hetzner/.env.example /opt/wealth-os/.env
+  - chmod 600 /opt/wealth-os/.env
+
+  # ── Ownership ─────────────────────────────────────────────────────────────
+  - chown -R wealthos:wealthos /opt/wealth-os
+
+  # ── Systemd service ───────────────────────────────────────────────────────
+  - cp /opt/wealth-os/deploy/systemd/wealth-os-position-monitor.service /etc/systemd/system/
+  - systemctl daemon-reload
+  - systemctl enable wealth-os-position-monitor
+
+  # ── NOT auto-started: fill in .env first, then: ───────────────────────────
+  # systemctl start wealth-os-position-monitor
+
+final_message: |
+  Wealth OS cloud-init complete.
+
+  NEXT STEPS:
+  1. SSH in: ssh root@$(hostname -I | awk '{print $1}')
+  2. Edit credentials: nano /opt/wealth-os/.env
+  3. Start the monitor: systemctl start wealth-os-position-monitor
+  4. Verify: journalctl -u wealth-os-position-monitor -f
+  5. Health: curl http://localhost:3001/health

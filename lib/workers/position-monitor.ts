@@ -13,6 +13,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import http from 'node:http'
 import { fetchCurrentPrice } from '@/lib/paper-trading/price-feed'
 import type { OpenPosition, PriceTick, ManageAction } from '@/lib/strategies/pipeline-types'
 import type { StrategyKey } from '@/lib/strategies/strategy-registry'
@@ -85,6 +86,9 @@ export class PositionMonitor {
   private silenceTimer: ReturnType<typeof setTimeout> | null = null
   private backoffIdx = 0
   private readonly backoffSequence = [1000, 2000, 4000, 8000, 16000, 32000, 60000]
+  private httpServer: http.Server | null = null
+  private positionsTracked = 0
+  private readonly startedAt = Date.now()
 
   constructor() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
@@ -98,15 +102,37 @@ export class PositionMonitor {
   start(): void {
     if (this.running) return
     this.running = true
-    console.log('[PositionMonitor] starting')
+    console.log('Position Monitor started, connecting to Supabase + brokers...')
+    this.startHealthServer()
     this.heartbeatTimer = setInterval(() => { void this.writeHeartbeat() }, HEARTBEAT_MS)
     void this.pollLoop()
+  }
+
+  private startHealthServer(): void {
+    const port = parseInt(process.env.PORT ?? '3001', 10)
+    this.httpServer = http.createServer((req, res) => {
+      if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          status: 'ok',
+          uptime: Math.floor((Date.now() - this.startedAt) / 1000),
+          positionsTracked: this.positionsTracked,
+        }))
+      } else {
+        res.writeHead(404)
+        res.end()
+      }
+    })
+    this.httpServer.listen(port, () => {
+      console.log(`[PositionMonitor] /health endpoint on port ${port}`)
+    })
   }
 
   stop(): void {
     this.running = false
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
     if (this.silenceTimer) clearTimeout(this.silenceTimer)
+    this.httpServer?.close()
     console.log('[PositionMonitor] stopped')
   }
 
@@ -193,6 +219,7 @@ export class PositionMonitor {
 
     if (error) throw new Error(`sweep select: ${error.message}`)
     const rows = rawRows ?? []
+    this.positionsTracked = rows.length
     if (!rows.length) return
 
     // Deduplicate symbols to fetch prices efficiently
