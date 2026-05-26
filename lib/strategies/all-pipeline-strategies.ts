@@ -99,6 +99,8 @@ import { JpyInterventionFadeStrategy } from './impl/forex/jpy-intervention-fade'
 import { CrossPlatformSportsArbStrategy } from './impl/polymarket/cross-platform-sports-arb'
 import { PolymarketThetaDecayStrategy } from './impl/polymarket/polymarket-theta-decay'
 import { OdteStrangleHedgedStrategy } from './impl/stocks/odte-strangle-hedged'
+import { IbitVolSkewStrategy } from './impl/stocks/ibit-vol-skew'
+import { FactorCrowdedTradeFadeStrategy } from './impl/stocks/factor-crowded-trade-fade'
 
 // ─── Registration ──────────────────────────────────────────────────────────────
 
@@ -176,6 +178,10 @@ const ALL_STRATEGIES = [
   new CrossPlatformSportsArbStrategy(),
   new PolymarketThetaDecayStrategy(),
   new OdteStrangleHedgedStrategy(),
+
+  // Strategy Analysis 2026-05-09 Deep Scan scaffolds
+  new IbitVolSkewStrategy(),
+  new FactorCrowdedTradeFadeStrategy(),
 ]
 
 for (const s of ALL_STRATEGIES) {

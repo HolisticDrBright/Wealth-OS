@@ -72,6 +72,9 @@ export type StrategyKey =
   | 'cross_platform_sports_arb'
   | 'polymarket_theta_decay'
   | 'odte_strangle_hedged'
+  // ── Strategy Analysis 2026-05-09 Deep Scan ────────────────────────────────
+  | 'ibit_vol_skew'
+  | 'factor_crowded_trade_fade'
 
 export type MiroFishTier = 'high' | 'medium' | 'skip'
 export type KronosTier = 'high' | 'medium' | 'skip'
@@ -448,6 +451,16 @@ export const STRATEGY_REGISTRY_CONFIG: Record<StrategyKey, StrategyAIConfig> = {
     mirofish: 'skip', kronos: 'skip',
     edgeType: 'structural', defaultBroker: 'tastyfx', assetClass: 'options',
     enabledInProfiles: ['growth', 'speculative'],
+  },
+  ibit_vol_skew: {
+    mirofish: 'skip', kronos: 'skip',
+    edgeType: 'structural', defaultBroker: 'tastyfx', assetClass: 'options',
+    enabledInProfiles: ['balanced', 'growth', 'speculative'],
+  },
+  factor_crowded_trade_fade: {
+    mirofish: 'medium', kronos: 'skip',
+    edgeType: 'sentiment', defaultBroker: 'alpaca', assetClass: 'stocks',
+    enabledInProfiles: ['balanced', 'growth', 'speculative'],
   },
 }
 
