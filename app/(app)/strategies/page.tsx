@@ -1,6 +1,7 @@
 import { Topbar } from '@/components/layout/topbar'
-import { AIStrategiesClient } from './ai-strategies-client'
+import { StrategiesTabs } from './health-board-client'
 import { getallProfiles, getUserRiskProfile } from '@/lib/actions/risk-profile'
+import { getStrategyHealthRows } from '@/lib/actions/strategy-health'
 import { createClient } from '@/lib/supabase/server'
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { ProfileKey } from '@/lib/strategies/profile-params'
@@ -15,10 +16,11 @@ async function getStrategyDefinitions() {
 }
 
 export default async function StrategiesPage() {
-  const [profileData, userProfile, strategyDefs] = await Promise.all([
+  const [profileData, userProfile, strategyDefs, healthRows] = await Promise.all([
     getallProfiles(),
     getUserRiskProfile().catch(() => null),
     getStrategyDefinitions(),
+    getStrategyHealthRows().catch(() => []),
   ])
 
   const defsWithEnv = strategyDefs.map(def => ({
@@ -29,12 +31,15 @@ export default async function StrategiesPage() {
 
   return (
     <div>
-      <Topbar title="AI Strategies" subtitle="Pick your risk profile — AI activates the right strategies" />
-      <AIStrategiesClient
-        profiles={profileData.profiles}
-        userProfile={userProfile}
-        strategyDefs={defsWithEnv}
-        currentProfileKey={(userProfile?.profileKey ?? 'balanced') as ProfileKey}
+      <Topbar title="AI Strategies" subtitle="Strategy health, enablement, and configuration" />
+      <StrategiesTabs
+        rows={healthRows}
+        configureProps={{
+          profiles: profileData.profiles,
+          userProfile,
+          strategyDefs: defsWithEnv,
+          currentProfileKey: (userProfile?.profileKey ?? 'balanced') as ProfileKey,
+        }}
       />
     </div>
   )

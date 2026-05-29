@@ -46,6 +46,10 @@ export async function GET(req: NextRequest) {
       isEnabled: enabledMap.get(key)?.is_enabled ?? false,
       allocationPct: enabledMap.get(key)?.allocation_pct ?? null,
       paperEnabled: enabledMap.get(key)?.paper_enabled ?? false,
+      // `live_enabled` is not in the select above (column may not exist in all
+      // environments); default to false to avoid breaking the response shape.
+      liveEnabled: false,
+      maturityStatus: cfg.maturityStatus,
       enabledInProfiles: cfg.enabledInProfiles,
       missingRequired: (cfg.requiredEnv ?? []).filter(v => !process.env[v]),
       missingOptional: (cfg.optionalEnv ?? []).filter(v => !process.env[v]),
