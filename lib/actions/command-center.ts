@@ -32,6 +32,7 @@ import {
   type RiskProfileRow,
 } from '@/lib/actions/asset-risk-profile'
 import { detectRegime, CrossAssetRegime } from '@/lib/regime/cross-asset-regime'
+import { getShadowPortfolio, type ShadowPortfolioSummary } from '@/lib/actions/shadow-portfolio'
 
 // ─── Serializable shapes (no Date/enum/functions cross the boundary) ──────────
 
@@ -104,6 +105,7 @@ export interface CommandCenterData {
   opportunities: OpportunityView[]
   noTrade: NoTradeEntry[]
   paper: PaperView
+  shadow: ShadowPortfolioSummary | null
   allocationProfileKey: string
   allocationProfile: RiskProfileRow | null
   trust: TrustView
@@ -366,6 +368,14 @@ async function loadDecisions(
   return items
 }
 
+async function loadShadow(): Promise<ShadowPortfolioSummary | null> {
+  try {
+    return await getShadowPortfolio(20)
+  } catch {
+    return null
+  }
+}
+
 async function loadAiUsage(): Promise<AiUsageView> {
   const unavailable: AiUsageView = { available: false, spendUsdToday: 0, callsToday: 0 }
   try {
@@ -397,7 +407,7 @@ async function loadAiUsage(): Promise<AiUsageView> {
 // ─── Public entry point ─────────────────────────────────────────────────────
 
 export async function getCommandCenterData(): Promise<CommandCenterData> {
-  const [regime, risk, riskControls, opportunities, noTrade, paper, allocation, trust] =
+  const [regime, risk, riskControls, opportunities, noTrade, paper, shadow, allocation, trust] =
     await Promise.all([
       loadRegime(),
       loadRisk(),
@@ -405,6 +415,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
       loadOpportunities(),
       loadNoTrade(),
       loadPaper(),
+      loadShadow(),
       loadAllocation(),
       loadTrust(),
     ])
@@ -421,6 +432,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
     opportunities,
     noTrade,
     paper,
+    shadow,
     allocationProfileKey: allocation.profileKey,
     allocationProfile: allocation.profile,
     trust,

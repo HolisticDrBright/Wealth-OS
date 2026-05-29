@@ -8,7 +8,7 @@ import {
   DollarSign, Users, Zap, Activity, Lightbulb, ShieldAlert, Bell, RefreshCw,
   PiggyBank, ShoppingCart, BarChart2, Bitcoin, Globe, Scale, ListChecks, Leaf,
   Store, FlaskConical, Home, Briefcase, Layers, Sigma, Brain, Wallet, Target,
-  FileText, CandlestickChart, Crosshair, type LucideIcon,
+  FileText, CandlestickChart, Crosshair, Ghost, type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -55,6 +55,7 @@ const NAV: NavNode[] = [
     label: 'Strategies', icon: BarChart2, href: '/strategies',
     children: [
       { href: '/backtests', label: 'Backtests', icon: FlaskConical },
+      { href: '/shadow-portfolio', label: 'Shadow Portfolio', icon: Ghost },
       { href: '/autopilot', label: 'Autopilot', icon: Zap },
       { href: '/autopilot/rules', label: 'Rules', icon: ListChecks },
     ],

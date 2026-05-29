@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { ALL_STRATEGIES } from '@/lib/strategies/all-pipeline-strategies'
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
 import { PaperBroker } from './PaperBroker'
+import { ShadowBroker } from './ShadowBroker'
 import type { PaperRunResult, SkippedDetail, SkipCounts } from './types'
 import { emptySkipCounts } from './types'
 import { getUserStateOfResidence, isVenueAllowedInState } from '@/lib/risk-profile/state-gate'
@@ -10,6 +11,11 @@ import { checkPolymarketValidity } from './polymarket-validity'
 
 const engine = new CIODecisionEngine()
 const broker = new PaperBroker()
+const shadow = new ShadowBroker()
+
+// Outcomes that warrant a shadow position — real market prices exist and the
+// block is a decision gate decision, not a data quality issue.
+const SHADOW_TRACKABLE = new Set(['block', 'profileBlocked', 'riskBlocked', 'venueBlocked', 'positionCapBlocked', 'liquidityBlocked'])
 
 function classifyBlockReason(reason: string): keyof SkipCounts {
   const r = reason.toLowerCase()
@@ -59,6 +65,8 @@ export async function runPaperTradingPass(
   // Step 1 & 2 — housekeeping on existing positions
   const positionsClosed = await broker.checkAndExitPositions(supabase, userId)
   await broker.markToMarket(supabase, userId)
+  await shadow.checkAndExitShadowPositions(supabase, userId)
+  await shadow.markToMarket(supabase, userId)
 
   // Load user state once; used for venue gating below
   const userState = await getUserStateOfResidence(supabase, userId)
@@ -176,6 +184,10 @@ export async function runPaperTradingPass(
           skippedDetails.push(skipDetail(
             key, opp.symbol, opp.assetClass, 'block', reason, opp.direction, opp.id,
           ))
+          // Shadow-track CIO blocks so we can compare them against accepted trades
+          if (SHADOW_TRACKABLE.has('block')) {
+            shadow.track(opp, counter, reason, userId, supabase).catch(() => {})
+          }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)

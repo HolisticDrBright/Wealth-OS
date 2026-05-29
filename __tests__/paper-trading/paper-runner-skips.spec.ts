@@ -42,6 +42,15 @@ vi.mock('@/lib/paper-trading/PaperBroker', () => ({
   },
 }))
 
+// ── ShadowBroker mock ─────────────────────────────────────────────────────────
+vi.mock('@/lib/paper-trading/ShadowBroker', () => ({
+  ShadowBroker: class {
+    track = vi.fn().mockResolvedValue(false)
+    markToMarket = vi.fn().mockResolvedValue(undefined)
+    checkAndExitShadowPositions = vi.fn().mockResolvedValue(0)
+  },
+}))
+
 // ── Polymarket validity mock ──────────────────────────────────────────────────
 vi.mock('@/lib/paper-trading/polymarket-validity', () => ({
   checkPolymarketValidity: vi.fn().mockResolvedValue({ valid: true, price: 0.6 }),

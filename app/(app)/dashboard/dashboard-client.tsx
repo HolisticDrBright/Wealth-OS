@@ -21,6 +21,7 @@ import { AllocationPanel } from './command-center/AllocationPanel'
 import { TrustPanel } from './command-center/TrustPanel'
 import { DecisionsPanel } from './command-center/DecisionsPanel'
 import { AiUsagePanel } from './command-center/AiUsagePanel'
+import { ShadowPortfolioPanel } from './command-center/ShadowPortfolioPanel'
 
 export function DashboardClient({ data }: { data: CommandCenterData }) {
   return (
@@ -42,6 +43,9 @@ export function DashboardClient({ data }: { data: CommandCenterData }) {
 
       {/* 4.5 — Last paper run breakdown */}
       <PaperRunPanel lastRun={data.paper.lastRun} />
+
+      {/* 5 — Shadow portfolio: "were your gates right?" */}
+      <ShadowPortfolioPanel data={data.shadow} />
 
       {/* 6 + 8 — Capital allocation + required decisions */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
