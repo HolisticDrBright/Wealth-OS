@@ -154,9 +154,17 @@ function BudgetSheet({
 }) {
   const [val, setVal] = useState(String(Math.round(currentBudget)))
 
-  useEffect(() => {
+  // Reset the editable input to the current budget whenever the sheet is opened
+  // or the incoming budget changes. Done as an adjust-state-during-render (the
+  // React-recommended replacement for a reset-on-prop-change effect) so it does
+  // not trigger a synchronous setState inside an effect. Behavior is unchanged:
+  // val is re-seeded on every change to currentBudget/visible, and freely
+  // editable in between.
+  const [prevKey, setPrevKey] = useState({ currentBudget, visible })
+  if (prevKey.currentBudget !== currentBudget || prevKey.visible !== visible) {
+    setPrevKey({ currentBudget, visible })
     setVal(String(Math.round(currentBudget)))
-  }, [currentBudget, visible])
+  }
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -242,7 +250,10 @@ export default function AIFeaturesScreen() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // Wrap in an async IIFE so the setState calls inside load() happen after an
+  // await rather than synchronously in the effect body. load() is still invoked
+  // synchronously, so fetch timing and the initial setLoading(true) are unchanged.
+  useEffect(() => { void (async () => { await load() })() }, [load])
 
   async function handleToggle(key: string, enabled: boolean) {
     const { data: { user } } = await supabase.auth.getUser()

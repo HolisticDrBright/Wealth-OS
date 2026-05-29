@@ -103,7 +103,7 @@ function PortfolioChat() {
               <div className="text-center text-xs text-text-2 py-8">
                 <Bot className="h-8 w-8 text-text-3 mx-auto mb-2" />
                 <p>Ask me anything about your portfolio.</p>
-                <p className="mt-1">Try: "What's my biggest position?" or "How diversified am I?"</p>
+                <p className="mt-1">Try: &quot;What&apos;s my biggest position?&quot; or &quot;How diversified am I?&quot;</p>
               </div>
             )}
             {messages.map((m, i) => (

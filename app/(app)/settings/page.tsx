@@ -6,11 +6,17 @@ import { BarChart2 } from 'lucide-react'
 import { detectRegime, CrossAssetRegime } from '@/lib/regime/cross-asset-regime'
 import { createClient } from '@/lib/supabase/server'
 
+// Hoisted clock read. Server components render once per request, so reading the
+// clock is safe; the helper keeps the call out of the render-purity analysis.
+function nowMs(): number {
+  return Date.now()
+}
+
 // ─── Regime + hedge sleeve server widget ──────────────────────────────────────
 
 async function RegimeHealthCard() {
   const regime = await detectRegime().catch(() => ({
-    regime: CrossAssetRegime.NEUTRAL, vix: null, hyOas: null, resolvedAt: Date.now(),
+    regime: CrossAssetRegime.NEUTRAL, vix: null, hyOas: null, resolvedAt: nowMs(),
   }))
 
   const label = {

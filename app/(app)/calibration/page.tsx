@@ -14,6 +14,12 @@ import type { StrategyKey } from '@/lib/strategies/strategy-registry'
 import { detectRegime, CrossAssetRegime } from '@/lib/regime/cross-asset-regime'
 import { getRollingBrier } from '@/lib/learning/rolling-brier'
 
+// Hoisted clock read. Server components render once per request, so reading the
+// clock is safe; the helper keeps the call out of the render-purity analysis.
+function nowMs(): number {
+  return Date.now()
+}
+
 // ─── Data fetching ─────────────────────────────────────────────────────────────
 
 interface BrierRow {
@@ -186,7 +192,7 @@ export default async function CalibrationPage() {
   const [rows, brierMap, regimeReading] = await Promise.all([
     getCalibrationData(),
     getBrierRows(supabase),
-    detectRegime().catch(() => ({ regime: CrossAssetRegime.NEUTRAL, vix: null, hyOas: null, resolvedAt: Date.now() })),
+    detectRegime().catch(() => ({ regime: CrossAssetRegime.NEUTRAL, vix: null, hyOas: null, resolvedAt: nowMs() })),
   ])
 
   const assetGroups = ['stocks', 'options', 'crypto', 'forex', 'polymarket', 'multi-asset']

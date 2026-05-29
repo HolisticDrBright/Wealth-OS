@@ -25,14 +25,18 @@ export function StrategyDetailClient({ strategy, positions, metrics }: Props) {
     .filter(p => p.status === 'closed' && p.closed_at)
     .sort((a, b) => new Date(a.closed_at!).getTime() - new Date(b.closed_at!).getTime())
 
-  let cumPnl = 0
-  const pnlSeries = closedSorted.map(p => {
-    cumPnl += p.pnl_usd
-    return {
-      date: new Date(p.closed_at!).toLocaleDateString(),
-      pnl: Math.round(cumPnl * 100) / 100,
-    }
-  })
+  // Cumulative P&L from raw running total (rounded only for display, matching prior behavior).
+  const pnlSeries = closedSorted.reduce<{ acc: { date: string; pnl: number }[]; running: number }>(
+    (state, p) => {
+      const running = state.running + p.pnl_usd
+      state.acc.push({
+        date: new Date(p.closed_at!).toLocaleDateString(),
+        pnl: Math.round(running * 100) / 100,
+      })
+      return { acc: state.acc, running }
+    },
+    { acc: [], running: 0 }
+  ).acc
 
   return (
     <div className="flex flex-col gap-6 p-6">

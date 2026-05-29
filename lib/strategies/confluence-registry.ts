@@ -93,7 +93,8 @@ export class ConfluenceRegistry {
 
   /** Async persist to Supabase for cross-instance state. Fire-and-forget — never throws. */
   persistSignal(signal: ConfluenceSignal, supabase: SupabaseClient): void {
-    ;(supabase.from('confluence_signals') as any)
+    void supabase
+      .from('confluence_signals')
       .upsert(
         {
           from_strategy_key: signal.fromStrategyKey,

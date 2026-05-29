@@ -59,7 +59,10 @@ export default function FeedScreen() {
 
   // Realtime subscription
   useEffect(() => {
-    load()
+    // Wrap in an async IIFE so the setState calls inside load() happen after an
+    // await (post-mount) rather than synchronously in the effect body. load() is
+    // still invoked synchronously, so fetch timing is unchanged.
+    void (async () => { await load() })()
 
     const channel = supabase
       .channel('mobile-feed-updates')

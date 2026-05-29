@@ -47,7 +47,7 @@ interface WizardState {
 }
 
 function computeRecommendation(state: WizardState): ProfileKey {
-  let idx = Math.min(4, Math.max(0, state.baseIndex + state.adjustment))
+  const idx = Math.min(4, Math.max(0, state.baseIndex + state.adjustment))
   return PROFILES[idx]
 }
 

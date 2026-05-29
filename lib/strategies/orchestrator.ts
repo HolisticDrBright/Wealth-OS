@@ -131,7 +131,7 @@ export class StrategyOrchestrator {
     }
 
     // ── Stage 5: Red Team (lightweight score adjustment) ─────────────────────
-    let score = computeBaseScore(signal, miroFishScore)
+    const score = computeBaseScore(signal, miroFishScore)
     trail.push(`[redteam] base_score=${score.toFixed(0)}`)
 
     if (score < 30) {

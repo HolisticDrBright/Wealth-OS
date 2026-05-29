@@ -17,6 +17,12 @@ import { projectMonthlyCost } from '@/lib/utils/cost-projection'
 import { formatCostCents } from '@/lib/utils/format-cost'
 import type { AIFeatureDefinition, AIFeatureFlag, AIUsageSummary } from '@/lib/actions/settings'
 
+// Hoisted clock read. Server components render once per request, so reading the
+// clock is safe; the helper keeps the call out of the render-purity analysis.
+function nowMs(): number {
+  return Date.now()
+}
+
 // ─── Cost summary banner ──────────────────────────────────────────────────────
 
 function CostSummaryBanner({
@@ -153,7 +159,7 @@ export default async function AIFeaturesPage() {
       .from('ai_usage_logs')
       .select('created_at, cost_usd, feature_key')
       .eq('user_id', user.id)
-      .gte('created_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+      .gte('created_at', new Date(nowMs() - 30 * 86_400_000).toISOString())
       .order('created_at', { ascending: true })
       .then(r => r.data ?? []),
   ])

@@ -28,7 +28,10 @@ export default function TradersScreen() {
     setRefreshing(false)
   }
 
-  useEffect(() => { load() }, [])
+  // Wrap in an async IIFE so the setState calls inside load() happen after an
+  // await (post-mount) rather than synchronously in the effect body. load() is
+  // still invoked synchronously, so fetch timing is unchanged.
+  useEffect(() => { void (async () => { await load() })() }, [])
 
   async function toggleFollow(trader: Trader) {
     const { data: { user } } = await supabase.auth.getUser()

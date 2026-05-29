@@ -73,6 +73,8 @@ export function PlanningClient({ goals: initialGoals, isDemo }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [isPending, startTransition] = useTransition()
+  // Read the clock once at mount for goal countdown math (preserves prior behavior).
+  const [now] = useState(() => Date.now())
 
   const retirementGoal = goals.find(g => g.category === 'retirement')
   const retirementData = buildRetirementProjection(retirementGoal?.current_amount ?? 125000)
@@ -237,7 +239,7 @@ export function PlanningClient({ goals: initialGoals, isDemo }: Props) {
               const remaining = goal.target_amount - goal.current_amount
               const targetDate = goal.target_date ? new Date(goal.target_date) : null
               const monthsLeft = targetDate
-                ? Math.max(0, Math.ceil((targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30)))
+                ? Math.max(0, Math.ceil((targetDate.getTime() - now) / (1000 * 60 * 60 * 24 * 30)))
                 : null
               const monthlyNeeded = monthsLeft && monthsLeft > 0 ? remaining / monthsLeft : null
 

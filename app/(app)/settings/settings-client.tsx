@@ -391,9 +391,9 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
           <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
             <p className="text-xs text-gray-400">
               <strong className="text-indigo-400">How the budget works:</strong> When you follow a trader and set
-              "5% max per trade", that percentage is applied to your total budget (${Number(budget).toLocaleString()}).
+              &quot;5% max per trade&quot;, that percentage is applied to your total budget (${Number(budget).toLocaleString()}).
               So each copied trade will be max ${(Number(budget) * 0.05).toLocaleString()} — proportional to the
-              trader's original position size.
+              trader&apos;s original position size.
             </p>
           </div>
         </CardContent>

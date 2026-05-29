@@ -11,6 +11,7 @@
  *         Aggregate report printed to stdout
  */
 
+import * as fs from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 import type { OpportunityContext, Opportunity } from '@/lib/strategies/pipeline-types'
 
@@ -248,7 +249,6 @@ if (require.main === module || (typeof process !== 'undefined' && process.argv[1
       console.log(`  Max DD: ${(r.maxDrawdown * 100).toFixed(1)}% | Sharpe≈: ${r.sharpeApprox.toFixed(2)} | Total: ${(r.totalReturn * 100).toFixed(1)}%`)
     }
     // Write JSON
-    const fs = require('fs')
     const dir = 'backtest-results'
     if (!fs.existsSync(dir)) fs.mkdirSync(dir)
     const file = `${dir}/tier1-${new Date().toISOString().split('T')[0]}.json`

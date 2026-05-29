@@ -22,10 +22,9 @@ async function requireAdmin() {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function Table({ title, rows, columns }: {
   title: string
-  rows: Record<string, any>[]
+  rows: Record<string, unknown>[]
   columns: { key: string; label: string; fmt?: (v: unknown) => string }[]
 }) {
   return (

@@ -56,7 +56,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       <div>
         <h2 className="text-2xl font-bold text-white">Welcome to Wealth OS</h2>
         <p className="mt-2 text-sm text-gray-400 max-w-xs mx-auto leading-relaxed">
-          Let's set up your financial dashboard in just 3 quick steps. It only takes 2 minutes.
+          Let&apos;s set up your financial dashboard in just 3 quick steps. It only takes 2 minutes.
         </p>
       </div>
       <div className="grid grid-cols-3 gap-3 text-xs">
@@ -81,7 +81,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         }}
         className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
       >
-        Skip setup — I'll add data manually
+        Skip setup — I&apos;ll add data manually
       </button>
     </div>
   )
@@ -113,7 +113,7 @@ function IncomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void
           <DollarSign className="h-6 w-6 text-emerald-400" />
         </div>
         <h2 className="text-xl font-bold text-white">Add your income</h2>
-        <p className="mt-1 text-sm text-gray-400">What's your primary source of income?</p>
+        <p className="mt-1 text-sm text-gray-400">What&apos;s your primary source of income?</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -284,7 +284,7 @@ function DoneStep() {
         <CheckCircle2 className="h-10 w-10 text-emerald-400" />
       </div>
       <div>
-        <h2 className="text-2xl font-bold text-white">You're all set!</h2>
+        <h2 className="text-2xl font-bold text-white">You&apos;re all set!</h2>
         <p className="mt-2 text-sm text-gray-400 max-w-xs mx-auto leading-relaxed">
           Your financial data is saved. Your dashboard will now show your real numbers.
         </p>
@@ -315,8 +315,12 @@ export function OnboardingWizard() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    // localStorage is only available on the client, so this read must stay in an
+    // effect (it cannot be a lazy useState initializer without breaking SSR).
+    // Defer setVisible off the synchronous effect body to avoid a cascading
+    // synchronous setState; the visibility flip still happens right after mount.
     const done = localStorage.getItem(STORAGE_KEY)
-    if (!done) setVisible(true)
+    if (!done) queueMicrotask(() => setVisible(true))
   }, [])
 
   if (!visible) return null

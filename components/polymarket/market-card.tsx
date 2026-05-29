@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Droplets, TrendingUp, Zap, Calendar, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -13,10 +14,12 @@ interface Props {
 export function MarketCard({ market, className }: Props) {
   const { yes_price, no_price, arb_edge, end_date, entropy_bits } = market
   const hasArb = arb_edge > 0.005
+  // Read the clock once at mount for display logic (preserves prior behavior).
+  const [now] = useState(() => Date.now())
   const endDate = end_date ? new Date(end_date) : null
   const isExpiringSoon =
     endDate !== null &&
-    endDate.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
+    endDate.getTime() - now < 7 * 24 * 60 * 60 * 1000
 
   return (
     <Link href={`/polymarket/${encodeURIComponent(market.condition_id)}`}>

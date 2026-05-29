@@ -22,6 +22,16 @@ export interface YahooQuote {
   exchange?: string
 }
 
+/** Shape of a single quote row returned by yahoo-finance2's `chart()` result. */
+interface YahooChartQuote {
+  date: Date | string | number
+  open: number | null
+  high: number | null
+  low: number | null
+  close: number | null
+  volume: number | null
+}
+
 /** Fetch historical daily OHLCV bars for one symbol. */
 export async function fetchHistoricalBars(
   symbol: string,
@@ -36,11 +46,10 @@ export async function fetchHistoricalBars(
       interval: '1d',
     })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const quotes: any[] = result?.quotes ?? []
+    const quotes: YahooChartQuote[] = result?.quotes ?? []
     return quotes
-      .filter((q: any) => q.open != null && q.close != null)
-      .map((q: any) => ({
+      .filter((q): q is YahooChartQuote & { open: number; close: number } => q.open != null && q.close != null)
+      .map((q) => ({
         date: new Date(q.date).toISOString().slice(0, 10),
         symbol: symbol.toUpperCase(),
         open: q.open,

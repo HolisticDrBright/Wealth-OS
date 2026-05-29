@@ -253,7 +253,7 @@ export function AssetRiskProfile({ assetClass, profiles, userProfile, strategyDe
           <p className="text-xs text-yellow-500 mt-1">
             Run the migration SQL in your Supabase dashboard. Copy from{' '}
             <code className="bg-yellow-950 px-1 rounded">supabase/schema.sql</code> starting at
-            the "Risk Profile System" section.
+            the &quot;Risk Profile System&quot; section.
           </p>
         </div>
       </div>
