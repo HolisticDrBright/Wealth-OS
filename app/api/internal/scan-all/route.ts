@@ -17,6 +17,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getAllPipelineStrategies } from '@/lib/strategies/all-pipeline-strategies'
 import type { OpportunityContext } from '@/lib/strategies/pipeline-types'
 import { loadUserProfile, getEffectiveStrategies } from '@/lib/strategies/profile-params'
+import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { StrategyKey } from '@/lib/strategies/strategy-registry'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { data: enabledRows } = await supabase
     .from('user_enabled_strategies')
     .select('user_id, strategy_key')
-    .eq('enabled', true)
+    .eq('is_enabled', true)
 
   const enabledByKey = new Map<string, string[]>()
   for (const row of enabledRows ?? []) {
@@ -56,6 +57,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const startedAt = Date.now()
 
   for (const strategy of strategies) {
+    // Maturity gate — stub and retired strategies must never execute
+    const registryConfig = STRATEGY_REGISTRY_CONFIG[strategy.key as StrategyKey]
+    if (registryConfig) {
+      const { maturityStatus } = registryConfig
+      if (maturityStatus === 'stub' || maturityStatus === 'retired') {
+        console.warn(`[scan-all] Skipping ${strategy.key}: maturityStatus=${maturityStatus}`)
+        continue
+      }
+    }
+
     const userIds = enabledByKey.get(strategy.key) ?? []
     if (userIds.length === 0) continue
 
