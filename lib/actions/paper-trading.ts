@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { toDisplayName } from '@/lib/strategies/strategy-display'
+import type { SkipCounts, SkippedDetail } from '@/lib/paper-trading/types'
 
 export interface PaperPosition {
   id: string
@@ -34,6 +35,19 @@ export interface PaperTradingSummary {
   hasData: boolean
 }
 
+export interface PaperRunView {
+  runAt: string
+  strategiesRun: number
+  opportunitiesFound: number
+  positionsOpened: number
+  positionsClosed: number
+  skipped: SkipCounts
+  topSkipReason: string | null
+  totalSkipped: number
+  plainEnglish: string
+  errors: string[]
+}
+
 interface PaperRow {
   id: string
   strategy_key: string | null
@@ -48,6 +62,51 @@ interface PaperRow {
   realized_pnl_usd: number | null
   opened_at: string | null
   status: string | null
+}
+
+function buildPlainEnglish(
+  opportunitiesFound: number,
+  positionsOpened: number,
+  positionsClosed: number,
+  skipped: SkipCounts,
+): string {
+  if (opportunitiesFound === 0) return 'No actionable signals found this run.'
+  const reasons: string[] = []
+  if (skipped.alreadyOpen > 0) reasons.push(`${skipped.alreadyOpen} already held`)
+  if (skipped.missingPrice > 0) reasons.push(`${skipped.missingPrice} had no live price`)
+  if (skipped.expiredMarket + skipped.resolvedMarket > 0) {
+    reasons.push(`${skipped.expiredMarket + skipped.resolvedMarket} Polymarket contracts expired`)
+  }
+  if (skipped.venueBlocked > 0) reasons.push(`${skipped.venueBlocked} venue-blocked`)
+  const blocked = skipped.riskBlocked + skipped.profileBlocked
+  if (blocked > 0) reasons.push(`${blocked} blocked by rules`)
+
+  if (positionsOpened === 0 && positionsClosed === 0) {
+    return reasons.length > 0
+      ? `Found ${opportunitiesFound} opportunities, opened none — ${reasons.join(', ')}.`
+      : `Found ${opportunitiesFound} opportunities, none executed.`
+  }
+  const lines: string[] = []
+  if (positionsOpened > 0) lines.push(`Opened ${positionsOpened} new position${positionsOpened > 1 ? 's' : ''}.`)
+  if (positionsClosed > 0) lines.push(`Closed ${positionsClosed} position${positionsClosed > 1 ? 's' : ''}.`)
+  if (reasons.length > 0) lines.push(`Skipped: ${reasons.join(', ')}.`)
+  return lines.join(' ')
+}
+
+function topSkipReason(s: SkipCounts): string | null {
+  const entries = [
+    ['Already open', s.alreadyOpen],
+    ['No price', s.missingPrice],
+    ['Expired market', s.expiredMarket],
+    ['Resolved market', s.resolvedMarket],
+    ['Risk blocked', s.riskBlocked],
+    ['Profile blocked', s.profileBlocked],
+    ['Venue blocked', s.venueBlocked],
+    ['Cap blocked', s.positionCapBlocked],
+    ['No size', s.noSize],
+  ] as [string, number][]
+  const top = entries.filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0]
+  return top ? `${top[0]} (${top[1]})` : null
 }
 
 export async function getActivePaperPositions(limit = 50): Promise<PaperPosition[]> {
@@ -119,5 +178,97 @@ export async function getPaperTradingSummary(): Promise<PaperTradingSummary> {
     }
   } catch {
     return empty
+  }
+}
+
+export async function getLastPaperRun(): Promise<PaperRunView | null> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data, error } = await supabase
+      .from('paper_trade_runs')
+      .select('run_at, strategies_run, opportunities_found, positions_opened, positions_closed, skipped, errors')
+      .eq('user_id', user.id)
+      .order('run_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error || !data) return null
+
+    const row = data as {
+      run_at: string
+      strategies_run: number
+      opportunities_found: number
+      positions_opened: number
+      positions_closed: number
+      skipped: SkipCounts
+      errors: string[]
+    }
+
+    const skipped = (row.skipped ?? {}) as SkipCounts
+    const totalSkipped = Object.values(skipped).reduce((s: number, v: unknown) => s + (typeof v === 'number' ? v : 0), 0)
+
+    return {
+      runAt: row.run_at,
+      strategiesRun: row.strategies_run ?? 0,
+      opportunitiesFound: row.opportunities_found ?? 0,
+      positionsOpened: row.positions_opened ?? 0,
+      positionsClosed: row.positions_closed ?? 0,
+      skipped,
+      topSkipReason: topSkipReason(skipped),
+      totalSkipped,
+      plainEnglish: buildPlainEnglish(
+        row.opportunities_found ?? 0,
+        row.positions_opened ?? 0,
+        row.positions_closed ?? 0,
+        skipped,
+      ),
+      errors: (row.errors as string[]) ?? [],
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function getPaperRunHistory(limit = 20): Promise<PaperRunView[]> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
+    const { data, error } = await supabase
+      .from('paper_trade_runs')
+      .select('run_at, strategies_run, opportunities_found, positions_opened, positions_closed, skipped, errors')
+      .eq('user_id', user.id)
+      .order('run_at', { ascending: false })
+      .limit(limit)
+
+    if (error || !data) return []
+
+    return (data as typeof data).map((row: Record<string, unknown>) => {
+      const skipped = (row.skipped as SkipCounts) ?? {}
+      const totalSkipped = Object.values(skipped).reduce((s: number, v: unknown) => s + (typeof v === 'number' ? v : 0), 0)
+      return {
+        runAt: row.run_at as string,
+        strategiesRun: (row.strategies_run as number) ?? 0,
+        opportunitiesFound: (row.opportunities_found as number) ?? 0,
+        positionsOpened: (row.positions_opened as number) ?? 0,
+        positionsClosed: (row.positions_closed as number) ?? 0,
+        skipped,
+        topSkipReason: topSkipReason(skipped),
+        totalSkipped,
+        plainEnglish: buildPlainEnglish(
+          (row.opportunities_found as number) ?? 0,
+          (row.positions_opened as number) ?? 0,
+          (row.positions_closed as number) ?? 0,
+          skipped,
+        ),
+        errors: (row.errors as string[]) ?? [],
+      }
+    })
+  } catch {
+    return []
   }
 }

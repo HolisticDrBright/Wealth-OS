@@ -94,8 +94,8 @@ describe('edge + asset labels', () => {
 })
 
 describe('no-trade reasons', () => {
-  it('exposes all 12 canonical reasons', () => {
-    expect(ALL_NO_TRADE_REASONS.length).toBe(12)
+  it('exposes all canonical reasons (12 original + 9 broker-level)', () => {
+    expect(ALL_NO_TRADE_REASONS.length).toBe(21)
   })
   it('looks up a known reason with a non-empty blurb', () => {
     const r = getNoTradeReason('jurisdiction_blocked')

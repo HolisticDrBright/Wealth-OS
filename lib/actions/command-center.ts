@@ -20,8 +20,10 @@ import { getNoTradeLedger, type NoTradeEntry } from '@/lib/actions/no-trade-ledg
 import {
   getActivePaperPositions,
   getPaperTradingSummary,
+  getLastPaperRun,
   type PaperPosition,
   type PaperTradingSummary,
+  type PaperRunView,
 } from '@/lib/actions/paper-trading'
 import { getRiskSummary, getRiskControls, type RiskSummary } from '@/lib/actions/risk'
 import { getOpportunities } from '@/lib/actions/opportunities'
@@ -63,6 +65,7 @@ export interface OpportunityView {
 export interface PaperView {
   positions: PaperPosition[]
   summary: PaperTradingSummary
+  lastRun: PaperRunView | null
 }
 
 export interface TrustEntry {
@@ -201,13 +204,14 @@ async function loadPaper(): Promise<PaperView> {
     hasData: false,
   }
   try {
-    const [positions, summary] = await Promise.all([
+    const [positions, summary, lastRun] = await Promise.all([
       getActivePaperPositions(),
       getPaperTradingSummary(),
+      getLastPaperRun(),
     ])
-    return { positions, summary }
+    return { positions, summary, lastRun }
   } catch {
-    return { positions: [], summary: emptySummary }
+    return { positions: [], summary: emptySummary, lastRun: null }
   }
 }
 

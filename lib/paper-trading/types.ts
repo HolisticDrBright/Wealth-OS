@@ -45,6 +45,53 @@ export interface PaperTrade {
   metadata: Record<string, unknown>
 }
 
+// ── Broker fill result ────────────────────────────────────────────────────────
+
+export type PaperFillResult =
+  | { status: 'opened'; id: string }
+  | { status: 'already_open'; reason: string }
+  | { status: 'missing_price'; reason: string }
+  | { status: 'invalid_price'; reason: string }
+  | { status: 'insert_error'; reason: string }
+  | { status: 'no_size'; reason: string }
+
+// ── Run breakdown ─────────────────────────────────────────────────────────────
+
+export interface SkippedDetail {
+  strategyKey: string
+  symbol: string
+  assetClass: string
+  direction?: string
+  outcome: string
+  reason: string
+  opportunityId?: string
+  timestamp: string
+}
+
+export interface SkipCounts {
+  alreadyOpen: number
+  missingPrice: number
+  expiredMarket: number
+  resolvedMarket: number
+  riskBlocked: number
+  profileBlocked: number
+  venueBlocked: number
+  positionCapBlocked: number
+  liquidityBlocked: number
+  strategyDisabled: number
+  strategyImmature: number
+  noSize: number
+  other: number
+}
+
+export function emptySkipCounts(): SkipCounts {
+  return {
+    alreadyOpen: 0, missingPrice: 0, expiredMarket: 0, resolvedMarket: 0,
+    riskBlocked: 0, profileBlocked: 0, venueBlocked: 0, positionCapBlocked: 0,
+    liquidityBlocked: 0, strategyDisabled: 0, strategyImmature: 0, noSize: 0, other: 0,
+  }
+}
+
 export interface PaperRunResult {
   runAt: string
   strategiesRun: number
@@ -53,6 +100,8 @@ export interface PaperRunResult {
   decisionsBlock: number
   positionsOpened: number
   positionsClosed: number
+  skipped: SkipCounts
+  skippedDetails: SkippedDetail[]
   errors: string[]
 }
 

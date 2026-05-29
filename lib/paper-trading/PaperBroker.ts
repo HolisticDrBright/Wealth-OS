@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Opportunity, PositionSize } from '@/lib/strategies/pipeline-types'
 import type { AssetClass } from '@/lib/strategies/strategy-registry'
+import type { PaperFillResult } from './types'
 import { fetchCurrentPrice } from './price-feed'
 
 // Realistic one-way slippage estimates per asset class (bps)
@@ -25,40 +26,40 @@ interface ExitDefaults { sl: number; tp: number; hours: number }
 // risk/reward profile — these replace the one-size-fits-all 2%/5%/24h.
 const STRATEGY_EXIT: Record<StrategyKey, ExitDefaults> = {
   // ── Polymarket (binary 0 → 1, prices move ±30–60% before resolution) ──
-  polymarket_base_rate:          { sl: 0.10, tp: 0.15, hours:  72 }, // near-certain YES, hold to resolution
-  polymarket_resolution_rules:   { sl: 0.15, tp: 0.25, hours:  72 }, // rules-based near-expiry
-  polymarket_cross_market:       { sl: 0.25, tp: 0.45, hours: 168 }, // structural arb, 7-day horizon
-  polymarket_liquidity_pocket:   { sl: 0.25, tp: 0.40, hours: 120 }, // liquidity entry, 5-day
+  polymarket_base_rate:          { sl: 0.10, tp: 0.15, hours:  72 },
+  polymarket_resolution_rules:   { sl: 0.15, tp: 0.25, hours:  72 },
+  polymarket_cross_market:       { sl: 0.25, tp: 0.45, hours: 168 },
+  polymarket_liquidity_pocket:   { sl: 0.25, tp: 0.40, hours: 120 },
   polymarket_event_compression:  { sl: 0.20, tp: 0.35, hours: 120 },
   polymarket_narrative_fade:     { sl: 0.20, tp: 0.35, hours: 120 },
   // ── Crypto ───────────────────────────────────────────────────────────
-  dca_halving:          { sl: 0.10, tp: 0.30, hours: 336 }, // 14-day DCA horizon
-  liquidation_hunting:  { sl: 0.02, tp: 0.05, hours:   8 }, // very short cascade play
+  dca_halving:          { sl: 0.10, tp: 0.30, hours: 336 },
+  liquidation_hunting:  { sl: 0.02, tp: 0.05, hours:   8 },
   narrative_rotation:   { sl: 0.07, tp: 0.18, hours:  72 },
   onchain_signal:       { sl: 0.08, tp: 0.20, hours: 120 },
   defi_yield:           { sl: 0.05, tp: 0.12, hours: 168 },
   airdrop_farming:      { sl: 0.15, tp: 0.40, hours: 168 },
-  memecoin_bondingcurve:{ sl: 0.20, tp: 0.60, hours:  48 }, // quick pump/dump
+  memecoin_bondingcurve:{ sl: 0.20, tp: 0.60, hours:  48 },
   // ── Forex — 1:3 R/R with hold times scaled to signal horizon ────────────
-  fx_trendfollowing:    { sl: 0.007, tp: 0.021, hours: 120 }, // 5d — trend needs time
-  cb_divergence:        { sl: 0.007, tp: 0.021, hours:  72 }, // 3d around CB meeting
-  correlation_divergence:{ sl: 0.010, tp: 0.030, hours: 72 }, // 3d mean-reversion
-  ict_smc:              { sl: 0.006, tp: 0.018, hours:  48 }, // 2d — SMC runs intraday→swing
-  carry_trade:          { sl: 0.015, tp: 0.045, hours: 336 }, // 2 weeks — carry accrues
-  cot_positioning:      { sl: 0.012, tp: 0.036, hours: 240 }, // 10d — COT is slow-moving
-  session_breakout:     { sl: 0.005, tp: 0.015, hours:  48 }, // 2d — breakout needs follow-through
-  macro_news_event:     { sl: 0.006, tp: 0.018, hours:  24 }, // 24h — momentum fades fast
-  triangular_arb:       { sl: 0.003, tp: 0.009, hours:   6 }, // 6h — arb or nothing
+  fx_trendfollowing:    { sl: 0.007, tp: 0.021, hours: 120 },
+  cb_divergence:        { sl: 0.007, tp: 0.021, hours:  72 },
+  correlation_divergence:{ sl: 0.010, tp: 0.030, hours: 72 },
+  ict_smc:              { sl: 0.006, tp: 0.018, hours:  48 },
+  carry_trade:          { sl: 0.015, tp: 0.045, hours: 336 },
+  cot_positioning:      { sl: 0.012, tp: 0.036, hours: 240 },
+  session_breakout:     { sl: 0.005, tp: 0.015, hours:  48 },
+  macro_news_event:     { sl: 0.006, tp: 0.018, hours:  24 },
+  triangular_arb:       { sl: 0.003, tp: 0.009, hours:   6 },
   // ── Stocks ───────────────────────────────────────────────────────────
-  pead:                 { sl: 0.03, tp: 0.08, hours: 120 }, // PEAD plays out over 5 days
-  autopilot_congressional:{ sl: 0.05, tp: 0.15, hours: 240 }, // congressional hold ~10 days
+  pead:                 { sl: 0.03, tp: 0.08, hours: 120 },
+  autopilot_congressional:{ sl: 0.05, tp: 0.15, hours: 240 },
   quant_momentum:       { sl: 0.05, tp: 0.12, hours: 120 },
   qvm_multifactor:      { sl: 0.06, tp: 0.15, hours: 168 },
-  dividend_aristocrat:  { sl: 0.08, tp: 0.15, hours: 504 }, // longer-term income hold
+  dividend_aristocrat:  { sl: 0.08, tp: 0.15, hours: 504 },
   sector_rotation:      { sl: 0.05, tp: 0.10, hours: 168 },
   options_wheel:        { sl: 0.10, tp: 0.20, hours: 336 },
   gamma_exposure:       { sl: 0.03, tp: 0.08, hours:  48 },
-  merger_arb:           { sl: 0.03, tp: 0.05, hours: 336 }, // merger timeline is long
+  merger_arb:           { sl: 0.03, tp: 0.05, hours: 336 },
   spinoff:              { sl: 0.07, tp: 0.20, hours: 504 },
   tail_risk_hedging:    { sl: 0.20, tp: 0.40, hours: 168 },
 }
@@ -91,7 +92,7 @@ export class PaperBroker {
     size: PositionSize,
     userId: string,
     supabase: SupabaseClient
-  ): Promise<{ id: string } | null> {
+  ): Promise<PaperFillResult> {
     // Deduplication: skip if this user already has an open position for this strategy+symbol
     const { count } = await supabase
       .from('paper_positions')
@@ -100,12 +101,19 @@ export class PaperBroker {
       .eq('strategy_key', opp.strategyKey)
       .eq('symbol', opp.symbol)
       .eq('status', 'open')
-    if ((count ?? 0) > 0) return null
+    if ((count ?? 0) > 0) {
+      return {
+        status: 'already_open',
+        reason: `Already holding an open position for ${opp.strategyKey} / ${opp.symbol}.`,
+      }
+    }
 
     const price = await fetchCurrentPrice(opp.symbol, opp.assetClass)
-    if (price == null || !isFinite(price) || price <= 0) {
-      console.warn(`[PaperBroker] no price for ${opp.symbol} (${opp.assetClass}) — skipping fill`)
-      return null
+    if (price == null) {
+      return { status: 'missing_price', reason: `Price feed returned null for ${opp.symbol} (${opp.assetClass}).` }
+    }
+    if (!isFinite(price) || price <= 0) {
+      return { status: 'invalid_price', reason: `Price ${price} is not a valid positive number for ${opp.symbol}.` }
     }
 
     const slippageBps = SLIPPAGE_BPS[opp.assetClass] ?? 10
@@ -114,7 +122,9 @@ export class PaperBroker {
     const fillPrice = opp.direction === 'long' ? price + slip
       : opp.direction === 'short' ? price - slip
       : price
-    if (fillPrice <= 0) return null
+    if (fillPrice <= 0) {
+      return { status: 'invalid_price', reason: `Fill price ${fillPrice} is not positive.` }
+    }
 
     const quantity = size.notionalUsd / fillPrice
     const exit = exitFor(opp.strategyKey, opp.exit)
@@ -147,7 +157,7 @@ export class PaperBroker {
 
     if (error) {
       console.error('[PaperBroker] position insert error:', error.message)
-      return null
+      return { status: 'insert_error', reason: error.message }
     }
 
     await supabase.from('paper_trades').insert({
@@ -166,7 +176,7 @@ export class PaperBroker {
       metadata:       opp.metadata,
     })
 
-    // Write to decision_log so the learning loop can grade this trade once the horizon passes.
+    // Write to decision_log so the learning loop can grade this trade.
     // Skip polymarket (conditionId-based symbols can't be priced via Yahoo Finance for grading).
     if (opp.assetClass !== 'polymarket') {
       const horizonDays = LEARNING_HORIZON_DAYS[opp.assetClass] ?? 5
@@ -191,7 +201,7 @@ export class PaperBroker {
       `[PaperBroker] ✓ opened ${opp.strategyKey} ${opp.direction.toUpperCase()} ` +
       `${opp.symbol} @ $${fillPrice.toFixed(4)} notional=$${size.notionalUsd.toFixed(2)}`
     )
-    return { id: pos.id }
+    return { status: 'opened', id: pos.id }
   }
 
   // ── Mark all open positions to current market price ────────────────────────
@@ -299,9 +309,7 @@ export class PaperBroker {
         metadata:     { exit_reason: exitReason, pnl_pct: realizedPct, pnl_usd: pnlUsd },
       })
 
-      // Grade the decision immediately using the paper trade's actual outcome.
-      // This bypasses the resolution_due_at horizon and the Yahoo Finance bar
-      // lookup — both of which fail for polymarket/forex symbols.
+      // Grade the decision using the actual outcome.
       const actualDirection = pnlUsd >= 0 ? 1 : 0
       supabase
         .from('decision_log')

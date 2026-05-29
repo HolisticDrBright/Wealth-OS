@@ -3,9 +3,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Play, RefreshCw, TrendingUp, TrendingDown, Clock, FlaskConical, Zap, Fish, Atom, AlertTriangle, Info } from 'lucide-react'
+import {
+  Play, RefreshCw, TrendingUp, TrendingDown, Clock,
+  FlaskConical, Zap, Fish, Atom, AlertTriangle, Info, ChevronDown, ChevronUp,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { StrategyKey, AssetClass, MiroFishTier, KronosTier, ProfileKey } from '@/lib/strategies/strategy-registry'
-import type { PaperSummary } from '@/lib/paper-trading/types'
+import type { PaperSummary, PaperRunResult, SkipCounts, SkippedDetail } from '@/lib/paper-trading/types'
 
 interface StrategyRow {
   strategyKey: StrategyKey
@@ -39,7 +43,6 @@ interface Position {
 
 interface Props {
   assetClasses: AssetClass[]
-  /** When set, hides strategies not enabled for this profile and shows a filter banner. */
   userProfileKey?: ProfileKey
 }
 
@@ -64,19 +67,15 @@ function timeAgo(iso: string) {
 
 function ApiWarning({ missingRequired, missingOptional }: { missingRequired: string[]; missingOptional: string[] }) {
   if (missingRequired.length === 0 && missingOptional.length === 0) return null
-
   if (missingRequired.length > 0) {
-    const tip = `Needs ${missingRequired.join(', ')} — strategy will return no signals without it`
     return (
-      <span title={tip} className="shrink-0 cursor-help">
+      <span title={`Needs ${missingRequired.join(', ')} — no signals without it`} className="shrink-0 cursor-help">
         <AlertTriangle className="h-3.5 w-3.5 text-orange-400" />
       </span>
     )
   }
-
-  const tip = `Add ${missingOptional.join(', ')} for full signals (runs with reduced data without it)`
   return (
-    <span title={tip} className="shrink-0 cursor-help">
+    <span title={`Add ${missingOptional.join(', ')} for full signals`} className="shrink-0 cursor-help">
       <Info className="h-3.5 w-3.5 text-yellow-500/70" />
     </span>
   )
@@ -89,8 +88,7 @@ function AiTierBadge({ tier, label, icon }: { tier: MiroFishTier | KronosTier; l
     : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
   return (
     <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 ${cls}`}>
-      {icon}
-      {label}
+      {icon}{label}
     </span>
   )
 }
@@ -107,6 +105,179 @@ function PaperToggle({ enabled, onChange, disabled }: { enabled: boolean; onChan
   )
 }
 
+// ── Run result summary ─────────────────────────────────────────────────────────
+
+function buildRunSummary(r: PaperRunResult): string {
+  const parts: string[] = [`Ran ${r.strategiesRun} strategies · ${r.opportunitiesFound} opportunities`]
+
+  if (r.positionsOpened > 0) parts.push(`${r.positionsOpened} opened`)
+  if (r.positionsClosed > 0) parts.push(`${r.positionsClosed} closed`)
+
+  const s = r.skipped
+  if (s.alreadyOpen > 0) parts.push(`${s.alreadyOpen} already open`)
+  if (s.missingPrice > 0) parts.push(`${s.missingPrice} no price`)
+  if (s.expiredMarket > 0) parts.push(`${s.expiredMarket} expired`)
+  if (s.resolvedMarket > 0) parts.push(`${s.resolvedMarket} resolved`)
+  if (s.venueBlocked > 0) parts.push(`${s.venueBlocked} venue blocked`)
+  const blocked = s.riskBlocked + s.profileBlocked + s.positionCapBlocked + s.liquidityBlocked
+  if (blocked > 0) parts.push(`${blocked} blocked`)
+  if (s.noSize > 0) parts.push(`${s.noSize} no size`)
+  if (s.strategyImmature > 0) parts.push(`${s.strategyImmature} not ready`)
+
+  if (r.positionsOpened === 0 && r.positionsClosed === 0) {
+    parts.push('· 0 opened')
+  }
+
+  return parts.join(' · ')
+}
+
+function plainEnglishSummary(r: PaperRunResult): string {
+  const { opportunitiesFound, positionsOpened, positionsClosed, skipped } = r
+
+  if (opportunitiesFound === 0) return 'No actionable signals found this run.'
+
+  const lines: string[] = []
+
+  if (positionsOpened > 0) {
+    lines.push(`Opened ${positionsOpened} new position${positionsOpened > 1 ? 's' : ''}.`)
+  }
+  if (positionsClosed > 0) {
+    lines.push(`Closed ${positionsClosed} position${positionsClosed > 1 ? 's' : ''}.`)
+  }
+
+  const reasons: string[] = []
+  if (skipped.alreadyOpen > 0) reasons.push(`${skipped.alreadyOpen} already held`)
+  if (skipped.missingPrice > 0) reasons.push(`${skipped.missingPrice} had no live price`)
+  if (skipped.expiredMarket + skipped.resolvedMarket > 0) {
+    reasons.push(`${skipped.expiredMarket + skipped.resolvedMarket} Polymarket contracts expired or resolved`)
+  }
+  if (skipped.venueBlocked > 0) reasons.push(`${skipped.venueBlocked} venue-blocked by jurisdiction`)
+  const blocked = skipped.riskBlocked + skipped.profileBlocked
+  if (blocked > 0) reasons.push(`${blocked} blocked by risk/profile rules`)
+  if (skipped.noSize > 0) reasons.push(`${skipped.noSize} produced zero size after caps`)
+
+  if (reasons.length > 0) {
+    if (positionsOpened === 0 && positionsClosed === 0) {
+      lines.push(`No new positions opened — ${reasons.join(', ')}.`)
+    } else {
+      lines.push(`Remaining skipped: ${reasons.join(', ')}.`)
+    }
+  }
+
+  return lines.join(' ') || `Found ${opportunitiesFound} opportunities, all reviewed.`
+}
+
+const OUTCOME_LABEL: Record<string, string> = {
+  opened: 'Opened',
+  already_open: 'Already open',
+  missing_price: 'No price',
+  invalid_price: 'Invalid price',
+  insert_error: 'DB error',
+  no_size: 'No size',
+  block: 'Blocked',
+  error: 'Error',
+  venueBlocked: 'Venue blocked',
+  expiredMarket: 'Expired',
+  resolvedMarket: 'Resolved',
+  strategyImmature: 'Not ready',
+}
+
+function outcomeColor(outcome: string) {
+  if (outcome === 'opened') return 'text-emerald-400'
+  if (outcome === 'already_open') return 'text-gray-400'
+  if (outcome === 'missing_price' || outcome === 'invalid_price' || outcome === 'no_active_book') return 'text-amber-400'
+  if (outcome === 'block' || outcome === 'insert_error' || outcome === 'error') return 'text-red-400'
+  if (outcome === 'expiredMarket' || outcome === 'resolvedMarket' || outcome === 'strategyImmature') return 'text-gray-500'
+  return 'text-gray-400'
+}
+
+function SkipBreakdown({ skipped, details }: { skipped: SkipCounts; details: SkippedDetail[] }) {
+  const [open, setOpen] = useState(false)
+
+  const totalSkipped = Object.values(skipped).reduce((s, v) => s + v, 0)
+  if (totalSkipped === 0) return null
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] text-xs">
+      <button
+        type="button"
+        onClick={() => setOpen(p => !p)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left text-gray-400 hover:text-white transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          <span>Why? — {totalSkipped} skipped</span>
+        </span>
+        <span className="flex gap-2">
+          {skipped.alreadyOpen > 0 && <span className="text-gray-500">{skipped.alreadyOpen} already open</span>}
+          {skipped.missingPrice > 0 && <span className="text-amber-500">{skipped.missingPrice} no price</span>}
+          {(skipped.riskBlocked + skipped.profileBlocked) > 0 && (
+            <span className="text-red-500">{skipped.riskBlocked + skipped.profileBlocked} blocked</span>
+          )}
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-white/10">
+          {/* Counts summary row */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-2 text-[11px]">
+            {(
+              [
+                ['Already open', skipped.alreadyOpen, 'text-gray-400'],
+                ['No price', skipped.missingPrice, 'text-amber-400'],
+                ['Expired', skipped.expiredMarket, 'text-gray-500'],
+                ['Resolved', skipped.resolvedMarket, 'text-gray-500'],
+                ['Risk blocked', skipped.riskBlocked, 'text-red-400'],
+                ['Profile blocked', skipped.profileBlocked, 'text-orange-400'],
+                ['Venue blocked', skipped.venueBlocked, 'text-red-400'],
+                ['Cap blocked', skipped.positionCapBlocked, 'text-amber-400'],
+                ['No size', skipped.noSize, 'text-amber-400'],
+                ['Not ready', skipped.strategyImmature, 'text-gray-500'],
+                ['Other', skipped.other, 'text-gray-500'],
+              ] as [string, number, string][]
+            )
+              .filter(([, count]) => count > 0)
+              .map(([label, count, cls]) => (
+                <span key={label} className="flex items-center gap-1">
+                  <span className={cn('font-semibold tabular-nums', cls)}>{count}</span>
+                  <span className="text-gray-600">{label}</span>
+                </span>
+              ))}
+          </div>
+
+          {/* Per-opportunity detail table */}
+          {details.length > 0 && (
+            <div className="max-h-64 overflow-y-auto border-t border-white/5">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider text-gray-600 border-b border-white/5">
+                    <th className="px-3 py-1.5 text-left font-medium">Strategy</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Symbol</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Outcome</th>
+                    <th className="px-3 py-1.5 text-left font-medium">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {details.map((d, i) => (
+                    <tr key={i} className="border-b border-white/5 last:border-0">
+                      <td className="px-3 py-1.5 font-mono text-gray-500 truncate max-w-[10rem]">{d.strategyKey}</td>
+                      <td className="px-3 py-1.5 font-mono text-indigo-400">{d.symbol}</td>
+                      <td className={cn('px-3 py-1.5 font-medium', outcomeColor(d.outcome))}>
+                        {OUTCOME_LABEL[d.outcome] ?? d.outcome}
+                      </td>
+                      <td className="px-3 py-1.5 text-gray-500 truncate max-w-[16rem]" title={d.reason}>{d.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
   const [mode, setMode] = useState<'paper' | 'live'>('paper')
   const [strategies, setStrategies] = useState<StrategyRow[]>([])
@@ -116,6 +287,7 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
   const [running, setRunning] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
   const [runMsg, setRunMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [lastRun, setLastRun] = useState<PaperRunResult | null>(null)
 
   const primaryClass = assetClasses[0]
 
@@ -140,7 +312,6 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
 
   async function togglePaper(key: StrategyKey, current: boolean) {
     setToggling(key)
-    // Optimistic update
     setStrategies(prev => prev.map(s => s.strategyKey === key ? { ...s, paperEnabled: !current } : s))
     try {
       const res = await fetch('/api/users/me/strategies', {
@@ -149,7 +320,6 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
         body: JSON.stringify({ strategy_key: key, paper_enabled: !current }),
       })
       if (!res.ok) {
-        // Revert on failure
         setStrategies(prev => prev.map(s => s.strategyKey === key ? { ...s, paperEnabled: current } : s))
         const body = await res.json().catch(() => ({})) as { error?: string }
         setRunMsg({ text: `Failed to save: ${body.error ?? res.statusText}`, ok: false })
@@ -165,19 +335,18 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
   async function runPaper() {
     setRunning(true)
     setRunMsg(null)
+    setLastRun(null)
     try {
       const res = await fetch('/api/paper-trading/run', { method: 'POST' })
-      const result = await res.json() as {
-        strategiesRun: number; opportunitiesFound: number
-        positionsOpened: number; positionsClosed: number; errors: string[]
-      }
-      if (result.errors?.[0] && result.strategiesRun === 0) {
+      const result = await res.json() as PaperRunResult & { error?: string }
+
+      if (result.error) {
+        setRunMsg({ text: result.error, ok: false })
+      } else if (result.errors?.length > 0 && result.strategiesRun === 0) {
         setRunMsg({ text: result.errors[0], ok: false })
       } else {
-        setRunMsg({
-          text: `Ran ${result.strategiesRun} strategies · ${result.opportunitiesFound} opportunities · ${result.positionsOpened} opened · ${result.positionsClosed} closed${result.errors.length > 0 ? ` · ⚠ ${result.errors[0]}` : ''}`,
-          ok: true,
-        })
+        setLastRun(result)
+        setRunMsg({ text: buildRunSummary(result), ok: true })
       }
       await loadPositions()
     } finally {
@@ -185,12 +354,10 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
     }
   }
 
-  // Profile-aware filtering: hide strategies not in the current profile
   const visibleStrategies = userProfileKey
     ? strategies.filter(s => s.enabledInProfiles?.includes(userProfileKey) ?? true)
     : strategies
   const hiddenCount = strategies.length - visibleStrategies.length
-
   const enabledCount = visibleStrategies.filter(s => s.paperEnabled).length
   const totalPnl = summary?.totalPnlUsd ?? 0
 
@@ -294,6 +461,16 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
             <div className={`rounded-lg px-3 py-2 text-xs ${runMsg.ok ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-400'}`}>
               {runMsg.text}
             </div>
+          )}
+
+          {/* Plain-English explanation */}
+          {lastRun && (
+            <p className="text-xs text-gray-500 px-0.5">{plainEnglishSummary(lastRun)}</p>
+          )}
+
+          {/* Skip breakdown drawer */}
+          {lastRun && (
+            <SkipBreakdown skipped={lastRun.skipped} details={lastRun.skippedDetails} />
           )}
 
           {/* P&L summary */}

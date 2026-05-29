@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { runPaperTradingPass } from '@/lib/paper-trading/PaperTradeRunner'
+import { emptySkipCounts } from '@/lib/paper-trading/types'
 
 export async function POST() {
   const supabase = await createClient()
@@ -25,11 +26,13 @@ export async function POST() {
         decisionsBlock: 0,
         positionsOpened: 0,
         positionsClosed: 0,
-        errors: ['No strategies have paper trading enabled. Toggle strategies on using the Paper switches on the Crypto, Forex, or Options page.'],
+        skipped: emptySkipCounts(),
+        skippedDetails: [],
+        errors: ['No strategies have paper trading enabled. Toggle strategies on using the Paper switches on any asset page.'],
       })
     }
 
-    const result = await runPaperTradingPass(user.id, supabase, enabledKeys.length > 0 ? enabledKeys : undefined)
+    const result = await runPaperTradingPass(user.id, supabase, enabledKeys)
     return NextResponse.json(result)
   } catch (err) {
     console.error('[paper-trading/run]', err)

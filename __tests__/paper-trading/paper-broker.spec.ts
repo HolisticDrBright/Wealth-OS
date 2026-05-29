@@ -1,10 +1,8 @@
 /**
- * PaperBroker — 4 unit tests
+ * PaperBroker — unit tests
  *
- * 1. fill() returns null when price feed returns null
- * 2. fill() applies long slippage correctly (buy at ask = mid + slip)
- * 3. fill() applies short slippage correctly (sell at bid = mid - slip)
- * 4. checkAndExitPositions() closes a position that has hit stop_loss
+ * fill() now returns PaperFillResult (discriminated union) instead of { id } | null.
+ * Tests updated accordingly.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -38,8 +36,6 @@ function makeSize(notionalUsd = 500): PositionSize {
 
 /** Supabase mock that handles the dedup count query + insert flow. */
 function makeSupabase(positionId = 'pos-1'): SupabaseClient {
-  // Builder that resolves to { count: 0 } when awaited (dedup check)
-  // and supports .insert().select().single() for position insert
   const builder = {
     insert: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -49,7 +45,6 @@ function makeSupabase(positionId = 'pos-1'): SupabaseClient {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-    // Makes the chain awaitable — resolves to { count: 0 } for the dedup check
     then: (resolve: (v: { count: number; data: null; error: null }) => void) =>
       Promise.resolve({ count: 0, data: null, error: null }).then(resolve),
   }
@@ -57,22 +52,33 @@ function makeSupabase(positionId = 'pos-1'): SupabaseClient {
 }
 
 describe('PaperBroker', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-  afterEach(() => {
-    vi.clearAllMocks()
-  })
+  beforeEach(() => { vi.clearAllMocks() })
+  afterEach(() => { vi.clearAllMocks() })
 
-  it('fill() returns null when price feed returns null', async () => {
+  it('fill() returns missing_price when price feed returns null', async () => {
     mockFetchCurrentPrice.mockResolvedValue(null)
     const { PaperBroker } = await import('@/lib/paper-trading/PaperBroker')
     const broker = new PaperBroker()
     const result = await broker.fill(makeOpp(), makeSize(), 'user-1', makeSupabase())
-    expect(result).toBeNull()
+    expect(result.status).toBe('missing_price')
   })
 
-  it('fill() buys at mid + slippage for long positions (crypto = 5 bps)', async () => {
+  it('fill() returns already_open when dedup check finds an open position', async () => {
+    mockFetchCurrentPrice.mockResolvedValue(50_000)
+    const dedupBuilder = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      then: (resolve: (v: { count: number }) => void) =>
+        Promise.resolve({ count: 1 }).then(resolve),
+    }
+    const supabase = { from: vi.fn().mockReturnValue(dedupBuilder) } as unknown as SupabaseClient
+    const { PaperBroker } = await import('@/lib/paper-trading/PaperBroker')
+    const broker = new PaperBroker()
+    const result = await broker.fill(makeOpp(), makeSize(), 'user-1', supabase)
+    expect(result.status).toBe('already_open')
+  })
+
+  it('fill() returns opened and charges long slippage (crypto = 5 bps)', async () => {
     const midPrice = 50_000
     mockFetchCurrentPrice.mockResolvedValue(midPrice)
 
@@ -104,12 +110,12 @@ describe('PaperBroker', () => {
     const broker = new PaperBroker()
     const result = await broker.fill(makeOpp({ direction: 'long' }), makeSize(), 'user-1', supabase)
 
-    expect(result).not.toBeNull()
+    expect(result.status).toBe('opened')
     const expectedFillPrice = midPrice * (1 + 5 / 10_000)
     expect(capturedFillPrice).toBeCloseTo(expectedFillPrice, 2)
   })
 
-  it('fill() sells at mid - slippage for short positions (crypto = 5 bps)', async () => {
+  it('fill() returns opened and charges short slippage (crypto = 5 bps)', async () => {
     const midPrice = 50_000
     mockFetchCurrentPrice.mockResolvedValue(midPrice)
 
@@ -145,38 +151,54 @@ describe('PaperBroker', () => {
     expect(capturedFillPrice).toBeCloseTo(expectedFillPrice, 2)
   })
 
+  it('fill() returns insert_error when Supabase insert fails', async () => {
+    mockFetchCurrentPrice.mockResolvedValue(50_000)
+    const supabase = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'paper_positions') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } }),
+              }),
+            }),
+            then: (resolve: (v: unknown) => void) =>
+              Promise.resolve({ count: 0 }).then(resolve),
+          }
+        }
+        return { insert: vi.fn().mockResolvedValue({ error: null }) }
+      }),
+    } as unknown as SupabaseClient
+
+    const { PaperBroker } = await import('@/lib/paper-trading/PaperBroker')
+    const broker = new PaperBroker()
+    const result = await broker.fill(makeOpp(), makeSize(), 'user-1', supabase)
+    expect(result.status).toBe('insert_error')
+  })
+
   it('checkAndExitPositions() closes a position at stop_loss and writes close trade', async () => {
-    // Position entered at $50,000; current price $48,900 → -2.2% → triggers 2% stop
     const entryPrice   = 50_000
-    const currentPrice = 48_900
+    const currentPrice = 48_900  // -2.2% → triggers 2% stop
     mockFetchCurrentPrice.mockResolvedValue(currentPrice)
 
     const mockUpdate = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
     const insertCalls: unknown[] = []
 
     const supabase = {
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        // Returns open positions list
-        then: undefined,
-        // Vitest will call this as a thenable — just return the positions array
-        [Symbol.iterator]: undefined,
-      }),
+      from: vi.fn(),
       auth: {},
     } as unknown as SupabaseClient
 
-    // Override from() to return positions for SELECT and capture updates
     let callCount = 0
     ;(supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
       if (table === 'paper_positions') {
         callCount++
         if (callCount === 1) {
-          // First call: SELECT open positions
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
-            // Make the whole chain resolve to our test position
             then: (resolve: (v: { data: unknown[] }) => void) => resolve({
               data: [{
                 id: 'pos-1', user_id: 'user-1',
@@ -200,7 +222,6 @@ describe('PaperBroker', () => {
         }
       }
       if (table === 'decision_log') {
-        // Fire-and-forget grading select — return null (no decision_log entry in test)
         return {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),

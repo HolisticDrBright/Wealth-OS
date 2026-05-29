@@ -10,6 +10,7 @@
 import type { Tone } from '@/lib/strategies/strategy-display'
 
 export type NoTradeReasonCode =
+  // ── CIO decision-level codes ──────────────────────────────────────────────
   | 'edge_after_fees'
   | 'spread_too_wide'
   | 'liquidity_too_low'
@@ -22,6 +23,16 @@ export type NoTradeReasonCode =
   | 'red_team_rejected'
   | 'agents_contradicted'
   | 'missing_data'
+  // ── Broker / runner-level skip codes ─────────────────────────────────────
+  | 'already_open'
+  | 'missing_price'
+  | 'expired_market'
+  | 'resolved_market'
+  | 'venue_blocked'
+  | 'position_cap'
+  | 'strategy_disabled'
+  | 'strategy_immature'
+  | 'no_size'
 
 export interface NoTradeReasonMeta {
   code: NoTradeReasonCode
@@ -34,7 +45,7 @@ export interface NoTradeReasonMeta {
 export const NO_TRADE_REASONS: Record<NoTradeReasonCode, NoTradeReasonMeta> = {
   edge_after_fees: {
     code: 'edge_after_fees',
-    label: 'Edge disappeared after fees',
+    label: 'Edge after fees',
     blurb: 'The expected gain no longer covered trading costs and slippage.',
     tone: 'caution',
   },
@@ -64,25 +75,25 @@ export const NO_TRADE_REASONS: Record<NoTradeReasonCode, NoTradeReasonMeta> = {
   },
   strategy_planned: {
     code: 'strategy_planned',
-    label: 'Strategy planned only',
+    label: 'Strategy planned',
     blurb: 'This strategy is a placeholder with no live signal logic yet.',
     tone: 'neutral',
   },
   risk_profile_mismatch: {
     code: 'risk_profile_mismatch',
-    label: 'Risk profile mismatch',
+    label: 'Profile mismatch',
     blurb: 'This opportunity is outside the strategies your risk profile allows.',
     tone: 'info',
   },
   correlation_too_high: {
     code: 'correlation_too_high',
-    label: 'Correlated exposure too high',
+    label: 'Correlated exposure',
     blurb: 'Too similar to positions you already hold — would concentrate risk.',
     tone: 'caution',
   },
   jurisdiction_blocked: {
     code: 'jurisdiction_blocked',
-    label: 'Jurisdiction blocked',
+    label: 'Jurisdiction',
     blurb: 'Not permitted in your state/country of residence.',
     tone: 'danger',
   },
@@ -94,15 +105,69 @@ export const NO_TRADE_REASONS: Record<NoTradeReasonCode, NoTradeReasonMeta> = {
   },
   agents_contradicted: {
     code: 'agents_contradicted',
-    label: 'MiroFish / Kronos contradicted',
+    label: 'Agents contradicted',
     blurb: 'The simulation and predictor disagreed with the signal.',
     tone: 'caution',
   },
   missing_data: {
     code: 'missing_data',
-    label: 'Missing required data',
+    label: 'Missing data',
     blurb: 'A required market feed or integration was unavailable.',
     tone: 'neutral',
+  },
+  already_open: {
+    code: 'already_open',
+    label: 'Already open',
+    blurb: 'This strategy already has an open position in this symbol.',
+    tone: 'neutral',
+  },
+  missing_price: {
+    code: 'missing_price',
+    label: 'No price',
+    blurb: 'The price feed returned no data for this symbol.',
+    tone: 'caution',
+  },
+  expired_market: {
+    code: 'expired_market',
+    label: 'Market expired',
+    blurb: 'This Polymarket contract passed its end date and is no longer tradable.',
+    tone: 'neutral',
+  },
+  resolved_market: {
+    code: 'resolved_market',
+    label: 'Market resolved',
+    blurb: 'This Polymarket contract already resolved — no fill possible.',
+    tone: 'neutral',
+  },
+  venue_blocked: {
+    code: 'venue_blocked',
+    label: 'Venue blocked',
+    blurb: 'This trading venue is not permitted in your state of residence.',
+    tone: 'danger',
+  },
+  position_cap: {
+    code: 'position_cap',
+    label: 'Position cap',
+    blurb: 'Adding this position would exceed your single-position or portfolio cap.',
+    tone: 'info',
+  },
+  strategy_disabled: {
+    code: 'strategy_disabled',
+    label: 'Strategy off',
+    blurb: 'Paper trading is not enabled for this strategy.',
+    tone: 'neutral',
+  },
+  strategy_immature: {
+    code: 'strategy_immature',
+    label: 'Not ready',
+    blurb: 'Strategy is still in planning/backtest phase — paper trading not permitted.',
+    tone: 'neutral',
+  },
+  no_size: {
+    code: 'no_size',
+    label: 'No size',
+    blurb: 'The position sizer returned zero notional after applying caps.',
+    tone: 'info',
   },
 }
 

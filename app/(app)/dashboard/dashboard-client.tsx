@@ -16,6 +16,7 @@ import { RiskStatusPanel } from './command-center/RiskStatusPanel'
 import { OpportunitiesPanel } from './command-center/OpportunitiesPanel'
 import { NoTradePanel } from './command-center/NoTradePanel'
 import { PaperTradesPanel } from './command-center/PaperTradesPanel'
+import { PaperRunPanel } from './command-center/PaperRunPanel'
 import { AllocationPanel } from './command-center/AllocationPanel'
 import { TrustPanel } from './command-center/TrustPanel'
 import { DecisionsPanel } from './command-center/DecisionsPanel'
@@ -38,6 +39,9 @@ export function DashboardClient({ data }: { data: CommandCenterData }) {
         <NoTradePanel entries={data.noTrade} />
         <PaperTradesPanel paper={data.paper} />
       </div>
+
+      {/* 4.5 — Last paper run breakdown */}
+      <PaperRunPanel lastRun={data.paper.lastRun} />
 
       {/* 6 + 8 — Capital allocation + required decisions */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
