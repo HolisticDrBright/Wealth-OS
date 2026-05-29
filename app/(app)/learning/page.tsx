@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { loadWeightsForUser } from '@/lib/learning/weights'
 import { scoreStrategies } from '@/lib/learning/scorer'
+import { getAgentTrust } from '@/lib/actions/agent-trust'
 import { LearningClient } from './learning-client'
 
 export default async function LearningPage() {
@@ -8,7 +9,7 @@ export default async function LearningPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const [weights, { data: outcomes }, { count: totalDecisions }, { count: pendingCount }] = await Promise.all([
+  const [weights, { data: outcomes }, { count: totalDecisions }, { count: pendingCount }, agents] = await Promise.all([
     loadWeightsForUser(user.id),
     supabase
       .from('outcome_log')
@@ -25,6 +26,7 @@ export default async function LearningPage() {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('outcome_graded', false),
+    getAgentTrust(),
   ])
 
   const rows = (outcomes ?? [])
@@ -57,6 +59,7 @@ export default async function LearningPage() {
         totalDecisions={totalDecisions ?? 0}
         totalOutcomes={outcomes?.length ?? 0}
         pendingGrade={pendingCount ?? 0}
+        agents={agents}
       />
     </div>
   )

@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Brain, RefreshCw, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, BarChart2, Zap } from 'lucide-react'
+import { Brain, RefreshCw, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, BarChart2, Zap, Info } from 'lucide-react'
 import type { StrategyStats } from '@/lib/learning/types'
+import { AgentTrustBoard } from '@/components/calibration/AgentTrustBoard'
+import type { AgentTrust } from '@/lib/actions/agent-trust'
 
 interface Props {
   initialWeights: Record<string, number>
@@ -12,6 +14,7 @@ interface Props {
   totalDecisions: number
   totalOutcomes: number
   pendingGrade: number
+  agents: AgentTrust[]
 }
 
 const STRATEGY_COLORS: Record<string, string> = {
@@ -33,7 +36,7 @@ function ScoreBadge({ score }: { score: number | null }) {
   return <span className={`font-mono text-sm font-bold ${color}`}>{score > 0 ? '+' : ''}{score.toFixed(2)}</span>
 }
 
-export function LearningClient({ initialWeights, initialStats, totalDecisions, totalOutcomes, pendingGrade }: Props) {
+export function LearningClient({ initialWeights, initialStats, totalDecisions, totalOutcomes, pendingGrade, agents }: Props) {
   const [weights, setWeights] = useState(initialWeights)
   const [stats, setStats] = useState(initialStats)
   const [decisions, setDecisions] = useState(totalDecisions)
@@ -106,6 +109,14 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
 
   const sortedWeights = Object.entries(weights).sort((a, b) => b[1] - a[1])
 
+  // De-emphasize unexplained weights: a weight is only "learned" once its
+  // strategy has accumulated enough graded outcomes (the loop requires 20+).
+  // Below that, the number is still the default prior, not evidence — flag it
+  // as "shadow" so a raw percentage isn't read as an authoritative track record.
+  const LEARN_THRESHOLD = 20
+  const gradedByStrategy = new Map(stats.map(s => [s.strategy, s.count]))
+  const isLearnedWeight = (strategy: string) => (gradedByStrategy.get(strategy) ?? 0) >= LEARN_THRESHOLD
+
   return (
     <div className="space-y-6">
       {/* Stats overview */}
@@ -126,6 +137,9 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
           </Card>
         ))}
       </div>
+
+      {/* Agent trust / calibration */}
+      <AgentTrustBoard agents={agents} />
 
       {/* Learning pass trigger */}
       <Card>
@@ -199,17 +213,33 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Active Strategy Weights</h2>
         <Card>
           <div className="p-6 space-y-4">
-            {sortedWeights.map(([strategy, weight]) => (
+            {sortedWeights.map(([strategy, weight]) => {
+              const learned = isLearnedWeight(strategy)
+              const graded = gradedByStrategy.get(strategy) ?? 0
+              return (
               <div key={strategy}>
-                <div className="flex items-center justify-between mb-1.5 text-xs">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between mb-1.5 text-xs gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className="h-2.5 w-2.5 rounded-full"
+                      className="h-2.5 w-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: STRATEGY_COLORS[strategy] ?? '#6b7280' }}
                     />
-                    <span className="font-medium text-white capitalize">{strategy}</span>
+                    <span className="font-medium text-white capitalize truncate">{strategy}</span>
+                    {!learned && (
+                      <span
+                        title={`Default prior, not yet learned — only ${graded} graded outcome${graded === 1 ? '' : 's'} (needs ${LEARN_THRESHOLD}+). This weight is not an authoritative track record.`}
+                        className="inline-flex items-center gap-1 rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-sky-400 shrink-0"
+                      >
+                        <Info className="h-2.5 w-2.5" /> shadow
+                      </span>
+                    )}
                   </div>
-                  <span className="text-gray-400 font-mono">{(weight * 100).toFixed(1)}%</span>
+                  <span
+                    className="text-gray-400 font-mono shrink-0"
+                    title={learned ? `Learned from ${graded} graded outcomes` : 'Default prior — not yet learned from outcomes'}
+                  >
+                    {(weight * 100).toFixed(1)}%
+                  </span>
                 </div>
                 <div className="h-2 rounded-full bg-white/10">
                   <div
@@ -221,9 +251,12 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
                   />
                 </div>
               </div>
-            ))}
+              )
+            })}
             <p className="text-xs text-gray-600 pt-2">
               Weights are updated automatically when strategies accumulate 20+ graded outcomes.
+              A <span className="text-sky-400">shadow</span> tag marks weights still at their
+              default prior — shown for context, not as an authoritative track record.
               Max change: 8% per pass. Floors protect strategies with asymmetric P&L.
             </p>
           </div>
