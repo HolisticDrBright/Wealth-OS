@@ -1,56 +1,32 @@
+export const dynamic = 'force-dynamic'
+
 import { Topbar } from '@/components/layout/topbar'
+import { Badge } from '@/components/ui/badge'
 import { DashboardClient } from './dashboard-client'
-import { getAssets } from '@/lib/actions/assets'
-import { getTransactions } from '@/lib/actions/transactions'
-import { getNetWorthHistory } from '@/lib/actions/networth'
-import { getUserRiskProfile } from '@/lib/actions/risk-profile'
-import { ProfileBadge } from '@/components/risk-profile/ProfileBadge'
-import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
-import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
-import {
-  mockNetWorthHistory,
-  mockAssets,
-  mockTransactions,
-} from '@/lib/mock-data'
-import type { ProfileKey } from '@/lib/strategies/profile-params'
+import { getCommandCenterData } from '@/lib/actions/command-center'
+
+const REGIME_BADGE: Record<
+  string,
+  { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' }
+> = {
+  RISK_ON: { label: 'Risk On', variant: 'success' },
+  NEUTRAL: { label: 'Neutral', variant: 'default' },
+  RISK_OFF: { label: 'Risk Off', variant: 'warning' },
+  CRISIS: { label: 'Crisis', variant: 'danger' },
+}
 
 export default async function DashboardPage() {
-  const [assetsData, transactionsData, netWorthData, riskProfile, riskData] = await Promise.all([
-    getAssets(),
-    getTransactions(),
-    getNetWorthHistory(),
-    getUserRiskProfile().catch(() => null),
-    getAssetRiskProfileData('all').catch(() => ({ profiles: [], userProfile: null, strategyDefs: [], migrationApplied: false })),
-  ])
-
-  const assets = assetsData.length > 0 ? assetsData : mockAssets
-  const transactions = transactionsData.length > 0 ? transactionsData : mockTransactions
-  const netWorthHistory = netWorthData.length > 0 ? netWorthData : mockNetWorthHistory
-  const isDemo = assetsData.length === 0
-  const profileKey: ProfileKey = riskProfile?.profileKey ?? 'balanced'
+  const data = await getCommandCenterData()
+  const badge = REGIME_BADGE[data.regime.regime] ?? REGIME_BADGE.NEUTRAL
 
   return (
     <div>
       <Topbar
-        title="Dashboard"
-        subtitle="Financial Overview"
-        badge={<ProfileBadge profile={profileKey} />}
+        title="Command Center"
+        subtitle="What to do with capital today — and why"
+        badge={<Badge variant={badge.variant}>{badge.label}</Badge>}
       />
-      <div className="px-6 pt-4 pb-2 max-w-4xl">
-        <AssetRiskProfile
-          assetClass="all"
-          profiles={riskData.profiles}
-          userProfile={riskData.userProfile}
-          strategyDefs={riskData.strategyDefs}
-          migrationApplied={riskData.migrationApplied}
-        />
-      </div>
-      <DashboardClient
-        assets={assets}
-        transactions={transactions}
-        netWorthHistory={netWorthHistory}
-        isDemo={isDemo}
-      />
+      <DashboardClient data={data} />
     </div>
   )
 }
