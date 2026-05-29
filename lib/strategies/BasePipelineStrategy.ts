@@ -412,9 +412,10 @@ export abstract class BasePipelineStrategy {
     opp: Opportunity,
     decision: Decision,
     verdicts: AllVerdicts,
-    supabase?: SupabaseClient
+    supabase?: SupabaseClient,
+    userId?: string
   ): Promise<void> {
-    const row = {
+    const row: Record<string, unknown> = {
       strategy_key: this.key,
       symbol: opp.symbol,
       edge_type: this.config.edgeType,
@@ -428,6 +429,7 @@ export abstract class BasePipelineStrategy {
       decided_at: new Date().toISOString(),
       metadata: { detected_at: opp.detectedAt, direction: opp.direction },
     }
+    if (userId) row.user_id = userId
 
     if (supabase) {
       supabase.from('audit_logs').insert(row).then(({ error }) => {

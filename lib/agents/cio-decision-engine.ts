@@ -316,7 +316,7 @@ Write a CIO synthesis as JSON:
     // Gate 1 — risk veto
     if (risk.veto) {
       const decision = { action: 'block' as const, reason: risk.reason ?? 'risk veto' }
-      await strat.logAudit(opp, decision, verdicts, supabase)
+      await strat.logAudit(opp, decision, verdicts, supabase, userId)
       return decision
     }
 
@@ -334,7 +334,7 @@ Write a CIO synthesis as JSON:
             reason: `order book imbalance opposes ${opp.direction} (${imbalance.signal}, ratio=${imbalance.ratio.toFixed(2)})`,
             size,
           }
-          await strat.logAudit(opp, decision, verdicts, supabase)
+          await strat.logAudit(opp, decision, verdicts, supabase, userId)
           return decision
         }
       }
@@ -344,14 +344,14 @@ Write a CIO synthesis as JSON:
     if (mirofish?.scenario === 'bear' && opp.direction === 'long') {
       const size = await strat.sizePosition(opp, verdicts, userId)
       const decision = { action: 'reduce_size' as const, reason: 'mirofish bear scenario', size }
-      await strat.logAudit(opp, decision, verdicts, supabase)
+      await strat.logAudit(opp, decision, verdicts, supabase, userId)
       return decision
     }
 
     // Gate 3 — Kronos blocks
     if (kronos && !kronos.pass && opp.direction === 'long') {
       const decision = { action: 'block' as const, reason: `kronos contradicts: ${kronos.reason}` }
-      await strat.logAudit(opp, decision, verdicts, supabase)
+      await strat.logAudit(opp, decision, verdicts, supabase, userId)
       return decision
     }
 
@@ -359,7 +359,7 @@ Write a CIO synthesis as JSON:
     if (!redTeam.passed) {
       const size = await strat.sizePosition(opp, verdicts, userId)
       const decision = { action: 'reduce_size' as const, reason: redTeam.reason ?? 'red team score low', size }
-      await strat.logAudit(opp, decision, verdicts, supabase)
+      await strat.logAudit(opp, decision, verdicts, supabase, userId)
       return decision
     }
 
@@ -461,7 +461,7 @@ Write a CIO synthesis as JSON:
     }
 
     const decision = { action: 'execute' as const, size }
-    await strat.logAudit(opp, decision, verdicts, supabase)
+    await strat.logAudit(opp, decision, verdicts, supabase, userId)
     // In paper mode the caller (PaperTradeRunner) handles the fill — skip real broker
     if (!options?.paperMode) {
       strat.execute(opp, size, userId, supabase, cache).catch(err =>
