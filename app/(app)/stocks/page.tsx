@@ -1,6 +1,7 @@
 import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
 import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
+import { RiskStrip } from '@/components/risk/RiskStrip'
 
 const EMPTY_RISK_DATA = { profiles: [], userProfile: null, strategyDefs: [], migrationApplied: false }
 
@@ -15,6 +16,8 @@ export default async function StocksPage() {
           Momentum, value, dividend, sector rotation, earnings drift, merger arb, and spinoff strategies
         </p>
       </div>
+
+      <RiskStrip />
 
       <AssetRiskProfile
         assetClass="stocks"

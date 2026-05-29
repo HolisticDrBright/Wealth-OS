@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeOptionPnL } from '@/lib/options'
 import { OptionsClient } from './options-client'
+import { RiskStrip } from '@/components/risk/RiskStrip'
 
 export default async function OptionsPage() {
   const supabase = await createClient()
@@ -25,6 +26,7 @@ export default async function OptionsPage() {
         <h1 className="text-2xl font-bold text-white">Options</h1>
         <p className="text-sm text-gray-500 mt-1">Track positions and compute Black-Scholes pricing</p>
       </div>
+      <RiskStrip />
       <OptionsClient initialPositions={positions} />
     </div>
   )

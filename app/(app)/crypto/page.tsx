@@ -2,6 +2,7 @@ import { CryptoClient } from './crypto-client'
 import { getCryptoPortfolio, getCryptoPrices } from '@/lib/actions/crypto'
 import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
 import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
+import { RiskStrip } from '@/components/risk/RiskStrip'
 
 const WATCHED_SYMBOLS = ['BTC', 'ETH', 'SOL', 'MATIC', 'ADA', 'AVAX', 'DOGE', 'DOT']
 
@@ -22,6 +23,7 @@ export default async function CryptoPage() {
           strategyDefs={riskData.strategyDefs}
           migrationApplied={riskData.migrationApplied}
         />
+        <div className="mt-3"><RiskStrip /></div>
       </div>
       <CryptoClient initialPortfolio={portfolio} initialPrices={prices} userProfileKey={(riskData.userProfile?.profile_key as import('@/lib/strategies/strategy-registry').ProfileKey) ?? undefined} />
     </div>

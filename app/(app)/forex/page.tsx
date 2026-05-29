@@ -2,6 +2,7 @@ import { ForexClient } from './forex-client'
 import { getForexRates, getForexPositions } from '@/lib/actions/forex'
 import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
 import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
+import { RiskStrip } from '@/components/risk/RiskStrip'
 
 export default async function ForexPage() {
   const [rates, positions, riskData] = await Promise.all([
@@ -20,6 +21,7 @@ export default async function ForexPage() {
           strategyDefs={riskData.strategyDefs}
           migrationApplied={riskData.migrationApplied}
         />
+        <div className="mt-3"><RiskStrip /></div>
       </div>
       <ForexClient initialRates={rates} initialPositions={positions} userProfileKey={(riskData.userProfile?.profile_key as import('@/lib/strategies/strategy-registry').ProfileKey) ?? undefined} />
     </div>

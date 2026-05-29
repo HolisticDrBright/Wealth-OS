@@ -16,6 +16,7 @@ import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
 import { Terminal, ExternalLink, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getUserStateOfResidence, isVenueAllowedInState } from '@/lib/risk-profile/state-gate'
+import { RiskStrip } from '@/components/risk/RiskStrip'
 
 export default async function PolymarketPage() {
   // Check state-of-residence ban before fetching live data
@@ -54,6 +55,15 @@ export default async function PolymarketPage() {
         strategyDefs={riskData.strategyDefs}
         migrationApplied={riskData.migrationApplied}
       />
+      <div className="mt-3">
+        <RiskStrip
+          jurisdiction={
+            stateBanned
+              ? { level: 'risk', value: `Blocked${userStateName ? ` (${userStateName})` : ''}` }
+              : { level: 'ok', value: 'Allowed' }
+          }
+        />
+      </div>
     </div>
   )
 
