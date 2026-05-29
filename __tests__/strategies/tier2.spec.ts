@@ -20,6 +20,26 @@ import { BasePipelineStrategy } from '@/lib/strategies/BasePipelineStrategy'
 import type { Opportunity, OpportunityContext } from '@/lib/strategies/pipeline-types'
 import { randomUUID } from 'crypto'
 
+// detectWithConfluence() applies two production gates (time-of-day and
+// cross-asset regime) that read the wall clock and hit live network feeds.
+// Mock both so the auto-registration behaviour is tested deterministically,
+// regardless of when/where the suite runs.
+vi.mock('@/lib/cadence/time-of-day-guards', () => ({
+  isTimeOfDayAllowed: () => true,
+}))
+vi.mock('@/lib/regime/cross-asset-regime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/regime/cross-asset-regime')>()
+  return {
+    ...actual,
+    detectRegime: async () => ({
+      regime: actual.CrossAssetRegime.NEUTRAL,
+      vix: null,
+      hyOas: null,
+      resolvedAt: Date.now(),
+    }),
+  }
+})
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeSignal(
