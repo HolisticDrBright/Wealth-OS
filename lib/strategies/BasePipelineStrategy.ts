@@ -416,6 +416,7 @@ export abstract class BasePipelineStrategy {
     userId?: string
   ): Promise<void> {
     const row: Record<string, unknown> = {
+      user_id: userId,
       strategy_key: this.key,
       symbol: opp.symbol,
       edge_type: this.config.edgeType,

@@ -93,6 +93,10 @@ export class PaperBroker {
     userId: string,
     supabase: SupabaseClient
   ): Promise<PaperFillResult> {
+    if (!size || !isFinite(size.notionalUsd) || size.notionalUsd <= 0) {
+      return { status: 'no_size', reason: 'CIO returned no positive paper-trade size.' }
+    }
+
     // Deduplication: skip if this user already has an open position for this strategy+symbol
     const { count } = await supabase
       .from('paper_positions')
@@ -160,7 +164,7 @@ export class PaperBroker {
       return { status: 'insert_error', reason: error.message }
     }
 
-    await supabase.from('paper_trades').insert({
+    const { error: tradeError } = await supabase.from('paper_trades').insert({
       user_id:        userId,
       position_id:    pos.id,
       strategy_key:   opp.strategyKey,
@@ -175,6 +179,9 @@ export class PaperBroker {
       opportunity_id: opp.id,
       metadata:       opp.metadata,
     })
+    if (tradeError) {
+      console.warn('[PaperBroker] trade insert error:', tradeError.message)
+    }
 
     // Write to decision_log so the learning loop can grade this trade.
     // Skip polymarket (conditionId-based symbols can't be priced via Yahoo Finance for grading).

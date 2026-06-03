@@ -1,6 +1,6 @@
 export type PaperPositionStatus = 'open' | 'closed' | 'stopped'
 export type PaperExitReason = 'take_profit' | 'stop_loss' | 'timeout' | 'manual' | 'signal'
-
+export type PaperTradeDirection = 'long' | 'short' | 'neutral'
 export interface PaperPosition {
   id: string
   openedAt: string
@@ -9,7 +9,7 @@ export interface PaperPosition {
   strategyKey: string
   symbol: string
   assetClass: string
-  direction: 'long' | 'short'
+  direction: PaperTradeDirection
   entryPrice: number
   currentPrice?: number
   exitPrice?: number
@@ -35,7 +35,7 @@ export interface PaperTrade {
   strategyKey: string
   symbol: string
   assetClass: string
-  direction: 'long' | 'short'
+  direction: PaperTradeDirection
   side: 'open' | 'close'
   fillPrice: number
   quantity: number

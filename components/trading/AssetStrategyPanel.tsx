@@ -28,7 +28,7 @@ interface Position {
   id: string
   strategy_key: string
   symbol: string
-  direction: 'long' | 'short'
+  direction: 'long' | 'short' | 'neutral'
   entry_price: number
   current_price: number | null
   exit_price: number | null
@@ -57,6 +57,11 @@ function fmt(v: number | null) {
 function fmtPct(v: number | null) {
   if (v == null) return '—'
   return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`
+}
+function directionClass(direction: Position['direction']) {
+  if (direction === 'long') return 'bg-green-500/20 text-green-400'
+  if (direction === 'short') return 'bg-red-500/20 text-red-400'
+  return 'bg-sky-500/20 text-sky-300'
 }
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -474,21 +479,19 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
           )}
 
           {/* P&L summary */}
-          {(openPos.length > 0 || (summary?.closedTrades ?? 0) > 0) && (
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: 'Total P&L', value: fmt(totalPnl), cls: pnlColor(totalPnl) },
-                { label: 'Win Rate', value: summary?.winRate != null ? `${(summary.winRate * 100).toFixed(0)}%` : '—', cls: '' },
-                { label: 'Open', value: String(openPos.length), cls: '' },
-                { label: 'Closed', value: String(summary?.closedTrades ?? 0), cls: '' },
-              ].map(t => (
-                <div key={t.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">{t.label}</p>
-                  <p className={`text-lg font-bold mt-0.5 ${t.cls || 'text-white'}`}>{t.value}</p>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: 'Total P&L', value: fmt(totalPnl), cls: pnlColor(totalPnl) },
+              { label: 'Win Rate', value: summary?.winRate != null ? `${(summary.winRate * 100).toFixed(0)}%` : '—', cls: '' },
+              { label: 'Open', value: String(openPos.length), cls: '' },
+              { label: 'Closed', value: String(summary?.closedTrades ?? 0), cls: '' },
+            ].map(t => (
+              <div key={t.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">{t.label}</p>
+                <p className={`text-lg font-bold mt-0.5 ${t.cls || 'text-white'}`}>{t.value}</p>
+              </div>
+            ))}
+          </div>
 
           {/* Open positions */}
           {openPos.length > 0 && (
@@ -513,7 +516,7 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
                         <td className="px-3 py-2 font-mono text-gray-400">{p.strategy_key}</td>
                         <td className="px-3 py-2 font-semibold text-white">{p.symbol}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${p.direction === 'long' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${directionClass(p.direction)}`}>
                             {p.direction.toUpperCase()}
                           </span>
                         </td>
@@ -556,7 +559,7 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
                         <td className="px-3 py-2 font-mono text-gray-400">{p.strategy_key}</td>
                         <td className="px-3 py-2 font-semibold text-white">{p.symbol}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${p.direction === 'long' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${directionClass(p.direction)}`}>
                             {p.direction.toUpperCase()}
                           </span>
                         </td>

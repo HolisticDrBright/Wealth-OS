@@ -19,6 +19,7 @@ import type { OpportunityContext } from '@/lib/strategies/pipeline-types'
 import { loadUserProfile, getEffectiveStrategies } from '@/lib/strategies/profile-params'
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { StrategyKey } from '@/lib/strategies/strategy-registry'
+import { runPaperTradingPass } from '@/lib/paper-trading/PaperTradeRunner'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const supabase = createAdminClient()
   const strategies = getAllPipelineStrategies()
+  const paperTrading = await runScheduledPaperTradingPasses(supabase)
 
   // Fetch enabled strategies per user to avoid running signals nobody wants
   const { data: enabledRows } = await supabase
@@ -163,6 +165,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ok: true,
     elapsed_ms: elapsed,
     strategies_scanned: Object.keys(results).length,
+    paper_trading: paperTrading,
     results,
   })
 }
@@ -173,4 +176,60 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return NextResponse.json({ ok: true, status: 'scan-all endpoint healthy' })
+}
+
+async function runScheduledPaperTradingPasses(
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<{
+  users: number
+  positionsOpened: number
+  positionsClosed: number
+  errors: number
+  skipped: number
+}> {
+  const { data: rows, error } = await supabase
+    .from('user_enabled_strategies')
+    .select('user_id, strategy_key')
+    .eq('paper_enabled', true)
+
+  if (error) {
+    console.warn('[scan-all] paper trading lookup error:', error.message)
+    return { users: 0, positionsOpened: 0, positionsClosed: 0, errors: 1, skipped: 0 }
+  }
+
+  const byUser = new Map<string, string[]>()
+  for (const row of rows ?? []) {
+    const uid = row.user_id as string
+    if (!byUser.has(uid)) byUser.set(uid, [])
+    byUser.get(uid)!.push(row.strategy_key as string)
+  }
+
+  if (byUser.size === 0) {
+    return { users: 0, positionsOpened: 0, positionsClosed: 0, errors: 0, skipped: 0 }
+  }
+
+  const results = await Promise.allSettled(
+    [...byUser.entries()].map(([userId, enabledKeys]) =>
+      runPaperTradingPass(userId, supabase, enabledKeys)
+    )
+  )
+
+  return results.reduce(
+    (acc, result) => {
+      if (result.status === 'rejected') {
+        acc.errors++
+        return acc
+      }
+
+      acc.positionsOpened += result.value.positionsOpened
+      acc.positionsClosed += result.value.positionsClosed
+      acc.errors += result.value.errors.length
+      acc.skipped += Object.values(result.value.skipped ?? {}).reduce(
+        (sum, count) => sum + count,
+        0
+      )
+      return acc
+    },
+    { users: byUser.size, positionsOpened: 0, positionsClosed: 0, errors: 0, skipped: 0 }
+  )
 }

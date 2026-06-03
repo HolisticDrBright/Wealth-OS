@@ -170,6 +170,7 @@ export async function runPaperTradingPass(
             if (status === 'already_open') skipped.alreadyOpen++
             else if (status === 'missing_price' || status === 'invalid_price') skipped.missingPrice++
             else if (status === 'no_size') skipped.noSize++
+            else if (status === 'insert_error') skipped.other++
             else skipped.other++
             skippedDetails.push(skipDetail(
               key, opp.symbol, opp.assetClass, status, reason, opp.direction, opp.id,
