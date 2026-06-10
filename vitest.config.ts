@@ -10,6 +10,11 @@ export default defineConfig({
     coverage: { provider: 'v8', reporter: ['text', 'lcov'] },
   },
   resolve: {
-    alias: { '@': path.resolve(__dirname, '.') },
+    alias: {
+      // The 'server-only' marker package throws outside React Server
+      // Components; in node tests it must be a no-op.
+      'server-only': path.resolve(__dirname, '__tests__/stubs/server-only.ts'),
+      '@': path.resolve(__dirname, '.'),
+    },
   },
 })
