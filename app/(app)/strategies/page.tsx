@@ -3,6 +3,7 @@ import { StrategiesTabs } from './health-board-client'
 import { getallProfiles, getUserRiskProfile } from '@/lib/actions/risk-profile'
 import { getStrategyHealthRows } from '@/lib/actions/strategy-health'
 import { getBookAllocation } from '@/lib/actions/book-exposure'
+import { getPromotionPipeline } from '@/lib/actions/promotion-readiness'
 import { createClient } from '@/lib/supabase/server'
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { ProfileKey } from '@/lib/strategies/profile-params'
@@ -17,12 +18,13 @@ async function getStrategyDefinitions() {
 }
 
 export default async function StrategiesPage() {
-  const [profileData, userProfile, strategyDefs, healthRows, bookAllocation] = await Promise.all([
+  const [profileData, userProfile, strategyDefs, healthRows, bookAllocation, promotionPipeline] = await Promise.all([
     getallProfiles(),
     getUserRiskProfile().catch(() => null),
     getStrategyDefinitions(),
     getStrategyHealthRows().catch(() => []),
     getBookAllocation().catch(() => null),
+    getPromotionPipeline().catch(() => []),
   ])
 
   const defsWithEnv = strategyDefs.map(def => ({
@@ -37,6 +39,7 @@ export default async function StrategiesPage() {
       <StrategiesTabs
         rows={healthRows}
         bookAllocation={bookAllocation}
+        promotionPipeline={promotionPipeline}
         configureProps={{
           profiles: profileData.profiles,
           userProfile,

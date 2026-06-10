@@ -27,8 +27,10 @@ import type {
 import { ALL_BOOKS, BOOK_META, type StrategyBook } from '@/lib/strategies/strategy-books'
 import type { StrategyHealthRow } from '@/lib/actions/strategy-health'
 import type { BookAllocationView } from '@/lib/actions/book-exposure'
+import type { PromotionPipelineRow } from '@/lib/actions/promotion-readiness'
 import { AIStrategiesClient } from './ai-strategies-client'
 import { BookAllocationPanel } from './BookAllocationPanel'
+import { PromotionPipelinePanel } from './PromotionPipelinePanel'
 
 // ─── Tabs shell ───────────────────────────────────────────────────────────────
 
@@ -38,10 +40,12 @@ export function StrategiesTabs({
   rows,
   configureProps,
   bookAllocation = null,
+  promotionPipeline = [],
 }: {
   rows: StrategyHealthRow[]
   configureProps: AIStrategiesProps
   bookAllocation?: BookAllocationView | null
+  promotionPipeline?: PromotionPipelineRow[]
 }) {
   const [tab, setTab] = useState<'health' | 'configure'>('health')
 
@@ -72,6 +76,7 @@ export function StrategiesTabs({
         ? (
           <div className="space-y-3">
             {bookAllocation && <BookAllocationPanel data={bookAllocation} />}
+            <PromotionPipelinePanel rows={promotionPipeline} />
             <HealthBoard rows={rows} />
           </div>
         )
