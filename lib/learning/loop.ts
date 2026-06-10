@@ -15,6 +15,7 @@
  */
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBarsReal, normaliseSymbolForGrading } from '@/lib/market-data'
+import { roundTripCostBps } from '@/lib/costs/transaction-costs'
 import { scoreStrategies, type StrategyScore, type ScoringRow } from './scorer'
 import {
   loadWeightsForUser,
@@ -122,7 +123,12 @@ async function gradeOutcomes(userId: string): Promise<number> {
 
       const entryPrice = assetBars[0].close
       const exitPrice  = assetBars[assetBars.length - 1].close
-      const actual_return = (exitPrice - entryPrice) / entryPrice
+      // Bar closes are frictionless midpoints — net out the round-trip cost
+      // (fee + spread both ways) so grading matches what a real fill earns.
+      // Pass 1 (paper positions) already paid slippage at fill time, so this
+      // adjustment applies only to bar-graded decisions.
+      const grossReturn = (exitPrice - entryPrice) / entryPrice
+      const actual_return = grossReturn - roundTripCostBps(assetClass) / 10_000
       const bench_return  = benchBars.length >= 2
         ? (benchBars[benchBars.length - 1].close - benchBars[0].close) / benchBars[0].close
         : 0

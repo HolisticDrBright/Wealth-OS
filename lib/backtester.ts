@@ -22,6 +22,13 @@ export interface PriceBar {
 export interface BacktestConfig {
   job: BacktestJob
   bars: PriceBar[]   // caller supplies historical bars
+  /**
+   * One-way transaction cost in bps of notional (fee + half-spread), charged
+   * on every fill. Defaults to the stocks model (4 bps). Pass the value from
+   * lib/costs/transaction-costs.ts oneWayCostBps() for other asset classes.
+   * Zero-cost backtests systematically overstate high-turnover strategies.
+   */
+  oneWayCostBps?: number
 }
 
 export interface BacktestOutput {
@@ -130,6 +137,8 @@ function kronosEnabled(): boolean {
 
 export async function runBacktest(config: BacktestConfig): Promise<BacktestOutput> {
   const { job, bars } = config
+  // Buys fill above close, sells below — each side pays fee + half-spread.
+  const costFrac = (config.oneWayCostBps ?? 4) / 10_000
 
   if (!bars.length) {
     return {
@@ -212,7 +221,8 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
           if (!targetSymbols.has(sym)) {
             const bar = dayBars.get(sym)
             if (bar && pos.quantity > 0) {
-              const proceeds = pos.quantity * bar.close
+              const fillPrice = bar.close * (1 - costFrac)
+              const proceeds = pos.quantity * fillPrice
               const pnl = proceeds - pos.quantity * pos.avg_cost
               cash += proceeds
               trades.push({
@@ -220,7 +230,7 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
                 symbol: sym,
                 action: 'sell',
                 quantity: pos.quantity,
-                price: bar.close,
+                price: fillPrice,
                 notional: proceeds,
                 pnl,
               })
@@ -241,25 +251,27 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
             if (Math.abs(diff) < 50) continue // ignore tiny adjustments
 
             if (diff > 0 && cash >= diff) {
-              const qty = diff / bar.close
-              cash -= qty * bar.close
+              const fillPrice = bar.close * (1 + costFrac)
+              const qty = diff / fillPrice
+              cash -= qty * fillPrice
               if (existing) {
                 const totalQty = existing.quantity + qty
-                existing.avg_cost = (existing.avg_cost * existing.quantity + bar.close * qty) / totalQty
+                existing.avg_cost = (existing.avg_cost * existing.quantity + fillPrice * qty) / totalQty
                 existing.quantity = totalQty
               } else {
-                positions.set(sym, { symbol: sym, quantity: qty, avg_cost: bar.close })
+                positions.set(sym, { symbol: sym, quantity: qty, avg_cost: fillPrice })
               }
-              trades.push({ date, symbol: sym, action: 'buy', quantity: qty, price: bar.close, notional: qty * bar.close })
+              trades.push({ date, symbol: sym, action: 'buy', quantity: qty, price: fillPrice, notional: qty * fillPrice })
             } else if (diff < 0 && existing) {
-              const sellQty = Math.min(Math.abs(diff) / bar.close, existing.quantity)
+              const fillPrice = bar.close * (1 - costFrac)
+              const sellQty = Math.min(Math.abs(diff) / fillPrice, existing.quantity)
               if (sellQty > 0) {
-                const proceeds = sellQty * bar.close
+                const proceeds = sellQty * fillPrice
                 const pnl = proceeds - sellQty * existing.avg_cost
                 cash += proceeds
                 existing.quantity -= sellQty
                 if (existing.quantity < 0.0001) positions.delete(sym)
-                trades.push({ date, symbol: sym, action: 'sell', quantity: sellQty, price: bar.close, notional: proceeds, pnl })
+                trades.push({ date, symbol: sym, action: 'sell', quantity: sellQty, price: fillPrice, notional: proceeds, pnl })
               }
             }
           }

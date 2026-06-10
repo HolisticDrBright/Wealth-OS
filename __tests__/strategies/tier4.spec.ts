@@ -36,7 +36,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data: Array.from({ length: 5 }, () => ({ brier_score: 0.1 })), error: null }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data: Array.from({ length: 5 }, () => ({ brier_score: 0.1 })), error: null }) }) }),
           }),
         }),
       }),
@@ -53,7 +53,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data: highBrierData, error: null }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data: highBrierData, error: null }) }) }),
           }),
         }),
       }),
@@ -72,7 +72,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data: lowBrierData, error: null }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data: lowBrierData, error: null }) }) }),
           }),
         }),
       }),
@@ -90,7 +90,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data: neutralData, error: null }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data: neutralData, error: null }) }) }),
           }),
         }),
       }),
@@ -106,7 +106,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data: null, error: new Error('db error') }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data: null, error: new Error('db error') }) }) }),
           }),
         }),
       }),
@@ -123,7 +123,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data, error: null }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data, error: null }) }) }),
           }),
         }),
       }),
@@ -140,7 +140,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data, error: null }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data, error: null }) }) }),
           }),
         }),
       }),
@@ -157,7 +157,7 @@ describe('T4.1 getRollingBrier', () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            gte: () => Promise.resolve({ data, error: null }),
+            gte: () => ({ order: () => ({ limit: () => Promise.resolve({ data, error: null }) }) }),
           }),
         }),
       }),

@@ -14,6 +14,8 @@ export interface WalkForwardConfig {
   trainDays?: number
   /** Test window in trading days, default 63 (1 quarter) */
   testDays?: number
+  /** One-way transaction cost in bps, forwarded to every window's backtest. */
+  oneWayCostBps?: number
 }
 
 export interface WalkForwardWindow {
@@ -39,7 +41,7 @@ export interface WalkForwardOutput {
 }
 
 export async function runWalkForward(config: WalkForwardConfig): Promise<WalkForwardOutput> {
-  const { job, bars, trainDays = 252, testDays = 63 } = config
+  const { job, bars, trainDays = 252, testDays = 63, oneWayCostBps } = config
 
   const allDates = [...new Set(bars.map(b => b.date))].sort()
   const windows: WalkForwardWindow[] = []
@@ -58,8 +60,8 @@ export async function runWalkForward(config: WalkForwardConfig): Promise<WalkFor
     const testJob = { ...job, start_date: testStart, end_date: testEnd }
 
     const [trainOut, testOut] = await Promise.all([
-      runBacktest({ job: trainJob, bars: trainBars }),
-      runBacktest({ job: testJob, bars: testBars }),
+      runBacktest({ job: trainJob, bars: trainBars, oneWayCostBps }),
+      runBacktest({ job: testJob, bars: testBars, oneWayCostBps }),
     ])
 
     windows.push({

@@ -11,13 +11,16 @@
  * across all market regimes, while hit-rate-only models overfit.
  */
 import { MIN_SAMPLES } from './weights'
+import { roundTripCostBps } from '@/lib/costs/transaction-costs'
 
 export interface ScoringRow {
   strategy: string
   confidence: number        // predicted prob of going up [0, 1]
   actual_direction: number  // 0 or 1
-  actual_return: number     // actual % return over horizon
+  actual_return: number     // actual % return over horizon (gross of costs)
   alpha_vs_benchmark: number
+  /** Asset class for cost netting. Omitted → no cost adjustment (legacy rows). */
+  assetClass?: string
 }
 
 export interface StrategyScore {
@@ -63,8 +66,13 @@ export function scoreStrategies(rows: ScoringRow[]): StrategyScore[] {
       (o.confidence >= 0.5 ? 1 : 0) === o.actual_direction
     ).length / n
 
-    const avg_return = outcomes.reduce((s, o) => s + o.actual_return, 0) / n
-    const avg_alpha = outcomes.reduce((s, o) => s + o.alpha_vs_benchmark, 0) / n
+    // Net returns of round-trip transaction costs (fee + spread) so the score
+    // reflects what a real fill would have earned, not the frictionless edge.
+    // A strategy that "wins" gross but loses net should rank below cash.
+    const costAdj = (o: ScoringRow) =>
+      o.assetClass ? roundTripCostBps(o.assetClass) / 10_000 : 0
+    const avg_return = outcomes.reduce((s, o) => s + o.actual_return - costAdj(o), 0) / n
+    const avg_alpha = outcomes.reduce((s, o) => s + o.alpha_vs_benchmark - costAdj(o), 0) / n
 
     // Clip return/alpha to ±3% and normalize to [-1, 1]
     const alpha_norm = Math.max(-1, Math.min(1, avg_alpha / 0.03))

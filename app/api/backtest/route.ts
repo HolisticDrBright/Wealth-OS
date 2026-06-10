@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError } from '@/lib/api'
 import { runBacktest } from '@/lib/backtester'
+import { oneWayCostBps } from '@/lib/costs/transaction-costs'
 import { runWalkForward, runMonteCarlo, type WalkForwardConfig } from '@/lib/backtester-advanced'
 import { computePortfolioReturns } from '@/lib/risk-engine'
 import { getBarsForSymbols } from '@/lib/market-data'
@@ -104,7 +105,12 @@ export async function POST(req: NextRequest) {
       metadata: {},
     }
 
-    const { result, error: btError } = await runBacktest({ job: typedJob, bars })
+    // Charge realistic venue costs — zero-cost backtests overstate turnover-heavy
+    // strategies. Job asset_class uses singular 'stock'; cost model uses 'stocks'.
+    const costClass = asset_class === 'stock' ? 'stocks' : asset_class
+    const { result, error: btError } = await runBacktest({
+      job: typedJob, bars, oneWayCostBps: oneWayCostBps(costClass),
+    })
 
     if (btError) {
       await admin.from('backtest_jobs')
@@ -128,7 +134,7 @@ export async function POST(req: NextRequest) {
     // Optional: walk-forward analysis
     let walkForwardOutput = null
     if (run_walk_forward) {
-      const wfConfig: WalkForwardConfig = { job: typedJob, bars }
+      const wfConfig: WalkForwardConfig = { job: typedJob, bars, oneWayCostBps: oneWayCostBps(costClass) }
       walkForwardOutput = await runWalkForward(wfConfig).catch(() => null)
     }
 

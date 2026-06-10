@@ -1,8 +1,14 @@
 /**
  * Rolling Brier score computation for adaptive position sizing (T4.1).
  *
- * Fetches the last N days of graded outcomes for a strategy and returns
- * a sizing multiplier:
+ * Uses a TRADE-COUNT window (last N graded outcomes) rather than a calendar
+ * window: a strategy that trades 3×/month would only ever have ~3 samples in
+ * a 30-day window, making the estimate pure noise. The last-20-outcomes window
+ * gives every strategy the same statistical footing regardless of frequency.
+ * A calendar lookback cap (180 days) still applies so ancient outcomes from a
+ * since-changed market can't dominate.
+ *
+ * Sizing multiplier:
  *   brierScore > 0.25  → poorly calibrated → 0.5× size
  *   brierScore < 0.18  → well calibrated   → 1.25× size
  *   otherwise          → neutral            → 1.0×
@@ -14,6 +20,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface RollingBrierResult {
   strategyKey: string
+  /** Number of most-recent graded outcomes the score was computed over. */
+  windowTrades: number
+  /** @deprecated retained for old callers; mirrors the calendar cap. */
   windowDays: number
   brierScore: number
   sampleCount: number
@@ -21,28 +30,37 @@ export interface RollingBrierResult {
 }
 
 const MIN_SAMPLES = 10
+const WINDOW_TRADES = 20
+const MAX_LOOKBACK_DAYS = 180
 
 export async function getRollingBrier(
   supabase: SupabaseClient,
   strategyKey: string,
-  windowDays = 30
+  windowTrades = WINDOW_TRADES
 ): Promise<RollingBrierResult | null> {
-  const since = new Date(Date.now() - windowDays * 86_400_000).toISOString()
+  const since = new Date(Date.now() - MAX_LOOKBACK_DAYS * 86_400_000).toISOString()
 
-  // Join decision_log with outcome_log via decision_id
+  // Join decision_log with outcome_log via decision_id; newest first so the
+  // limit keeps the most recent outcomes.
   const { data, error } = await (supabase as unknown as {
     from: (t: string) => {
       select: (s: string) => {
         eq: (a: string, b: unknown) => {
-          gte: (a: string, b: string) => Promise<{ data: unknown[] | null; error: unknown }>
+          gte: (a: string, b: string) => {
+            order: (c: string, o: { ascending: boolean }) => {
+              limit: (n: number) => Promise<{ data: unknown[] | null; error: unknown }>
+            }
+          }
         }
       }
     }
   })
     .from('outcome_log')
-    .select('brier_score, decision:decision_log!inner(strategy, created_at)')
+    .select('brier_score, created_at, decision:decision_log!inner(strategy, created_at)')
     .eq('decision.strategy', strategyKey)
-    .gte('decision.created_at', since)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(windowTrades)
 
   if (error || !data || data.length < MIN_SAMPLES) return null
 
@@ -61,7 +79,8 @@ export async function getRollingBrier(
 
   return {
     strategyKey,
-    windowDays,
+    windowTrades: brierScores.length,
+    windowDays: MAX_LOOKBACK_DAYS,
     brierScore,
     sampleCount: brierScores.length,
     sizingMultiplier,

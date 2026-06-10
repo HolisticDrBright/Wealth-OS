@@ -28,8 +28,15 @@ export const STRATEGY_FLOORS: Record<string, number> = {
 export const MIN_WEIGHT = 0.02
 export const MAX_WEIGHT = 0.50
 
-/** Max weight change per learning pass — prevents wild swings from one bad week */
-export const MAX_CHANGE_PER_CYCLE = 0.08
+/**
+ * Max weight change per learning pass — asymmetric by design.
+ * Upgrades are slow (one good week proves little), downgrades are fast
+ * (a deteriorating strategy compounds losses while we wait for confirmation).
+ */
+export const MAX_INCREASE_PER_CYCLE = 0.08
+export const MAX_DECREASE_PER_CYCLE = 0.25
+/** @deprecated kept for callers that referenced the old symmetric cap */
+export const MAX_CHANGE_PER_CYCLE = MAX_INCREASE_PER_CYCLE
 
 /** Minimum resolved outcomes before adjusting a strategy's weight */
 export const MIN_SAMPLES = 3
@@ -113,7 +120,8 @@ export function softmax(
 
 /**
  * Evolve current weights toward target with capped per-cycle change.
- * Prevents one bad week from obliterating a strategy's weight.
+ * Increases are capped tighter than decreases: one good week shouldn't
+ * earn much capital, but a deteriorating strategy must shed it quickly.
  * Result is renormalized to sum to 1.
  */
 export function clampEvolution(
@@ -126,7 +134,7 @@ export function clampEvolution(
   for (const k of keys) {
     const cur = current[k] ?? MIN_WEIGHT
     const tgt = target[k] ?? cur
-    const delta = Math.max(-MAX_CHANGE_PER_CYCLE, Math.min(MAX_CHANGE_PER_CYCLE, tgt - cur))
+    const delta = Math.max(-MAX_DECREASE_PER_CYCLE, Math.min(MAX_INCREASE_PER_CYCLE, tgt - cur))
     const floor = STRATEGY_FLOORS[k] ?? MIN_WEIGHT
     result[k] = Math.max(floor, Math.min(MAX_WEIGHT, cur + delta))
   }
