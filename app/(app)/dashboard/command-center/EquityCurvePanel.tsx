@@ -50,7 +50,7 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
         />
       ) : (
         <div className="space-y-2">
-          <div className="h-44">
+          <div className="h-44" style={{ minHeight: 176 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data.points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
