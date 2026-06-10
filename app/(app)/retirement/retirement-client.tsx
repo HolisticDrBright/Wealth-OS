@@ -8,16 +8,20 @@ import { upsertRetirementPlan } from '@/lib/actions/retirement'
 import { formatCurrency } from '@/lib/utils'
 import type { RetirementPlan } from '@/lib/types'
 import type { RetirementSummary } from '@/lib/retirement-calculator'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
-import { CheckCircle2, AlertCircle, TrendingUp, PiggyBank, Brain } from 'lucide-react'
+import type { MonteCarloResult } from '@/lib/retirement/monte-carlo'
+import type { WithdrawalYear } from '@/lib/retirement/withdrawal-sequencing'
+import { AreaChart, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
+import { CheckCircle2, AlertCircle, TrendingUp, PiggyBank, Brain, Dices, ArrowDownToLine } from 'lucide-react'
 
 interface Props {
   plan: RetirementPlan | null
   summary: RetirementSummary | null
   projection: Array<{ year: number; balance: number; phase: string }>
+  monteCarlo: MonteCarloResult | null
+  withdrawalFirstYear: WithdrawalYear | null
 }
 
-export function RetirementClient({ plan: initialPlan, summary: initialSummary, projection: initialProjection }: Props) {
+export function RetirementClient({ plan: initialPlan, summary: initialSummary, projection: initialProjection, monteCarlo, withdrawalFirstYear }: Props) {
   const [plan, setPlan] = useState(initialPlan)
   const [summary, setSummary] = useState(initialSummary)
   const [projection, setProjection] = useState(initialProjection)
@@ -72,6 +76,31 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
   const yearsToRetirement = Math.max(0, (plan?.target_retirement_age ?? 65) - (plan?.current_age ?? 35))
   const retirementYear = projection.findIndex(p => p.phase === 'retirement')
 
+  // Monte Carlo derived view data
+  const successPct = monteCarlo ? monteCarlo.successProbability * 100 : null
+  const successColor = successPct === null
+    ? 'text-gray-400'
+    : successPct >= 75 ? 'text-emerald-400' : successPct >= 50 ? 'text-amber-400' : 'text-red-400'
+  const fanData = monteCarlo?.bands.map(b => ({
+    age: b.age,
+    outer: [b.p10, b.p90] as [number, number],
+    inner: [b.p25, b.p75] as [number, number],
+    median: b.p50,
+  })) ?? []
+
+  // Withdrawal-order rows for the first retirement year
+  const withdrawalRows = withdrawalFirstYear ? [
+    { label: '1. Taxable brokerage', sub: 'Long-term capital gains rates', amount: withdrawalFirstYear.fromTaxable },
+    {
+      label: '2. Traditional 401(k) / IRA',
+      sub: withdrawalFirstYear.rmdForced > 0
+        ? `Ordinary income — includes ${formatCurrency(withdrawalFirstYear.rmdForced)} forced RMD`
+        : 'Ordinary income — RMDs forced from age 73',
+      amount: withdrawalFirstYear.fromTraditional,
+    },
+    { label: '3. Roth IRA', sub: 'Tax-free — preserved last', amount: withdrawalFirstYear.fromRoth },
+  ] : []
+
   return (
     <div className="space-y-6">
       {/* Summary cards */}
@@ -101,11 +130,111 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
         </div>
       )}
 
-      {/* Projection chart */}
+      {/* Monte Carlo simulation */}
+      {monteCarlo && successPct !== null && (
+        <Card>
+          <div className="p-6">
+            <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Dices className="h-4 w-4 text-indigo-400" />
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Monte Carlo Simulation</p>
+                </div>
+                <p className={`text-3xl font-bold ${successColor}`}>{successPct.toFixed(0)}%</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Success probability — money lasts to age {monteCarlo.endAge}
+                  {monteCarlo.medianDepletionAge !== null && (
+                    <span className="text-red-400/70"> · failed paths typically deplete at age {monteCarlo.medianDepletionAge}</span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                {[
+                  { label: '10–90th pct', className: 'bg-indigo-500/20' },
+                  { label: '25–75th pct', className: 'bg-indigo-500/40' },
+                  { label: 'Median', className: 'bg-indigo-400' },
+                ].map(({ label, className }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${className}`} />
+                    <span className="text-gray-400">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={fanData}>
+                  <XAxis dataKey="age" tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={v => `${v}`} />
+                  <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={v => `$${(v / 1e6).toFixed(1)}M`} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
+                    formatter={(value, name) => {
+                      if (Array.isArray(value)) {
+                        return [`${formatCurrency(Number(value[0]))} – ${formatCurrency(Number(value[1]))}`, name === 'outer' ? '10–90th pct' : '25–75th pct']
+                      }
+                      return [formatCurrency(Number(value)), 'Median']
+                    }}
+                    labelFormatter={v => `Age ${v}`}
+                  />
+                  {plan && (
+                    <ReferenceLine x={plan.target_retirement_age} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Retire', fill: '#f59e0b', fontSize: 11 }} />
+                  )}
+                  <Area type="monotone" dataKey="outer" stroke="none" fill="#6366f1" fillOpacity={0.15} activeDot={false} />
+                  <Area type="monotone" dataKey="inner" stroke="none" fill="#6366f1" fillOpacity={0.3} activeDot={false} />
+                  <Line type="monotone" dataKey="median" stroke="#818cf8" strokeWidth={2} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-gray-600 mt-3">
+              Based on {monteCarlo.paths.toLocaleString()} simulated market paths · returns N({plan?.expected_return_pct ?? 7}%, {monteCarlo.returnStdevPct}%) · inflation N(3%, 1%)
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Withdrawal order (first retirement year) */}
+      {withdrawalFirstYear && (
+        <Card>
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <ArrowDownToLine className="h-4 w-4 text-indigo-400" />
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Withdrawal Order</p>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Tax-optimized sequencing for your first retirement year (age {withdrawalFirstYear.age})
+            </p>
+            <div className="space-y-3">
+              {withdrawalRows.map(({ label, sub, amount }) => (
+                <div key={label} className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-white">{label}</p>
+                    <p className="text-xs text-gray-500">{sub}</p>
+                  </div>
+                  <p className={`text-sm font-semibold ${amount > 0 ? 'text-white' : 'text-gray-600'}`}>
+                    {formatCurrency(amount)}
+                  </p>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-4 border-t border-white/5 pt-3">
+                <p className="text-xs text-gray-500">Estimated tax (22% ordinary / 15% LTCG assumed)</p>
+                <p className="text-sm font-semibold text-amber-400">{formatCurrency(withdrawalFirstYear.estimatedTax)}</p>
+              </div>
+              {withdrawalFirstYear.shortfall > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs text-red-400">Unfunded need in year one</p>
+                  <p className="text-sm font-semibold text-red-400">{formatCurrency(withdrawalFirstYear.shortfall)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Deterministic projection chart (secondary view) */}
       {projection.length > 0 && (
         <Card>
           <div className="p-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Portfolio Projection</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Deterministic Projection (fixed {plan?.expected_return_pct ?? 7}% return)</p>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={projection}>

@@ -11,6 +11,8 @@ import { formatCurrency } from '@/lib/utils'
 import { deleteTransaction } from '@/lib/actions/transactions'
 import { deleteBudget } from '@/lib/actions/budgets'
 import type { Transaction, Budget } from '@/lib/types'
+import type { MonthlyCashFlowPoint } from '@/lib/savings/cash-flow'
+import { IDLE_CASH_MIN_GAP_USD, type IdleCashSummary } from '@/lib/savings/cash-sweep'
 import {
   BarChart,
   Bar,
@@ -20,24 +22,18 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { ArrowUpRight, ArrowDownRight, AlertTriangle, Plus, Trash2, PlusCircle, Info } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, AlertTriangle, Plus, Trash2, PlusCircle, Info, Banknote } from 'lucide-react'
 
 interface Props {
   transactions: Transaction[]
   budgets: Budget[]
   currentMonth: string
   isDemo: boolean
+  cashFlow: MonthlyCashFlowPoint[]
+  idleCash: IdleCashSummary
 }
 
-const cashFlowMonths = [
-  { month: 'Oct', income: 9200, expenses: 3800 },
-  { month: 'Nov', income: 9400, expenses: 4100 },
-  { month: 'Dec', income: 11200, expenses: 5200 },
-  { month: 'Jan', income: 9500, expenses: 3900 },
-  { month: 'Feb', income: 9700, expenses: 4050 },
-]
-
-export function BudgetClient({ transactions, budgets, currentMonth, isDemo }: Props) {
+export function BudgetClient({ transactions, budgets, currentMonth, isDemo, cashFlow, idleCash }: Props) {
   const [showTxForm, setShowTxForm] = useState(false)
   const [showBudgetForm, setShowBudgetForm] = useState(false)
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
@@ -48,10 +44,9 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo }: Pr
   const totalBudgeted = budgets.reduce((s, b) => s + b.monthly_limit, 0)
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0)
 
-  const cashFlowData = [
-    ...cashFlowMonths,
-    { month: 'Mar', income: monthlyIncome, expenses: monthlyExpenses },
-  ]
+  // Real monthly aggregates from the transactions table (last 6 months).
+  const monthsWithData = cashFlow.filter(m => m.hasData).length
+  const showIdleCash = idleCash.totalAnnualGapUsd > IDLE_CASH_MIN_GAP_USD
 
   function handleDeleteTx(id: string) {
     if (!confirm('Delete this transaction?')) return
@@ -101,32 +96,79 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo }: Pr
         </Card>
       </div>
 
+      {/* Idle Cash */}
+      {showIdleCash && (
+        <Card className="border-amber-500/30">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
+              <Banknote className="h-4.5 w-4.5 text-amber-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-sm font-semibold text-white">Idle cash detected</p>
+                <Badge variant="warning">{formatCurrency(idleCash.totalAnnualGapUsd)}/yr left on the table</Badge>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                {formatCurrency(idleCash.totalIdleCash)} in cash earning well below the {idleCash.benchmarkYieldPct}% T-bill/HYSA benchmark.
+              </p>
+              <div className="mt-3 space-y-1.5">
+                {idleCash.opportunities.slice(0, 3).map(opp => (
+                  <div key={opp.assetId} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-300 truncate">{opp.name} · {formatCurrency(opp.balance)}</span>
+                    <span className="text-amber-400 font-medium shrink-0 ml-3">+{formatCurrency(opp.annualYieldGapUsd)}/yr</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Cash Flow + Budget Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Cash Flow Trend</CardTitle>
-            <CardDescription>Income vs. Expenses — last 6 months</CardDescription>
+            <CardDescription>
+              Income vs. Expenses — last 6 months from your transactions
+              {monthsWithData > 0 && monthsWithData < cashFlow.length && (
+                <span className="text-amber-400/80"> · {monthsWithData} of {cashFlow.length} months have data</span>
+              )}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={cashFlowData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fill: '#6b7280', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  formatter={(value) => [formatCurrency(Number(value)), '']}
-                />
-                <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} name="Income" />
-                <Bar dataKey="expenses" fill="#6366f1" radius={[4, 4, 0, 0]} name="Expenses" />
-              </BarChart>
-            </ResponsiveContainer>
+            {monthsWithData === 0 ? (
+              <div className="flex h-[240px] flex-col items-center justify-center text-center">
+                <p className="text-sm text-gray-500 mb-1">No transaction history yet</p>
+                <p className="text-xs text-gray-600 mb-4">Add income and expenses to see your real cash-flow trend</p>
+                <Button size="sm" onClick={() => setShowTxForm(true)}>
+                  <Plus className="h-4 w-4" /> Add Transaction
+                </Button>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={cashFlow}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fill: '#6b7280', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                    formatter={(value) => [formatCurrency(Number(value)), '']}
+                    labelFormatter={(label, payload) => {
+                      const point = payload?.[0]?.payload as MonthlyCashFlowPoint | undefined
+                      return point && !point.hasData ? `${label} — no data` : String(label)
+                    }}
+                  />
+                  <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} name="Income" />
+                  <Bar dataKey="expenses" fill="#6366f1" radius={[4, 4, 0, 0]} name="Expenses" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { GoalForm } from '@/components/forms/goal-form'
+import { ContributionWaterfallCard } from './contribution-waterfall-card'
 import { formatCurrency } from '@/lib/utils'
 import { deleteGoal } from '@/lib/actions/goals'
 import type { Goal } from '@/lib/types'
@@ -66,9 +67,10 @@ function buildRetirementProjection(startValue: number) {
 interface Props {
   goals: Goal[]
   isDemo: boolean
+  waterfallDefaults?: { age?: number; k401?: number }
 }
 
-export function PlanningClient({ goals: initialGoals, isDemo }: Props) {
+export function PlanningClient({ goals: initialGoals, isDemo, waterfallDefaults }: Props) {
   const [goals, setGoals] = useState<Goal[]>(initialGoals)
   const [showForm, setShowForm] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
@@ -210,6 +212,12 @@ export function PlanningClient({ goals: initialGoals, isDemo }: Props) {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Contribution Waterfall */}
+      <ContributionWaterfallCard
+        defaultAge={waterfallDefaults?.age}
+        defaultK401={waterfallDefaults?.k401}
+      />
 
       {/* Goals Grid */}
       <div>
