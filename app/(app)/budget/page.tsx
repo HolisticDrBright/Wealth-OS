@@ -8,6 +8,9 @@ import { aggregateMonthlyCashFlow } from '@/lib/savings/cash-flow'
 import { detectIdleCash } from '@/lib/savings/cash-sweep'
 import { mockBudgets, mockTransactions } from '@/lib/mock-data'
 
+// Reads per-user data via cookies — must render per-request, not statically.
+export const dynamic = 'force-dynamic'
+
 export default async function BudgetPage() {
   const currentMonth = new Date().toISOString().slice(0, 7)
   const [transactionsData, budgetsData, cashFlowTransactions, assets] = await Promise.all([
