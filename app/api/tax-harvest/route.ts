@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, getBearerToken } from '@/lib/api'
-import { checkWashSaleRisk, suggestReplacement } from '@/lib/wash-sale-checker'
+import { checkWashSaleRisk } from '@/lib/wash-sale-checker'
+import { suggestReplacement } from '@/lib/tax/replacement'
 
 async function getUserId(req: NextRequest): Promise<string | null> {
   const token = getBearerToken(req)

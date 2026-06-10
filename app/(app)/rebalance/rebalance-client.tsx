@@ -6,10 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 import { upsertTarget, updateSuggestionStatus } from '@/lib/actions/rebalance'
 import { computeRebalanceTrades, DEFAULT_TARGETS } from '@/lib/rebalance-engine'
-import { formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import type { Asset, PortfolioTarget, RebalanceSuggestion } from '@/lib/types'
-import { RefreshCw, TrendingUp, TrendingDown, CheckCircle2, XCircle, Play, Sparkles } from 'lucide-react'
+import { RefreshCw, TrendingUp, TrendingDown, CheckCircle2, XCircle, Play, Sparkles, AlertTriangle, Ban } from 'lucide-react'
 import type { OptimizationStrategy } from '@/lib/optimizer'
+
+/** Tax columns added by migration 20260610c — kept local to avoid touching shared types */
+type TaxAwareSuggestion = RebalanceSuggestion & {
+  tax_drag_usd?: number | null
+  tax_warning?: string | null
+  blocked_reason?: string | null
+}
 
 interface OptimizeResult {
   weights: Record<string, number>
@@ -36,7 +43,7 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
       (initialTargets.length ? initialTargets : DEFAULT_TARGETS).map(t => [t.asset_class, t.target_pct])
     )
   )
-  const [suggestions, setSuggestions] = useState(initialSuggestions)
+  const [suggestions, setSuggestions] = useState<TaxAwareSuggestion[]>(initialSuggestions)
   const [isRunning, setIsRunning] = useState(false)
   const [runMsg, setRunMsg] = useState<string | null>(null)
   const [isSaving, startSave] = useTransition()
@@ -276,23 +283,51 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
           <div className="space-y-2">
             {pendingSuggestions.map(s => (
               <Card key={s.id}>
-                <div className="flex items-center gap-4 p-4">
-                  {s.action === 'buy'
-                    ? <TrendingUp className="h-5 w-5 text-emerald-400 shrink-0" />
-                    : <TrendingDown className="h-5 w-5 text-red-400 shrink-0" />}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-white capitalize">
-                      {s.action.toUpperCase()} {s.asset_class}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {s.current_pct?.toFixed(1)}% → {s.target_pct?.toFixed(1)}%
-                      · Drift: {s.drift_pct && s.drift_pct > 0 ? '+' : ''}{s.drift_pct?.toFixed(1)}%
-                    </p>
+                <div className={cn('p-4', s.blocked_reason && 'opacity-80')}>
+                  <div className="flex items-center gap-4">
+                    {s.blocked_reason
+                      ? <Ban className="h-5 w-5 text-amber-400 shrink-0" />
+                      : s.action === 'buy'
+                        ? <TrendingUp className="h-5 w-5 text-emerald-400 shrink-0" />
+                        : <TrendingDown className="h-5 w-5 text-red-400 shrink-0" />}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-white capitalize">
+                          {s.action.toUpperCase()} {s.asset_class}
+                        </p>
+                        {s.tax_warning === 'short_term_gains' && (
+                          <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
+                            <AlertTriangle className="h-3 w-3" />
+                            Sells short-term gains
+                          </span>
+                        )}
+                        {s.tax_warning === 'harvests_losses' && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
+                            Harvests losses
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {s.current_pct?.toFixed(1)}% → {s.target_pct?.toFixed(1)}%
+                        · Drift: {s.drift_pct && s.drift_pct > 0 ? '+' : ''}{s.drift_pct?.toFixed(1)}%
+                        {s.action === 'sell' && s.tax_drag_usd != null && (
+                          <span className={cn('ml-2', s.tax_drag_usd > 0 ? 'text-amber-400' : 'text-emerald-400')}>
+                            · Est. tax drag: {formatCurrency(s.tax_drag_usd)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <p className="text-sm font-bold text-white">{formatCurrency(s.suggested_notional ?? 0)}</p>
+                    <button onClick={() => dismissSuggestion(s.id)} className="text-gray-600 hover:text-gray-400">
+                      <XCircle className="h-4 w-4" />
+                    </button>
                   </div>
-                  <p className="text-sm font-bold text-white">{formatCurrency(s.suggested_notional ?? 0)}</p>
-                  <button onClick={() => dismissSuggestion(s.id)} className="text-gray-600 hover:text-gray-400">
-                    <XCircle className="h-4 w-4" />
-                  </button>
+                  {s.blocked_reason && (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-200/80">{s.blocked_reason}</p>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}
