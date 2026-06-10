@@ -8,6 +8,9 @@ import { emptySkipCounts } from './types'
 import { getUserStateOfResidence, isVenueAllowedInState } from '@/lib/risk-profile/state-gate'
 import { STRATEGY_REGISTRY_CONFIG, type StrategyKey } from '@/lib/strategies/strategy-registry'
 import { checkPolymarketValidity } from './polymarket-validity'
+import { computeBookExposures, gateThroughBook } from '@/lib/risk/book-allocation'
+import { bookFor } from '@/lib/strategies/strategy-books'
+import { detectRegime } from '@/lib/regime/cross-asset-regime'
 
 const engine = new CIODecisionEngine()
 const broker = new PaperBroker()
@@ -70,6 +73,15 @@ export async function runPaperTradingPass(
 
   // Load user state once; used for venue gating below
   const userState = await getUserStateOfResidence(supabase, userId)
+
+  // Book-level risk allocation: live exposure per book + current regime.
+  // Both are defensive — failures fall back to neutral (no extra restriction
+  // beyond the existing controls, which all still apply).
+  const regime = await detectRegime().then(r => r.regime as string).catch(() => 'NEUTRAL')
+  const bookState = await computeBookExposures(supabase, userId).catch(() => ({
+    totalNotionalUsd: 0,
+    byBook: {} as Record<string, number>,
+  }))
 
   const allStrategyKeys = ALL_STRATEGIES.map(s => s.key as string)
 
@@ -160,10 +172,41 @@ export async function runPaperTradingPass(
             continue
           }
 
-          const fill = await broker.fill(opp, decision.size, userId, supabase)
+          // Book-level gate: regime rotation + book notional cap. Only ever
+          // reduces size — never bypasses or inflates upstream controls.
+          const book = bookFor(key)
+          const bookGate = gateThroughBook({
+            strategyKey: key,
+            proposedNotionalUsd: decision.size.notionalUsd,
+            regime,
+            totalNotionalUsd: bookState.totalNotionalUsd,
+            bookNotionalUsd: bookState.byBook[book] ?? 0,
+          })
+
+          if (!bookGate.allowed) {
+            skipped.positionCapBlocked++
+            skippedDetails.push(skipDetail(
+              key, opp.symbol, opp.assetClass, 'bookCapBlocked',
+              bookGate.reason ?? `${book} book budget exhausted.`,
+              opp.direction, opp.id,
+            ))
+            shadow.track(opp, 'positionCapBlocked', bookGate.reason, userId, supabase).catch(() => {})
+            continue
+          }
+
+          const sizedNotional = decision.size.notionalUsd * bookGate.multiplier
+          const gatedSize = bookGate.multiplier < 1
+            ? { ...decision.size, notionalUsd: sizedNotional, rationale: `${decision.size.rationale} | ${bookGate.reason}` }
+            : decision.size
+
+          const fill = await broker.fill(opp, gatedSize, userId, supabase)
 
           if (fill.status === 'opened') {
             positionsOpened++
+            // Keep book exposure current within this run so later
+            // opportunities see the notional we just added.
+            bookState.totalNotionalUsd += sizedNotional
+            bookState.byBook[book] = (bookState.byBook[book] ?? 0) + sizedNotional
           } else {
             // Map broker result status to skip counter
             const { status, reason } = fill

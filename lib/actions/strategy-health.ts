@@ -24,6 +24,7 @@ import {
   type ProfileKey,
 } from '@/lib/strategies/strategy-registry'
 import { toDisplayName, getMaturityMeta } from '@/lib/strategies/strategy-display'
+import { bookFor, type StrategyBook } from '@/lib/strategies/strategy-books'
 import { getRollingBrier } from '@/lib/learning/rolling-brier'
 import { getPnlByStrategy, getTradesByStrategy } from '@/lib/admin/paper-trading-queries'
 
@@ -34,6 +35,8 @@ export interface StrategyHealthRow {
   edgeType: EdgeType
   maturityStatus: StrategyMaturityStatus
   enabledInProfiles: ProfileKey[]
+  /** Multi-strat book this strategy belongs to (carry/convexity/trend/event/arb/info). */
+  book: StrategyBook
 
   // Per-user enablement
   isEnabled: boolean
@@ -231,6 +234,7 @@ export async function getStrategyHealthRows(): Promise<StrategyHealthRow[]> {
       edgeType: cfg.edgeType,
       maturityStatus: cfg.maturityStatus,
       enabledInProfiles: cfg.enabledInProfiles,
+      book: bookFor(key),
 
       isEnabled,
       paperEnabled,

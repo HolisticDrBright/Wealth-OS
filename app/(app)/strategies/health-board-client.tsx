@@ -24,8 +24,11 @@ import { EmptyState, InsufficientData } from '@/components/ui/states'
 import type {
   AssetClass, StrategyMaturityStatus,
 } from '@/lib/strategies/strategy-registry'
+import { ALL_BOOKS, BOOK_META, type StrategyBook } from '@/lib/strategies/strategy-books'
 import type { StrategyHealthRow } from '@/lib/actions/strategy-health'
+import type { BookAllocationView } from '@/lib/actions/book-exposure'
 import { AIStrategiesClient } from './ai-strategies-client'
+import { BookAllocationPanel } from './BookAllocationPanel'
 
 // ─── Tabs shell ───────────────────────────────────────────────────────────────
 
@@ -34,9 +37,11 @@ type AIStrategiesProps = ComponentProps<typeof AIStrategiesClient>
 export function StrategiesTabs({
   rows,
   configureProps,
+  bookAllocation = null,
 }: {
   rows: StrategyHealthRow[]
   configureProps: AIStrategiesProps
+  bookAllocation?: BookAllocationView | null
 }) {
   const [tab, setTab] = useState<'health' | 'configure'>('health')
 
@@ -64,7 +69,12 @@ export function StrategiesTabs({
       </div>
 
       {tab === 'health'
-        ? <HealthBoard rows={rows} />
+        ? (
+          <div className="space-y-3">
+            {bookAllocation && <BookAllocationPanel data={bookAllocation} />}
+            <HealthBoard rows={rows} />
+          </div>
+        )
         : <AIStrategiesClient {...configureProps} />}
     </div>
   )
@@ -112,6 +122,7 @@ function FilterGroup({ label, children }: { label: string; children: React.React
 
 function HealthBoard({ rows }: { rows: StrategyHealthRow[] }) {
   const [assetFilter, setAssetFilter] = useState<AssetClass | 'all'>('all')
+  const [bookFilter, setBookFilter] = useState<StrategyBook | 'all'>('all')
   const [maturityFilter, setMaturityFilter] = useState<StrategyMaturityStatus | 'all'>('all')
   const [enabledOnly, setEnabledOnly] = useState(false)
   const [paperOnly, setPaperOnly] = useState(false)
@@ -125,6 +136,7 @@ function HealthBoard({ rows }: { rows: StrategyHealthRow[] }) {
   const filtered = useMemo(() => {
     const out = rows.filter(r => {
       if (assetFilter !== 'all' && r.assetClass !== assetFilter) return false
+      if (bookFilter !== 'all' && r.book !== bookFilter) return false
       if (maturityFilter !== 'all' && r.maturityStatus !== maturityFilter) return false
       if (enabledOnly && !r.isEnabled) return false
       if (paperOnly && !r.paperEnabled) return false
@@ -154,7 +166,7 @@ function HealthBoard({ rows }: { rows: StrategyHealthRow[] }) {
       }
     })
     return out
-  }, [rows, assetFilter, maturityFilter, enabledOnly, paperOnly, liveEligibleOnly, needsReview, missingData, sortKey, sortDir])
+  }, [rows, assetFilter, bookFilter, maturityFilter, enabledOnly, paperOnly, liveEligibleOnly, needsReview, missingData, sortKey, sortDir])
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -174,6 +186,15 @@ function HealthBoard({ rows }: { rows: StrategyHealthRow[] }) {
           {ASSET_CLASSES.map(ac => (
             <Chip key={ac} active={assetFilter === ac} onClick={() => setAssetFilter(ac)}>
               {assetClassLabel(ac)}
+            </Chip>
+          ))}
+        </FilterGroup>
+
+        <FilterGroup label="Book">
+          <Chip active={bookFilter === 'all'} onClick={() => setBookFilter('all')}>All</Chip>
+          {ALL_BOOKS.map(b => (
+            <Chip key={b} active={bookFilter === b} onClick={() => setBookFilter(b)}>
+              {BOOK_META[b].label}
             </Chip>
           ))}
         </FilterGroup>

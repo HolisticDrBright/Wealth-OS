@@ -2,6 +2,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { StrategiesTabs } from './health-board-client'
 import { getallProfiles, getUserRiskProfile } from '@/lib/actions/risk-profile'
 import { getStrategyHealthRows } from '@/lib/actions/strategy-health'
+import { getBookAllocation } from '@/lib/actions/book-exposure'
 import { createClient } from '@/lib/supabase/server'
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { ProfileKey } from '@/lib/strategies/profile-params'
@@ -16,11 +17,12 @@ async function getStrategyDefinitions() {
 }
 
 export default async function StrategiesPage() {
-  const [profileData, userProfile, strategyDefs, healthRows] = await Promise.all([
+  const [profileData, userProfile, strategyDefs, healthRows, bookAllocation] = await Promise.all([
     getallProfiles(),
     getUserRiskProfile().catch(() => null),
     getStrategyDefinitions(),
     getStrategyHealthRows().catch(() => []),
+    getBookAllocation().catch(() => null),
   ])
 
   const defsWithEnv = strategyDefs.map(def => ({
@@ -34,6 +36,7 @@ export default async function StrategiesPage() {
       <Topbar title="AI Strategies" subtitle="Strategy health, enablement, and configuration" />
       <StrategiesTabs
         rows={healthRows}
+        bookAllocation={bookAllocation}
         configureProps={{
           profiles: profileData.profiles,
           userProfile,
