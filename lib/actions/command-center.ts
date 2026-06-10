@@ -21,10 +21,12 @@ import {
   getActivePaperPositions,
   getPaperTradingSummary,
   getLastPaperRun,
+  getPaperRunHistory,
   type PaperPosition,
   type PaperTradingSummary,
   type PaperRunView,
 } from '@/lib/actions/paper-trading'
+import { getEquityCurve, type EquityCurveView } from '@/lib/actions/equity-curve'
 import { getRiskSummary, getRiskControls, type RiskSummary } from '@/lib/actions/risk'
 import { getOpportunities } from '@/lib/actions/opportunities'
 import {
@@ -67,6 +69,7 @@ export interface PaperView {
   positions: PaperPosition[]
   summary: PaperTradingSummary
   lastRun: PaperRunView | null
+  runHistory: PaperRunView[]
 }
 
 export interface TrustEntry {
@@ -106,6 +109,7 @@ export interface CommandCenterData {
   noTrade: NoTradeEntry[]
   paper: PaperView
   shadow: ShadowPortfolioSummary | null
+  equityCurve: EquityCurveView | null
   allocationProfileKey: string
   allocationProfile: RiskProfileRow | null
   trust: TrustView
@@ -206,14 +210,15 @@ async function loadPaper(): Promise<PaperView> {
     hasData: false,
   }
   try {
-    const [positions, summary, lastRun] = await Promise.all([
+    const [positions, summary, lastRun, runHistory] = await Promise.all([
       getActivePaperPositions(),
       getPaperTradingSummary(),
       getLastPaperRun(),
+      getPaperRunHistory(30).catch(() => []),
     ])
-    return { positions, summary, lastRun }
+    return { positions, summary, lastRun, runHistory }
   } catch {
-    return { positions: [], summary: emptySummary, lastRun: null }
+    return { positions: [], summary: emptySummary, lastRun: null, runHistory: [] }
   }
 }
 
@@ -407,7 +412,7 @@ async function loadAiUsage(): Promise<AiUsageView> {
 // ─── Public entry point ─────────────────────────────────────────────────────
 
 export async function getCommandCenterData(): Promise<CommandCenterData> {
-  const [regime, risk, riskControls, opportunities, noTrade, paper, shadow, allocation, trust] =
+  const [regime, risk, riskControls, opportunities, noTrade, paper, shadow, equityCurve, allocation, trust] =
     await Promise.all([
       loadRegime(),
       loadRisk(),
@@ -416,6 +421,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
       loadNoTrade(),
       loadPaper(),
       loadShadow(),
+      getEquityCurve().catch(() => null),
       loadAllocation(),
       loadTrust(),
     ])
@@ -433,6 +439,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
     noTrade,
     paper,
     shadow,
+    equityCurve,
     allocationProfileKey: allocation.profileKey,
     allocationProfile: allocation.profile,
     trust,

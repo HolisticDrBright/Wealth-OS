@@ -3,6 +3,7 @@ import type { Opportunity, PositionSize } from '@/lib/strategies/pipeline-types'
 import type { AssetClass } from '@/lib/strategies/strategy-registry'
 import type { PaperFillResult } from './types'
 import { fetchCurrentPrice } from './price-feed'
+import { alertPositionClosed } from '@/lib/alerts/auto-alerts'
 
 // Realistic one-way slippage estimates per asset class (bps)
 const SLIPPAGE_BPS: Partial<Record<AssetClass, number>> = {
@@ -314,6 +315,15 @@ export class PaperBroker {
         notional_usd: pos.notional_usd,
         slippage_bps: slippageBps,
         metadata:     { exit_reason: exitReason, pnl_pct: realizedPct, pnl_usd: pnlUsd },
+      })
+
+      // Fire-and-forget alert so closes show up in /alerts without polling.
+      alertPositionClosed(supabase, userId, {
+        strategyKey: pos.strategy_key as string,
+        symbol: pos.symbol as string,
+        exitReason,
+        realizedPnlUsd: pnlUsd,
+        realizedPnlPct: realizedPct,
       })
 
       // Grade the decision using the actual outcome.

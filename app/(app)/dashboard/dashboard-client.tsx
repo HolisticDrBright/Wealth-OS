@@ -22,6 +22,8 @@ import { TrustPanel } from './command-center/TrustPanel'
 import { DecisionsPanel } from './command-center/DecisionsPanel'
 import { AiUsagePanel } from './command-center/AiUsagePanel'
 import { ShadowPortfolioPanel } from './command-center/ShadowPortfolioPanel'
+import { EquityCurvePanel } from './command-center/EquityCurvePanel'
+import { RunHistoryStrip } from './command-center/RunHistoryStrip'
 
 export function DashboardClient({ data }: { data: CommandCenterData }) {
   return (
@@ -32,6 +34,9 @@ export function DashboardClient({ data }: { data: CommandCenterData }) {
       {/* 2 — Portfolio risk status (full width, high priority) */}
       <RiskStatusPanel risk={data.risk} controls={data.riskControls} />
 
+      {/* 2.5 — Equity curve: cumulative P&L, real vs shadow */}
+      <EquityCurvePanel data={data.equityCurve} />
+
       {/* 3 — Today's best opportunities (full width) */}
       <OpportunitiesPanel opportunities={data.opportunities} />
 
@@ -41,8 +46,9 @@ export function DashboardClient({ data }: { data: CommandCenterData }) {
         <PaperTradesPanel paper={data.paper} />
       </div>
 
-      {/* 4.5 — Last paper run breakdown */}
+      {/* 4.5 — Last paper run breakdown + run history trend */}
       <PaperRunPanel lastRun={data.paper.lastRun} />
+      <RunHistoryStrip runs={data.paper.runHistory} />
 
       {/* 5 — Shadow portfolio: "were your gates right?" */}
       <ShadowPortfolioPanel data={data.shadow} />

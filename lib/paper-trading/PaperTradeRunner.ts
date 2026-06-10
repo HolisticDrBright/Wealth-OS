@@ -11,6 +11,7 @@ import { checkPolymarketValidity } from './polymarket-validity'
 import { computeBookExposures, gateThroughBook } from '@/lib/risk/book-allocation'
 import { bookFor } from '@/lib/strategies/strategy-books'
 import { detectRegime } from '@/lib/regime/cross-asset-regime'
+import { alertRegimeChange, alertRunErrors } from '@/lib/alerts/auto-alerts'
 
 const engine = new CIODecisionEngine()
 const broker = new PaperBroker()
@@ -257,6 +258,25 @@ export async function runPaperTradingPass(
     errors,
   }
 
+  // Auto-alerts: regime change since the previous run + degraded-feed errors.
+  // Both best-effort — never block the response.
+  try {
+    const { data: prevRun } = await supabase
+      .from('paper_trade_runs')
+      .select('regime')
+      .eq('user_id', userId)
+      .order('run_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const prevRegime = prevRun?.regime as string | null | undefined
+    if (prevRegime && prevRegime !== regime) {
+      alertRegimeChange(supabase, userId, prevRegime, regime)
+    }
+  } catch {
+    // regime column may not exist yet — alert is best-effort
+  }
+  alertRunErrors(supabase, userId, errors)
+
   // Persist run record (fire-and-forget — never blocks the response)
   supabase.from('paper_trade_runs').insert({
     user_id:             userId,
@@ -270,6 +290,7 @@ export async function runPaperTradingPass(
     skipped:             result.skipped,
     skipped_details:     result.skippedDetails,
     errors:              result.errors,
+    regime,
   }).then(({ error }) => {
     if (error) console.warn('[paper-trading] run record error:', error.message)
   })
