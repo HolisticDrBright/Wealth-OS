@@ -175,6 +175,27 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'learning', users: userIds.length, summary })
     }
 
+    if (task === 'advisory-staleness') {
+      // Flags tax_constants / kb_parameters unverified for >90 days — stale
+      // limits must surface as alerts, never silently produce outdated advice.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { listStaleConstants } = await import('@/lib/advisory/constants')
+      const stale = await listStaleConstants(supabase)
+      if (stale.length > 0) {
+        await supabase.from('alerts').insert({
+          type: 'advisory_constants_stale',
+          severity: 'warning',
+          title: `${stale.length} advisory constant(s) unverified for >90 days`,
+          message: stale.map(s => `${s.table}.${s.key} (${s.daysStale}d)`).join(', '),
+          created_at: new Date().toISOString(),
+        }).then(({ error }) => {
+          if (error) console.warn('[advisory-staleness] alert insert failed:', error.message)
+        })
+      }
+      return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
+    }
+
     if (task === 'news-sentiment') {
       const { createAdminClient } = await import('@/lib/supabase/admin')
       const supabase = createAdminClient()
