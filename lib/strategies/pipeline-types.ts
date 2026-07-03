@@ -117,6 +117,8 @@ export interface Decision {
   action: 'execute' | 'reduce_size' | 'block'
   reason?: string
   size?: PositionSize
+  /** Broker execution outcome when the engine ran the trade (non-paper mode). */
+  execution?: ExecutionResult
 }
 
 // ─── Position Monitor types ────────────────────────────────────────────────────

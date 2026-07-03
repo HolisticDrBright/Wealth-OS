@@ -491,13 +491,21 @@ Write a CIO synthesis as JSON:
       stopLossMultiplier: effectiveParams.stopLossMultiplier,
     }
 
-    const decision = { action: 'execute' as const, size }
+    const decision: import('@/lib/strategies/pipeline-types').Decision = { action: 'execute', size }
     await strat.logAudit(opp, decision, verdicts, supabase, userId)
-    // In paper mode the caller (PaperTradeRunner) handles the fill — skip real broker
+    // In paper mode the caller (PaperTradeRunner) handles the fill — skip real broker.
+    // Otherwise AWAIT execution: fire-and-forget swallowed broker failures and
+    // let decide() report 'execute' for trades that never happened.
     if (!options?.paperMode) {
-      strat.execute(opp, size, userId, supabase, cache).catch(err =>
-        console.error(`[CIO] execute failed for ${opp.symbol}:`, err)
-      )
+      try {
+        decision.execution = await strat.execute(opp, size, userId, supabase, cache)
+        if (decision.execution.status === 'failed') {
+          console.error(`[CIO] execute failed for ${opp.symbol}: ${decision.execution.error ?? 'unknown broker error'}`)
+        }
+      } catch (err) {
+        console.error(`[CIO] execute threw for ${opp.symbol}:`, err)
+        decision.execution = { status: 'failed', broker: 'unknown', error: err instanceof Error ? err.message : String(err) }
+      }
     }
     return decision
 
