@@ -106,7 +106,10 @@ INSERT INTO public.kb_parameters (key, value, description, source) VALUES
   ('scorp_min_distribution',       20000, 'Minimum profit left after salary for election to make sense', 'Advisory brief R1'),
   ('assumed_marginal_rate',        0.22,  'Assumed federal marginal rate for benefit estimates (overridable)', 'Mid-bracket default'),
   ('roth_annual_drag_saved_rate',  0.005, 'Estimated annual taxable-drag saved per Roth dollar', 'Tax-drag estimate'),
-  ('hdhp_consideration_confidence', 0.5,  'Confidence multiplier for the consider-an-HDHP card', 'Advisory brief R4')
+  ('hdhp_consideration_confidence', 0.5,  'Confidence multiplier for the consider-an-HDHP card', 'Advisory brief R4'),
+  ('contribution_escalator_step_pct', 1,  'Save More Tomorrow: +1%/yr contribution escalation', 'Thaler-Benartzi'),
+  ('contribution_escalator_cap_pct', 15,  'Escalator cap (% of pay)', 'Planner consensus'),
+  ('behavior_gap_rate',            0.012, 'Behavior gap cost estimate (fraction/yr)', 'Morningstar Mind the Gap 2025')
 ON CONFLICT (key) DO NOTHING;
 
 -- ── financial_profile ─────────────────────────────────────────────────────────

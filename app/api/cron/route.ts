@@ -196,6 +196,73 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
     }
 
+    if (task === 'sweep') {
+      // Monthly sweep evaluation (KB §6): derive sleeve state per user from
+      // paper positions + assets, run the trigger cascade, surface actions as
+      // alerts. Recommendations only — the engine never moves money.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { evaluateSweepTriggers } = await import('@/lib/advisory/sweep-engine')
+      const { loadKbParameters } = await import('@/lib/advisory/constants')
+      const params = await loadKbParameters(supabase)
+
+      const { data: users } = await supabase
+        .from('paper_positions').select('user_id').eq('status', 'open')
+      const userIds = [...new Set((users ?? []).map(r => r.user_id as string))]
+      let actionsTotal = 0
+
+      for (const uid of userIds) {
+        const [{ data: open }, { data: assets }, { data: flags }, { data: profile }] = await Promise.all([
+          supabase.from('paper_positions').select('asset_class, notional_usd').eq('user_id', uid).eq('status', 'open'),
+          supabase.from('assets').select('current_value').eq('user_id', uid),
+          supabase.from('system_flags').select('user_id, enabled').eq('key', 'trading_halted'),
+          supabase.from('financial_profile').select('monthly_essential_expenses_usd, liquid_cash_usd, income_stability').eq('user_id', uid).maybeSingle(),
+        ])
+        const investable = (assets ?? []).reduce((s, r) => s + ((r.current_value as number) ?? 0), 0)
+        if (investable <= 0) continue
+
+        const months = profile?.income_stability === 'self_employed' ? params.emergency_months_self_employed
+          : profile?.income_stability === 'variable' ? params.emergency_months_family
+          : params.emergency_months_w2
+        const byClass = new Map<string, number>()
+        for (const r of open ?? []) {
+          byClass.set(r.asset_class as string, (byClass.get(r.asset_class as string) ?? 0) + ((r.notional_usd as number) ?? 0))
+        }
+
+        const actions = evaluateSweepTriggers({
+          emergencyFundUsd: (profile?.liquid_cash_usd as number) ?? 0,
+          emergencyTargetUsd: months * ((profile?.monthly_essential_expenses_usd as number) ?? 0),
+          tradingHalted: (flags ?? []).some(f => f.enabled && (f.user_id === null || f.user_id === uid)),
+          investableAssetsUsd: investable,
+          sleeves: [...byClass.entries()].map(([key, valueUsd]) => ({
+            key, valueUsd,
+            floorUsd: 0, peakCushionUsd: 0,               // TIPP state not yet persisted per sleeve
+            initialBankrollUsd: 0, ratchetHwmUsd: 0,
+            sigmaRealized: null, sigmaTarget: null,
+            weightFraction: investable > 0 ? valueUsd / investable : 0,
+            tierCapFraction: investable < 100_000 ? params.sleeve_cap_mass_market : params.sleeve_cap_mass_affluent,
+            kellyCapFraction: params.kelly_fraction_max,
+            suspended: false,
+          })),
+          headroom: { iraUsd: 0, hsaUsd: 0, solo401kUsd: 0, daysToDeadline: 365 },
+          allocations: [],
+        }, params)
+
+        for (const a of actions) {
+          actionsTotal++
+          await supabase.from('alerts').insert({
+            user_id: uid,
+            type: 'sweep_recommendation',
+            severity: a.priority <= 3 ? 'critical' : 'info',
+            title: `Sweep: ${a.trigger} — $${Math.round(a.amountUsd).toLocaleString()}`,
+            message: a.rationale,
+            created_at: new Date().toISOString(),
+          }).then(({ error }) => { if (error) console.warn('[sweep] alert insert failed:', error.message) })
+        }
+      }
+      return NextResponse.json({ task: 'sweep', users: userIds.length, actions: actionsTotal })
+    }
+
     if (task === 'news-sentiment') {
       const { createAdminClient } = await import('@/lib/supabase/admin')
       const supabase = createAdminClient()
