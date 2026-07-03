@@ -1,13 +1,23 @@
 /**
- * Pure in-process backtesting engine.
- * Default signal: simple 20-day momentum.
- * When KRONOS_API_URL or KRONOS_HF_MODEL is set, uses Kronos forecast scores
- * instead — replacing momentum with model-predicted expected returns.
- * For real OHLCV data wire in a market-data provider (Polygon, Alpha Vantage, etc.).
+ * Pure in-process backtesting engine — tests the ACTUAL strategy under test.
+ *
+ * runBacktest resolves job.strategy_id in the legacy strategy registry and
+ * calls that strategy's generateSignal() per bar step. (The old engine ran
+ * one hardcoded 20-day momentum system regardless of strategy_id, so every
+ * "backtest" validated the same rule.)
+ *
+ * Honesty guarantees:
+ *   - Bars are sorted by date PER SYMBOL and history is truncated by DATE,
+ *     never by an index into the union of all dates (the old index slice
+ *     leaked future bars for any symbol missing early dates).
+ *   - assertNoLookahead() throws if a bar with date > asOf ever reaches a
+ *     strategy.
+ *   - Signals decided on bar t fill at bar t+1's OPEN (never the same close
+ *     that produced the signal), with per-venue costs from
+ *     lib/costs/transaction-costs.ts applied to every fill.
  */
 import type { BacktestJob, BacktestResult, BacktestTrade } from './types'
-import { kronosPredictBatch } from './predictors/kronos'
-import type { KronosPrediction } from './predictors/kronos'
+import type { BaseStrategy, StrategySignal } from './strategies/base-strategy'
 
 export interface PriceBar {
   date: string        // YYYY-MM-DD
@@ -29,6 +39,12 @@ export interface BacktestConfig {
    * Zero-cost backtests systematically overstate high-turnover strategies.
    */
   oneWayCostBps?: number
+  /**
+   * Strategy instance override — used by walk-forward parameter search and
+   * tests. When omitted, job.strategy_id is resolved in the registry
+   * ('momentum' when unset).
+   */
+  strategy?: BaseStrategy
 }
 
 export interface BacktestOutput {
@@ -115,36 +131,58 @@ function computeMonthlyReturns(equity: Array<{ date: string; value: number }>): 
   return monthly
 }
 
-// ─── Signal layer ────────────────────────────────────────
+// ─── Lookahead guard ─────────────────────────────────────
 
-function computeMomentumScore(bars: PriceBar[], symbol: string, asOfIdx: number, lookback = 20): number {
-  const symbolBars = bars.filter(b => b.symbol === symbol).slice(0, asOfIdx + 1)
-  if (symbolBars.length < lookback) return 0
-  const recent = symbolBars[symbolBars.length - 1].close
-  const old = symbolBars[symbolBars.length - lookback].close
-  return (recent - old) / old
+export class LookaheadError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'LookaheadError'
+  }
 }
 
-/**
- * Whether Kronos is configured in the current environment.
- * Used to decide whether to call Kronos during a backtest rebalance step.
- */
-function kronosEnabled(): boolean {
-  return !!(process.env.KRONOS_API_URL || (process.env.KRONOS_HF_MODEL && process.env.HF_API_TOKEN))
+/** Throws when any bar postdates asOf — no future bar may reach a strategy. */
+export function assertNoLookahead(bars: PriceBar[], asOfDate: string): void {
+  for (const b of bars) {
+    if (b.date > asOfDate) {
+      throw new LookaheadError(
+        `lookahead: bar ${b.symbol}@${b.date} leaked into a decision as of ${asOfDate}`
+      )
+    }
+  }
+}
+
+// ─── Strategy resolution ─────────────────────────────────
+
+async function resolveStrategy(job: BacktestJob, override?: BaseStrategy): Promise<BaseStrategy | null> {
+  if (override) return override
+  const strategyId = job.strategy_id ?? 'momentum'
+  // Dynamic import: all-strategies type-imports PriceBar from this module.
+  const { STRATEGY_REGISTRY } = await import('./strategies/all-strategies')
+  return STRATEGY_REGISTRY.get(strategyId) ?? null
 }
 
 // ─── Main backtester ─────────────────────────────────────
 
+interface PendingOrder {
+  symbol: string
+  action: 'buy' | 'sell'
+  /** Buy: notional to deploy at the fill. Sell: quantity to close. */
+  notionalUsd?: number
+  quantity?: number
+}
+
 export async function runBacktest(config: BacktestConfig): Promise<BacktestOutput> {
   const { job, bars } = config
-  // Buys fill above close, sells below — each side pays fee + half-spread.
+  // Buys fill above the reference price, sells below — each side pays fee + half-spread.
   const costFrac = (config.oneWayCostBps ?? 4) / 10_000
 
   if (!bars.length) {
-    return {
-      result: emptyResult(job),
-      error: 'No price data provided',
-    }
+    return { result: emptyResult(job), error: 'No price data provided' }
+  }
+
+  const strategy = await resolveStrategy(job, config.strategy)
+  if (!strategy) {
+    return { result: emptyResult(job), error: `Unknown strategy_id: ${job.strategy_id}` }
   }
 
   const symbols = job.symbols
@@ -155,7 +193,16 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
   const equity: Array<{ date: string; value: number; benchmark?: number }> = []
   const dailyReturns: number[] = []
 
-  // Group bars by date
+  // ── Data hygiene: per-symbol bars SORTED BY DATE ───────────────────────────
+  const barsBySymbol = new Map<string, PriceBar[]>()
+  for (const bar of bars) {
+    if (!barsBySymbol.has(bar.symbol)) barsBySymbol.set(bar.symbol, [])
+    barsBySymbol.get(bar.symbol)!.push(bar)
+  }
+  for (const arr of barsBySymbol.values()) {
+    arr.sort((a, b) => a.date.localeCompare(b.date))
+  }
+
   const allDates = [...new Set(bars.map(b => b.date))].sort()
   const barsByDateSym: Map<string, Map<string, PriceBar>> = new Map()
   for (const bar of bars) {
@@ -163,123 +210,134 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
     barsByDateSym.get(bar.date)?.set(bar.symbol, bar)
   }
 
-  // Benchmark bars (benchmark symbol treated as first symbol if not in dataset separately)
+  // Advancing per-symbol pointers: history is truncated by DATE, never by an
+  // index into the union of all dates.
+  const ptr = new Map<string, number>()
+  for (const sym of barsBySymbol.keys()) ptr.set(sym, -1)
+  function historyUpTo(sym: string, date: string): PriceBar[] {
+    const arr = barsBySymbol.get(sym) ?? []
+    let i = ptr.get(sym) ?? -1
+    while (i + 1 < arr.length && arr[i + 1].date <= date) i++
+    ptr.set(sym, i)
+    return arr.slice(0, i + 1)
+  }
+
+  // Benchmark
   const benchmarkSymbol = job.benchmark_symbol ?? 'SPY'
-  const benchmarkBars = bars.filter(b => b.symbol === benchmarkSymbol)
+  const benchmarkBars = barsBySymbol.get(benchmarkSymbol) ?? []
   const benchmarkStart = benchmarkBars[0]?.close ?? 100
   const benchmarkMap: Map<string, number> = new Map(benchmarkBars.map(b => [b.date, b.close]))
 
   let prevEquity = capital
+  const pending: PendingOrder[] = []
+  const minBars = Math.max(2, strategy.minBars ?? 20)
 
   for (let di = 0; di < allDates.length; di++) {
     const date = allDates[di]
-    const dayBars = barsByDateSym.get(date) ?? new Map()
+    const dayBars: Map<string, PriceBar> = barsByDateSym.get(date) ?? new Map()
 
-    // Compute portfolio value
+    // ── 1. Execute pending orders at TODAY'S OPEN (decided on an earlier bar) ─
+    if (pending.length) {
+      const stillPending: PendingOrder[] = []
+      // Sells first — they free the cash the buys need.
+      pending.sort((a, b) => (a.action === 'sell' ? -1 : 1) - (b.action === 'sell' ? -1 : 1))
+      for (const order of pending) {
+        const bar = dayBars.get(order.symbol)
+        if (!bar) { stillPending.push(order); continue }  // symbol has no bar today — fill at its next bar
+
+        if (order.action === 'sell') {
+          const pos = positions.get(order.symbol)
+          if (!pos || pos.quantity <= 0) continue
+          const sellQty = Math.min(order.quantity ?? pos.quantity, pos.quantity)
+          const fillPrice = bar.open * (1 - costFrac)
+          const proceeds = sellQty * fillPrice
+          const pnl = proceeds - sellQty * pos.avg_cost
+          cash += proceeds
+          pos.quantity -= sellQty
+          if (pos.quantity < 1e-9) positions.delete(order.symbol)
+          trades.push({ date, symbol: order.symbol, action: 'sell', quantity: sellQty, price: fillPrice, notional: proceeds, pnl })
+        } else {
+          const notional = Math.min(order.notionalUsd ?? 0, cash)
+          if (notional < 50) continue
+          const fillPrice = bar.open * (1 + costFrac)
+          const qty = notional / fillPrice
+          cash -= notional
+          const existing = positions.get(order.symbol)
+          if (existing) {
+            const totalQty = existing.quantity + qty
+            existing.avg_cost = (existing.avg_cost * existing.quantity + fillPrice * qty) / totalQty
+            existing.quantity = totalQty
+          } else {
+            positions.set(order.symbol, { symbol: order.symbol, quantity: qty, avg_cost: fillPrice })
+          }
+          trades.push({ date, symbol: order.symbol, action: 'buy', quantity: qty, price: fillPrice, notional, pnl: undefined })
+        }
+      }
+      pending.length = 0
+      pending.push(...stillPending)
+    }
+
+    // ── 2. Mark portfolio to today's closes ───────────────────────────────────
     let portfolioValue = cash
     for (const [sym, pos] of positions.entries()) {
       const bar = dayBars.get(sym)
       if (bar) portfolioValue += pos.quantity * bar.close
     }
 
-    // Rebalance / signal logic
-    if (di > 20) { // need warmup period
-      const shouldRebalance = job.rebalance_frequency === 'daily' ||
-        (job.rebalance_frequency === 'weekly' && di % 5 === 0) ||
-        (job.rebalance_frequency === 'monthly' && di % 21 === 0)
+    // ── 3. Signal step: call the ACTUAL strategy per symbol ───────────────────
+    const shouldRebalance =
+      job.rebalance_frequency === 'daily' ||
+      (job.rebalance_frequency === 'none' && di === minBars) ||   // single entry pass post-warmup
+      (job.rebalance_frequency === 'weekly' && di % 5 === 0) ||
+      (job.rebalance_frequency === 'monthly' && di % 21 === 0)
 
-      const isFirstDay = di === 21
+    if (shouldRebalance) {
+      const buySignals: Array<{ sym: string; signal: StrategySignal }> = []
+      const sellSymbols: string[] = []
 
-      if (shouldRebalance || isFirstDay) {
-        // Score symbols: use Kronos predictions if available, else momentum fallback
-        let kronosPredictions: Map<string, KronosPrediction> | null = null
-        if (kronosEnabled()) {
-          const symbolBarMap = new Map(
-            symbols.map(sym => [
-              sym,
-              bars.filter(b => b.symbol === sym).slice(0, di + 1),
-            ])
-          )
-          kronosPredictions = await kronosPredictBatch(symbolBarMap, 5).catch(() => null)
+      for (const sym of symbols) {
+        if (!dayBars.has(sym)) continue
+        const history = historyUpTo(sym, date)
+        if (history.length < minBars) continue
+
+        // The invariant the old engine broke: nothing after `date` may be seen.
+        assertNoLookahead(history, date)
+
+        let signal: StrategySignal | null = null
+        try {
+          signal = await strategy.generateSignal(sym, history, job.metadata)
+        } catch (err) {
+          if (err instanceof LookaheadError) throw err
+          continue  // a strategy error on one symbol must not kill the run
         }
+        if (!signal) continue
+        if (signal.side === 'buy') buySignals.push({ sym, signal })
+        else if (positions.has(sym)) sellSymbols.push(sym)
+      }
 
-        const scored = symbols.map(sym => {
-          const kronosPred = kronosPredictions?.get(sym)
-          const score = kronosPred
-            ? kronosPred.expected_return                  // Kronos expected return
-            : computeMomentumScore(bars, sym, di)         // momentum fallback
-          return { sym, score }
-        }).filter(s => dayBars.has(s.sym))
-          .sort((a, b) => b.score - a.score)
+      // Queue exits (fill at next bar's open)
+      for (const sym of sellSymbols) {
+        pending.push({ symbol: sym, action: 'sell' })
+      }
 
-        // Take top half with positive momentum (equal-weight)
-        const longs = scored.filter(s => s.score > 0).slice(0, Math.ceil(scored.length / 2))
-        const targetSymbols = new Set(longs.map(s => s.sym))
-
-        // Sell positions not in target
-        for (const [sym, pos] of positions.entries()) {
-          if (!targetSymbols.has(sym)) {
-            const bar = dayBars.get(sym)
-            if (bar && pos.quantity > 0) {
-              const fillPrice = bar.close * (1 - costFrac)
-              const proceeds = pos.quantity * fillPrice
-              const pnl = proceeds - pos.quantity * pos.avg_cost
-              cash += proceeds
-              trades.push({
-                date,
-                symbol: sym,
-                action: 'sell',
-                quantity: pos.quantity,
-                price: fillPrice,
-                notional: proceeds,
-                pnl,
-              })
-              positions.delete(sym)
-            }
-          }
-        }
-
-        // Buy / rebalance to equal weight
-        if (longs.length > 0) {
-          const targetPerPosition = (portfolioValue * 0.95) / longs.length
-          for (const { sym } of longs) {
-            const bar = dayBars.get(sym)
-            if (!bar) continue
-            const existing = positions.get(sym)
-            const existingValue = existing ? existing.quantity * bar.close : 0
-            const diff = targetPerPosition - existingValue
-            if (Math.abs(diff) < 50) continue // ignore tiny adjustments
-
-            if (diff > 0 && cash >= diff) {
-              const fillPrice = bar.close * (1 + costFrac)
-              const qty = diff / fillPrice
-              cash -= qty * fillPrice
-              if (existing) {
-                const totalQty = existing.quantity + qty
-                existing.avg_cost = (existing.avg_cost * existing.quantity + fillPrice * qty) / totalQty
-                existing.quantity = totalQty
-              } else {
-                positions.set(sym, { symbol: sym, quantity: qty, avg_cost: fillPrice })
-              }
-              trades.push({ date, symbol: sym, action: 'buy', quantity: qty, price: fillPrice, notional: qty * fillPrice })
-            } else if (diff < 0 && existing) {
-              const fillPrice = bar.close * (1 - costFrac)
-              const sellQty = Math.min(Math.abs(diff) / fillPrice, existing.quantity)
-              if (sellQty > 0) {
-                const proceeds = sellQty * fillPrice
-                const pnl = proceeds - sellQty * existing.avg_cost
-                cash += proceeds
-                existing.quantity -= sellQty
-                if (existing.quantity < 0.0001) positions.delete(sym)
-                trades.push({ date, symbol: sym, action: 'sell', quantity: sellQty, price: fillPrice, notional: proceeds, pnl })
-              }
-            }
-          }
+      // Queue entries/rebalances to equal weight across buy signals + holds
+      const holds = [...positions.keys()].filter(s => !sellSymbols.includes(s))
+      const targetSymbols = new Set([...holds, ...buySignals.map(b => b.sym)])
+      if (targetSymbols.size > 0) {
+        const targetPerPosition = (portfolioValue * 0.95) / targetSymbols.size
+        for (const { sym } of buySignals) {
+          const bar = dayBars.get(sym)
+          if (!bar) continue
+          const existing = positions.get(sym)
+          const existingValue = existing ? existing.quantity * bar.close : 0
+          const diff = targetPerPosition - existingValue
+          if (diff < 50) continue  // already at/above target or dust
+          pending.push({ symbol: sym, action: 'buy', notionalUsd: diff })
         }
       }
     }
 
-    // Recompute equity after any trades
+    // ── 4. Record equity ───────────────────────────────────────────────────────
     let finalValue = cash
     for (const [sym, pos] of positions.entries()) {
       const bar = dayBars.get(sym)

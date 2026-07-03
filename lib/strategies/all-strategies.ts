@@ -53,9 +53,23 @@ export class MomentumStrategy extends BaseStrategy {
   readonly defaultBroker = 'alpaca'
   readonly defaultAssetClass = 'stock'
 
+  constructor(private readonly lookback = 20) {
+    super()
+    this.minBars = this.lookback + 1
+  }
+
+  // Walk-forward fits the lookback on each train window.
+  paramGrid() {
+    return { lookback: [10, 20, 40] }
+  }
+
+  withParams(params: Record<string, number>): BaseStrategy {
+    return new MomentumStrategy(params.lookback ?? this.lookback)
+  }
+
   async generateSignal(symbol: string, bars: PriceBar[]): Promise<StrategySignal | null> {
     if (bars.length < this.minBars) return null
-    const m = momentum(bars, 20)
+    const m = momentum(bars, this.lookback)
     if (Math.abs(m) < 0.03) return null
     return sig(symbol, m > 0 ? 'buy' : 'sell', Math.min(1, Math.abs(m) / 0.1), m, this.id, this.defaultAssetClass)
   }

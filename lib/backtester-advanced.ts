@@ -1,8 +1,17 @@
 /**
  * Advanced backtesting: Walk-Forward Analysis + Monte Carlo simulation.
  * Builds on the core runBacktest() engine in lib/backtester.ts.
+ *
+ * Walk-forward ACTUALLY FITS parameters now: strategies exposing a paramGrid
+ * get a grid search on each train window (best in-sample Sharpe wins) and the
+ * chosen parameters are applied UNSEEN to the test window. Strategies with no
+ * tunables degrade to plain out-of-sample splits — the robustness ratio then
+ * compares the same rule's in-sample vs out-of-sample expectancy. Either way
+ * the ratio finally measures something: the old walk-forward fit nothing, so
+ * "robustness ≥ 0.5" compared a fixed rule to itself.
  */
-import { runBacktest, type PriceBar, type BacktestConfig } from './backtester'
+import { runBacktest, type PriceBar } from './backtester'
+import type { BaseStrategy } from './strategies/base-strategy'
 import type { BacktestJob, BacktestResult } from './types'
 
 // ─── Walk-Forward ─────────────────────────────────────────
@@ -16,6 +25,8 @@ export interface WalkForwardConfig {
   testDays?: number
   /** One-way transaction cost in bps, forwarded to every window's backtest. */
   oneWayCostBps?: number
+  /** Strategy override (defaults to job.strategy_id, then 'momentum'). */
+  strategy?: BaseStrategy
 }
 
 export interface WalkForwardWindow {
@@ -25,6 +36,8 @@ export interface WalkForwardWindow {
   testEnd: string
   trainResult: Omit<BacktestResult, 'id' | 'created_at'>
   testResult: Omit<BacktestResult, 'id' | 'created_at'>
+  /** Parameters fitted on the train window (null when the strategy has no grid). */
+  chosenParams: Record<string, number> | null
 }
 
 export interface WalkForwardOutput {
@@ -38,10 +51,36 @@ export interface WalkForwardOutput {
   }
   /** Ratio of out-of-sample Sharpe to in-sample Sharpe (>0.5 is healthy) */
   robustnessRatio: number
+  /** True when parameters were actually fitted per train window. */
+  parametersFitted: boolean
+}
+
+/** All combinations of a param grid, capped to keep runtimes sane. */
+export function gridCombinations(grid: Record<string, number[]>, cap = 24): Array<Record<string, number>> {
+  let combos: Array<Record<string, number>> = [{}]
+  for (const [name, values] of Object.entries(grid)) {
+    const next: Array<Record<string, number>> = []
+    for (const combo of combos) {
+      for (const v of values) next.push({ ...combo, [name]: v })
+    }
+    combos = next
+    if (combos.length > cap) { combos = combos.slice(0, cap); break }
+  }
+  return combos
+}
+
+async function resolveBaseStrategy(job: BacktestJob, override?: BaseStrategy): Promise<BaseStrategy | null> {
+  if (override) return override
+  const { STRATEGY_REGISTRY } = await import('./strategies/all-strategies')
+  return STRATEGY_REGISTRY.get(job.strategy_id ?? 'momentum') ?? null
 }
 
 export async function runWalkForward(config: WalkForwardConfig): Promise<WalkForwardOutput> {
   const { job, bars, trainDays = 252, testDays = 63, oneWayCostBps } = config
+
+  const baseStrategy = await resolveBaseStrategy(job, config.strategy)
+  const grid = baseStrategy?.paramGrid() ?? null
+  const combos = grid ? gridCombinations(grid) : null
 
   const allDates = [...new Set(bars.map(b => b.date))].sort()
   const windows: WalkForwardWindow[] = []
@@ -59,15 +98,36 @@ export async function runWalkForward(config: WalkForwardConfig): Promise<WalkFor
     const trainJob = { ...job, start_date: trainStart, end_date: trainEnd }
     const testJob = { ...job, start_date: testStart, end_date: testEnd }
 
-    const [trainOut, testOut] = await Promise.all([
-      runBacktest({ job: trainJob, bars: trainBars, oneWayCostBps }),
-      runBacktest({ job: testJob, bars: testBars, oneWayCostBps }),
-    ])
+    let trainResult: Omit<BacktestResult, 'id' | 'created_at'>
+    let testStrategy: BaseStrategy | undefined = baseStrategy ?? undefined
+    let chosenParams: Record<string, number> | null = null
+
+    if (baseStrategy && combos && combos.length > 0) {
+      // ── Fit on train: grid search, best in-sample Sharpe wins ──────────────
+      let best: { result: Omit<BacktestResult, 'id' | 'created_at'>; params: Record<string, number> } | null = null
+      for (const params of combos) {
+        const candidate = baseStrategy.withParams(params)
+        const out = await runBacktest({ job: trainJob, bars: trainBars, oneWayCostBps, strategy: candidate })
+        if (!best || (out.result.sharpe_ratio ?? 0) > (best.result.sharpe_ratio ?? 0)) {
+          best = { result: out.result, params }
+        }
+      }
+      trainResult = best!.result
+      chosenParams = best!.params
+      testStrategy = baseStrategy.withParams(best!.params)
+    } else {
+      // ── No tunables: plain out-of-sample split on the same rule ────────────
+      const trainOut = await runBacktest({ job: trainJob, bars: trainBars, oneWayCostBps, strategy: testStrategy })
+      trainResult = trainOut.result
+    }
+
+    const testOut = await runBacktest({ job: testJob, bars: testBars, oneWayCostBps, strategy: testStrategy })
 
     windows.push({
       trainStart, trainEnd, testStart, testEnd,
-      trainResult: trainOut.result,
+      trainResult,
       testResult: testOut.result,
+      chosenParams,
     })
 
     cursor += testDays
@@ -78,6 +138,7 @@ export async function runWalkForward(config: WalkForwardConfig): Promise<WalkFor
       windows: [],
       avgOutOfSample: { totalReturnPct: 0, sharpe: 0, maxDrawdown: 0, winRate: 0 },
       robustnessRatio: 0,
+      parametersFitted: false,
     }
   }
 
@@ -93,7 +154,7 @@ export async function runWalkForward(config: WalkForwardConfig): Promise<WalkFor
     ? Math.round((avgOOS.sharpe / avgInSampleSharpe) * 100) / 100
     : 0
 
-  return { windows, avgOutOfSample: avgOOS, robustnessRatio }
+  return { windows, avgOutOfSample: avgOOS, robustnessRatio, parametersFitted: combos !== null }
 }
 
 // ─── Monte Carlo ──────────────────────────────────────────

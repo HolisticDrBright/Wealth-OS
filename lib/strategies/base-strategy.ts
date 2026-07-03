@@ -46,6 +46,9 @@ export interface PipelineResult {
   auditTrail: string[]
 }
 
+/** Tunable-parameter grid: parameter name → candidate values. */
+export type ParamGrid = Record<string, number[]>
+
 export abstract class BaseStrategy {
   abstract readonly id: string
   abstract readonly displayName: string
@@ -68,4 +71,18 @@ export abstract class BaseStrategy {
 
   /** Minimum bars required to generate a signal */
   minBars: number = 20
+
+  /**
+   * Tunable parameters for walk-forward analysis. Strategies that expose a
+   * grid get real train-window parameter fitting; strategies returning null
+   * degrade to plain out-of-sample splits (train vs test on the same rule).
+   */
+  paramGrid(): ParamGrid | null {
+    return null
+  }
+
+  /** Return a NEW instance configured with the given parameters. */
+  withParams(_params: Record<string, number>): BaseStrategy {
+    return this
+  }
 }
