@@ -20,6 +20,12 @@ export class AlpacaAdapter extends BrokerAdapter {
     displayName: 'Alpaca',
     assetClasses: ['stock', 'etf', 'crypto'],
     requiredEnvVars: ['ALPACA_API_KEY', 'ALPACA_SECRET_KEY'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: true, supportsBracket: true,
+      supportsCancel: true, supportsStatus: false,
+      supportsNotionalSizing: true, supportsQuantitySizing: true,
+      liveReady: false, // not verified against the live API — paper phase
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
@@ -178,11 +184,19 @@ export class AlpacaAdapter extends BrokerAdapter {
 // ─── Kraken (crypto) ─────────────────────────────────────────────────────────
 
 export class KrakenAdapter extends BrokerAdapter {
+  // Kraken volume must be BASE-CURRENCY units — deriving it from USD notional
+  // would require a live price lookup; refuse rather than guess.
   readonly config: BrokerConfig = {
     id: 'kraken',
     displayName: 'Kraken',
     assetClasses: ['crypto'],
     requiredEnvVars: ['KRAKEN_API_KEY', 'KRAKEN_API_SECRET'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: true, supportsBracket: true,
+      supportsCancel: false, supportsStatus: false,
+      supportsNotionalSizing: false, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   private mapPair(symbol: string): string {
@@ -198,6 +212,9 @@ export class KrakenAdapter extends BrokerAdapter {
     const key = process.env.KRAKEN_API_KEY
     const secret = process.env.KRAKEN_API_SECRET
     if (!key || !secret) return { status: 'skipped', reason: 'KRAKEN_API_KEY not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'kraken', reason: 'Kraken requires quantity in base-currency units — refusing to submit without volume (USD notional not supported)' }
+    }
 
     try {
       const nonce = Date.now().toString()
@@ -206,7 +223,7 @@ export class KrakenAdapter extends BrokerAdapter {
         nonce, type: params.side, pair: this.mapPair(params.symbol), oflags: 'fciq',
         ordertype: params.order_type === 'limit' ? 'limit' : params.order_type === 'stop' ? 'stop-loss' : 'market',
       }
-      if (params.quantity) orderData.volume = params.quantity.toString()
+      orderData.volume = params.quantity.toString()
       if (params.limit_price) orderData.price = params.limit_price.toString()
 
       const postData = new URLSearchParams(orderData).toString()
@@ -235,6 +252,9 @@ export class KrakenAdapter extends BrokerAdapter {
     const key = process.env.KRAKEN_API_KEY
     const secret = process.env.KRAKEN_API_SECRET
     if (!key || !secret) return { status: 'skipped', broker: 'kraken', reason: 'KRAKEN_API_KEY not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'kraken', reason: 'Kraken bracket requires quantity in base-currency units — refusing to submit without volume' }
+    }
 
     try {
       const nonce = Date.now().toString()
@@ -246,7 +266,7 @@ export class KrakenAdapter extends BrokerAdapter {
         oflags: 'fciq',
         ordertype: params.limit_price ? 'limit' : 'market',
       }
-      if (params.quantity) orderData.volume = params.quantity.toString()
+      orderData.volume = params.quantity.toString()
       if (params.limit_price) orderData.price = params.limit_price.toString()
       if (params.stop_price) {
         orderData['close[ordertype]'] = 'stop-loss'
@@ -305,12 +325,21 @@ export class CoinbaseAdapter extends BrokerAdapter {
     displayName: 'Coinbase Advanced',
     assetClasses: ['crypto'],
     requiredEnvVars: ['COINBASE_API_KEY', 'COINBASE_API_SECRET'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: false, supportsBracket: true,
+      supportsCancel: true, supportsStatus: false,
+      supportsNotionalSizing: true, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.COINBASE_API_KEY
     const secret = process.env.COINBASE_API_SECRET
     if (!key || !secret) return { status: 'skipped', reason: 'COINBASE_API_KEY not configured' }
+    if (!params.notional_usd && !params.quantity) {
+      return { status: 'skipped', broker: 'coinbase', reason: 'order must specify notional_usd or quantity — refusing zero-size order' }
+    }
 
     try {
       const ts = Math.floor(Date.now() / 1000).toString()
@@ -322,7 +351,7 @@ export class CoinbaseAdapter extends BrokerAdapter {
         order_configuration: {
           market_market_ioc: params.notional_usd
             ? { quote_size: params.notional_usd.toFixed(2) }
-            : { base_size: (params.quantity ?? 0).toString() },
+            : { base_size: (params.quantity as number).toString() },
         },
       })
       const sig = createHmac('sha256', secret).update(`${ts}POST${path}${body}`).digest('hex')
@@ -348,6 +377,18 @@ export class CoinbaseAdapter extends BrokerAdapter {
     const key = process.env.COINBASE_API_KEY
     const secret = process.env.COINBASE_API_SECRET
     if (!key || !secret) return { status: 'skipped', broker: 'coinbase', reason: 'COINBASE_API_KEY not configured' }
+    // Coinbase protective legs (stop/take-profit) require base_size in units.
+    // With notional-only sizing the entry would fill but NO stop-loss could be
+    // placed — never allow an unprotected entry.
+    if ((params.stop_price || params.take_profit_price) && !params.quantity) {
+      return {
+        status: 'skipped', broker: 'coinbase',
+        reason: 'bracket protective legs require quantity in base units — refusing entry that would fill without stop coverage',
+      }
+    }
+    if (!params.notional_usd && !params.quantity) {
+      return { status: 'skipped', broker: 'coinbase', reason: 'order must specify notional_usd or quantity — refusing zero-size order' }
+    }
 
     const post = async (body: string): Promise<{ ok: boolean; data: Record<string, unknown> }> => {
       const ts = Math.floor(Date.now() / 1000).toString()
@@ -371,9 +412,9 @@ export class CoinbaseAdapter extends BrokerAdapter {
         product_id: productId,
         side: params.side.toUpperCase(),
         order_configuration: {
-          market_market_ioc: params.notional_usd
-            ? { quote_size: params.notional_usd.toFixed(2) }
-            : { base_size: (params.quantity ?? 0).toString() },
+          market_market_ioc: params.quantity
+            ? { base_size: params.quantity.toString() }
+            : { quote_size: (params.notional_usd as number).toFixed(2) },
         },
       })
       const entry = await post(entryBody)
@@ -460,12 +501,21 @@ export class BinanceAdapter extends BrokerAdapter {
     // Binance.US not available in NY, TX, HI, VT — simplified: blocked globally for UK/EU
     blockedJurisdictions: ['GB', 'DE', 'FR', 'NL', 'IT', 'ES', 'BE', 'AT', 'PL'],
     requiredEnvVars: ['BINANCE_API_KEY', 'BINANCE_API_SECRET'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: false, supportsBracket: false,
+      supportsCancel: false, supportsStatus: false,
+      supportsNotionalSizing: true, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.BINANCE_API_KEY
     const secret = process.env.BINANCE_API_SECRET
     if (!key || !secret) return { status: 'skipped', reason: 'BINANCE_API_KEY not configured' }
+    if (!params.notional_usd && !params.quantity) {
+      return { status: 'skipped', broker: 'binance', reason: 'order must specify notional_usd or quantity — refusing zero-size order' }
+    }
 
     try {
       const ts = Date.now()
@@ -474,7 +524,7 @@ export class BinanceAdapter extends BrokerAdapter {
         side: params.side.toUpperCase(),
         type: 'MARKET',
         timestamp: ts.toString(),
-        ...(params.notional_usd ? { quoteOrderQty: params.notional_usd.toFixed(2) } : { quantity: (params.quantity ?? 0).toString() }),
+        ...(params.notional_usd ? { quoteOrderQty: params.notional_usd.toFixed(2) } : { quantity: (params.quantity as number).toString() }),
       })
       const sig = createHmac('sha256', secret).update(qs.toString()).digest('hex')
       qs.set('signature', sig)
@@ -500,6 +550,14 @@ export class OandaAdapter extends BrokerAdapter {
     displayName: 'OANDA',
     assetClasses: ['forex'],
     requiredEnvVars: ['OANDA_API_KEY', 'OANDA_ACCOUNT_ID'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: false, supportsBracket: true,
+      supportsCancel: false, supportsStatus: false,
+      // OANDA units are BASE-CURRENCY units, not USD — treating USD notional
+      // as units mis-sizes every non-USD-base pair. Quantity only.
+      supportsNotionalSizing: false, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
@@ -511,9 +569,12 @@ export class OandaAdapter extends BrokerAdapter {
       const isPractice = process.env.OANDA_PRACTICE !== 'false'
       const base = isPractice ? 'https://api-fxpractice.oanda.com' : 'https://api-fxtrade.oanda.com'
       const instrument = params.symbol.includes('_') ? params.symbol : params.symbol.replace('/', '_')
+      if (!params.quantity) {
+        return { status: 'skipped', broker: 'oanda', reason: 'OANDA units are base-currency units — refusing to derive units from USD notional; pass explicit quantity' }
+      }
       const units = params.side === 'buy'
-        ? (params.quantity ?? Math.floor(params.notional_usd ?? 0)).toString()
-        : `-${params.quantity ?? Math.floor(params.notional_usd ?? 0)}`
+        ? params.quantity.toString()
+        : `-${params.quantity}`
 
       const res = await fetch(`${base}/v3/accounts/${accountId}/orders`, {
         method: 'POST',
@@ -540,9 +601,12 @@ export class OandaAdapter extends BrokerAdapter {
       const isPractice = process.env.OANDA_PRACTICE !== 'false'
       const base = isPractice ? 'https://api-fxpractice.oanda.com' : 'https://api-fxtrade.oanda.com'
       const instrument = params.symbol.includes('_') ? params.symbol : params.symbol.replace('/', '_')
+      if (!params.quantity) {
+        return { status: 'skipped', broker: 'oanda', reason: 'OANDA units are base-currency units — refusing to derive units from USD notional; pass explicit quantity' }
+      }
       const units = params.side === 'buy'
-        ? (params.quantity ?? Math.floor(params.notional_usd ?? 0)).toString()
-        : `-${params.quantity ?? Math.floor(params.notional_usd ?? 0)}`
+        ? params.quantity.toString()
+        : `-${params.quantity}`
 
       const order: Record<string, unknown> = { type: 'MARKET', instrument, units }
       if (params.stop_price) {
@@ -626,12 +690,23 @@ export class IBKRAdapter extends BrokerAdapter {
     displayName: 'Interactive Brokers',
     assetClasses: ['stock', 'etf', 'options', 'futures', 'forex', 'crypto'],
     requiredEnvVars: ['IBKR_ACCOUNT_ID', 'IBKR_API_URL'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: true, supportsBracket: true,
+      supportsCancel: true, supportsStatus: false,
+      // The old notional→quantity placeholder (notional/100) assumed a $100
+      // share price. Explicit quantity only.
+      supportsNotionalSizing: false, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const accountId = process.env.IBKR_ACCOUNT_ID
     const baseUrl = process.env.IBKR_API_URL
     if (!accountId || !baseUrl) return { status: 'skipped', reason: 'IBKR_API_URL not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'ibkr', reason: 'IBKR requires explicit quantity — refusing notional/price-guess conversion' }
+    }
 
     try {
       const res = await fetch(`${baseUrl}/v1/api/iserver/account/${accountId}/orders`, {
@@ -643,7 +718,7 @@ export class IBKRAdapter extends BrokerAdapter {
           symbol: params.symbol,
           side: params.side.toUpperCase(),
           orderType: 'MKT',
-          quantity: params.quantity ?? Math.floor((params.notional_usd ?? 0) / 100),
+          quantity: params.quantity,
           tif: 'DAY',
         }]),
       })
@@ -663,9 +738,12 @@ export class IBKRAdapter extends BrokerAdapter {
     const accountId = process.env.IBKR_ACCOUNT_ID
     const baseUrl = process.env.IBKR_API_URL
     if (!accountId || !baseUrl) return { status: 'skipped', broker: 'ibkr', reason: 'IBKR_API_URL not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'ibkr', reason: 'IBKR bracket requires explicit quantity — refusing notional/price-guess conversion' }
+    }
 
     try {
-      const qty = params.quantity ?? Math.floor((params.notional_usd ?? 0) / 100)
+      const qty = params.quantity
       const parentId = 1
       const orders = [
         {
@@ -740,11 +818,20 @@ export class RobinhoodAdapter extends BrokerAdapter {
     displayName: 'Robinhood',
     assetClasses: ['stock', 'etf', 'crypto', 'options'],
     requiredEnvVars: ['ROBINHOOD_API_KEY'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: false, supportsBracket: false,
+      supportsCancel: false, supportsStatus: false,
+      supportsNotionalSizing: true, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.ROBINHOOD_API_KEY
     if (!key) return { status: 'skipped', reason: 'ROBINHOOD_API_KEY not configured' }
+    if (!params.notional_usd && !params.quantity) {
+      return { status: 'skipped', broker: 'robinhood', reason: 'order must specify notional_usd or quantity — refusing sizeless order' }
+    }
 
     try {
       const body = {
@@ -776,12 +863,21 @@ export class WebullAdapter extends BrokerAdapter {
     displayName: 'Webull',
     assetClasses: ['stock', 'etf', 'options', 'crypto'],
     requiredEnvVars: ['WEBULL_ACCESS_TOKEN', 'WEBULL_ACCOUNT_ID'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: false, supportsBracket: false,
+      supportsCancel: false, supportsStatus: false,
+      supportsNotionalSizing: false, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const token = process.env.WEBULL_ACCESS_TOKEN
     const accountId = process.env.WEBULL_ACCOUNT_ID
     if (!token || !accountId) return { status: 'skipped', reason: 'WEBULL_ACCESS_TOKEN not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'webull', reason: 'Webull requires explicit quantity — refusing order without qty' }
+    }
 
     try {
       const res = await fetch(`https://openapi.webull.com/openapi/trade/v1/placeOrder`, {
@@ -815,13 +911,21 @@ export class EToroAdapter extends BrokerAdapter {
     // Not available in US
     blockedJurisdictions: ['US'],
     requiredEnvVars: ['ETORO_API_KEY', 'ETORO_ACCOUNT_ID'],
+    // Partner API integration pending — this adapter cannot really do anything.
+    capabilities: {
+      supportsMarket: false, supportsLimit: false, supportsBracket: false,
+      supportsCancel: false, supportsStatus: false,
+      supportsNotionalSizing: false, supportsQuantitySizing: false,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.ETORO_API_KEY
     if (!key) return { status: 'skipped', reason: 'ETORO_API_KEY not configured' }
-    // eToro Partner API is invitation-only; stub returns submitted
-    return { status: 'submitted', broker: 'etoro', reason: 'eToro partner API integration pending' }
+    // eToro Partner API is invitation-only — no real order is placed, so this
+    // MUST NOT report 'submitted'.
+    return { status: 'skipped', broker: 'etoro', reason: 'eToro partner API integration pending — no order placed' }
   }
 }
 
@@ -833,12 +937,22 @@ export class TastytradeAdapter extends BrokerAdapter {
     displayName: 'Tastytrade',
     assetClasses: ['stock', 'etf', 'options', 'futures', 'crypto'],
     requiredEnvVars: ['TASTYTRADE_SESSION_TOKEN', 'TASTYTRADE_ACCOUNT_NUMBER'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: true, supportsBracket: true,
+      supportsCancel: false, supportsStatus: false,
+      // Defaulting to 1 contract silently was dangerous — quantity only.
+      supportsNotionalSizing: false, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const token = process.env.TASTYTRADE_SESSION_TOKEN
     const account = process.env.TASTYTRADE_ACCOUNT_NUMBER
     if (!token || !account) return { status: 'skipped', reason: 'TASTYTRADE_SESSION_TOKEN not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'tastytrade', reason: 'Tastytrade requires explicit quantity — refusing to default to 1 contract' }
+    }
 
     try {
       const res = await fetch(`https://api.tastyworks.com/accounts/${account}/orders`, {
@@ -850,7 +964,7 @@ export class TastytradeAdapter extends BrokerAdapter {
           legs: [{
             instrument_type: params.asset_class === 'options' ? 'Equity Option' : 'Equity',
             symbol: params.symbol,
-            quantity: params.quantity ?? 1,
+            quantity: params.quantity,
             action: params.side === 'buy' ? 'Buy to Open' : 'Sell to Close',
           }],
         }),
@@ -867,9 +981,12 @@ export class TastytradeAdapter extends BrokerAdapter {
     const token = process.env.TASTYTRADE_SESSION_TOKEN
     const account = process.env.TASTYTRADE_ACCOUNT_NUMBER
     if (!token || !account) return { status: 'skipped', broker: 'tastytrade', reason: 'TASTYTRADE_SESSION_TOKEN not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'tastytrade', reason: 'Tastytrade bracket requires explicit quantity — refusing to default to 1 contract' }
+    }
 
     try {
-      const qty = params.quantity ?? 1
+      const qty = params.quantity
       const legs = [{
         instrument_type: 'Equity',
         symbol: params.symbol,
@@ -914,6 +1031,13 @@ export class PolymarketAdapter extends BrokerAdapter {
     // Polymarket is not available to US persons (CFTC settlement).
     blockedJurisdictions: ['US'],
     requiredEnvVars: ['POLYMARKET_PRIVATE_KEY'],
+    // CLOB client pending — this adapter cannot place real orders yet.
+    capabilities: {
+      supportsMarket: false, supportsLimit: false, supportsBracket: false,
+      supportsCancel: false, supportsStatus: false,
+      supportsNotionalSizing: false, supportsQuantitySizing: false,
+      liveReady: false,
+    },
   }
 
   async execute(_params: OrderParams): Promise<BrokerResult> {
@@ -928,8 +1052,9 @@ export class PolymarketAdapter extends BrokerAdapter {
   async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
     if (!process.env.POLYMARKET_PRIVATE_KEY) return { status: 'skipped', broker: 'polymarket', reason: 'POLYMARKET_PRIVATE_KEY not configured' }
     if (!params.take_profit_price) return { status: 'skipped', broker: 'polymarket', reason: 'no take-profit target provided' }
-    // Pre-arm limit sell at take_profit_price — CLOB integration placeholder
-    return { status: 'submitted', broker: 'polymarket', reason: 'take-profit limit pre-armed (CLOB pending)' }
+    // CLOB integration placeholder — no real order reaches Polymarket, so this
+    // MUST NOT report 'submitted'.
+    return { status: 'skipped', broker: 'polymarket', reason: 'CLOB client pending — no take-profit order placed' }
   }
 }
 
@@ -941,12 +1066,21 @@ export class DeribitAdapter extends BrokerAdapter {
     displayName: 'Deribit',
     assetClasses: ['crypto_options', 'crypto_futures'],
     requiredEnvVars: ['DERIBIT_CLIENT_ID', 'DERIBIT_CLIENT_SECRET'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: false, supportsBracket: false,
+      supportsCancel: false, supportsStatus: false,
+      supportsNotionalSizing: false, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
     const clientId = process.env.DERIBIT_CLIENT_ID
     const clientSecret = process.env.DERIBIT_CLIENT_SECRET
     if (!clientId || !clientSecret) return { status: 'skipped', reason: 'DERIBIT_CLIENT_ID not configured' }
+    if (!params.quantity) {
+      return { status: 'skipped', broker: 'deribit', reason: 'Deribit requires explicit amount — refusing to default to 1 contract' }
+    }
 
     try {
       // Auth first
@@ -962,7 +1096,7 @@ export class DeribitAdapter extends BrokerAdapter {
       const orderRes = await fetch('https://www.deribit.com/api/v2/private/buy', {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: `private/${params.side}`, params: { instrument_name: params.symbol, amount: params.quantity ?? 1, type: 'market' } }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: `private/${params.side}`, params: { instrument_name: params.symbol, amount: params.quantity, type: 'market' } }),
       })
       const orderData = await orderRes.json()
       if (orderData.error) return { status: 'failed', broker: 'deribit', error: orderData.error.message }

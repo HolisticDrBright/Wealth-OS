@@ -323,9 +323,12 @@ export class CexLatencyArbStrategy extends BasePipelineStrategy {
       }, msUntilHardExit)
     }
 
+    // No leg is actually placed here (venue order placement pending) — never
+    // report 'submitted' for an order that does not exist.
     return {
-      status: 'submitted',
+      status: 'skipped',
       broker: longVenue === 'coinbase' ? 'coinbase' : longVenue === 'kraken' ? 'kraken' : 'binance_us',
+      error: 'venue order placement pending — intent logged, no orders placed',
     }
   }
 }

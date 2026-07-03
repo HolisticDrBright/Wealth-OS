@@ -133,5 +133,18 @@ export async function submitOrder(
       reason: `No configured broker for asset_class="${params.asset_class}"${params.jurisdiction ? ` in jurisdiction="${params.jurisdiction}"` : ''}`,
     }
   }
+  // Capability enforcement: refuse orders that rely on something the adapter
+  // cannot really do, and live routing requires sandbox-verified adapters.
+  const unsupported = adapter.checkOrderSupport(params)
+  if (unsupported) {
+    return { status: 'skipped', broker: adapter.config.id, reason: `capability_blocked: ${unsupported}` }
+  }
+  if (!adapter.config.capabilities.liveReady) {
+    return {
+      status: 'skipped',
+      broker: adapter.config.id,
+      reason: `broker_not_live_ready: ${adapter.config.id} has not been verified against the broker sandbox — live routing refused`,
+    }
+  }
   return adapter.execute(params)
 }

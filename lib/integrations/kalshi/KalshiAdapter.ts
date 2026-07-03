@@ -18,6 +18,13 @@ export class KalshiAdapter extends BrokerAdapter {
     displayName: 'Kalshi',
     assetClasses: ['polymarket', 'prediction_market'],
     requiredEnvVars: ['KALSHI_API_KEY', 'KALSHI_API_SECRET'],
+    capabilities: {
+      supportsMarket: true, supportsLimit: true, supportsBracket: false,
+      supportsCancel: false, supportsStatus: false,
+      // Notional→contracts needs a real limit price; guarded in execute().
+      supportsNotionalSizing: true, supportsQuantitySizing: true,
+      liveReady: false,
+    },
   }
 
   async execute(params: OrderParams): Promise<BrokerResult> {
@@ -25,6 +32,12 @@ export class KalshiAdapter extends BrokerAdapter {
     const secret = process.env.KALSHI_API_SECRET
     if (!key || !secret) {
       return { status: 'skipped', reason: 'KALSHI_API_KEY not configured' }
+    }
+    if (!params.quantity && !params.notional_usd) {
+      return { status: 'skipped', broker: 'kalshi', reason: 'order must specify quantity or notional_usd — refusing to default to 1 contract' }
+    }
+    if (!params.quantity && params.notional_usd && !params.limit_price) {
+      return { status: 'skipped', broker: 'kalshi', reason: 'notional sizing needs a limit_price to convert to contracts — refusing 0.50 price guess' }
     }
 
     try {
@@ -36,9 +49,8 @@ export class KalshiAdapter extends BrokerAdapter {
 
       // Convert notional to contracts (Kalshi contracts are $0.01 - $1.00 each)
       const price = params.limit_price ?? 0.5
-      const count = params.notional_usd
-        ? Math.max(1, Math.floor((params.notional_usd ?? 100) / Math.max(price, 0.01)))
-        : (params.quantity ?? 1)
+      const count = params.quantity
+        ?? Math.max(1, Math.floor((params.notional_usd as number) / Math.max(price, 0.01)))
 
       const body = {
         ticker,

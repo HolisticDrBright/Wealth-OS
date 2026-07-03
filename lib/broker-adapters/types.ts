@@ -72,6 +72,34 @@ export interface BrokerResult {
   reason?: string
 }
 
+/**
+ * Honest capability declaration per adapter. Execution refuses orders that
+ * rely on a capability the adapter does not really have, instead of guessing
+ * (e.g. deriving instrument units from USD notional).
+ */
+export interface BrokerCapabilities {
+  /** Can place market orders. */
+  supportsMarket: boolean
+  /** Can place limit orders. */
+  supportsLimit: boolean
+  /** Can place bracket orders (entry + protective stop/take-profit). */
+  supportsBracket: boolean
+  /** Can cancel a previously placed order. */
+  supportsCancel: boolean
+  /** Can query order status / fills. */
+  supportsStatus: boolean
+  /** Accepts USD-notional sizing natively (no client-side unit conversion). */
+  supportsNotionalSizing: boolean
+  /** Accepts explicit quantity / units / contracts sizing. */
+  supportsQuantitySizing: boolean
+  /**
+   * True ONLY after the adapter has been verified against the broker's real
+   * sandbox/paper environment. Live routing requires liveReady=true — during
+   * the paper validation phase every adapter is false.
+   */
+  liveReady: boolean
+}
+
 export interface BrokerConfig {
   id: string
   displayName: string
@@ -81,6 +109,8 @@ export interface BrokerConfig {
   blockedJurisdictions?: string[]
   /** Env vars required for this broker to be considered "configured" */
   requiredEnvVars: string[]
+  /** What this adapter can really do — enforced before execution. */
+  capabilities: BrokerCapabilities
 }
 
 /** Abstract base class — all concrete adapters extend this. */
@@ -96,6 +126,28 @@ export abstract class BrokerAdapter {
   isAllowedJurisdiction(jurisdiction?: string): boolean {
     if (!jurisdiction || !this.config.blockedJurisdictions?.length) return true
     return !this.config.blockedJurisdictions.includes(jurisdiction.toUpperCase())
+  }
+
+  /**
+   * Returns a human-readable reason when the order relies on a capability
+   * this adapter does not have, or null when the order is supported.
+   */
+  checkOrderSupport(params: OrderParams): string | null {
+    const c = this.config.capabilities
+    const id = this.config.id
+    const type = params.order_type ?? 'market'
+    if (type === 'market' && !c.supportsMarket) return `${id} does not support market orders`
+    if (type === 'limit' && !c.supportsLimit) return `${id} does not support limit orders`
+    if (params.quantity == null && params.notional_usd == null) {
+      return `order must specify quantity or notional_usd`
+    }
+    if (params.quantity == null && params.notional_usd != null && !c.supportsNotionalSizing) {
+      return `${id} does not accept USD-notional sizing — pass an explicit quantity in instrument units`
+    }
+    if (params.quantity != null && !c.supportsQuantitySizing) {
+      return `${id} does not accept quantity sizing — pass notional_usd`
+    }
+    return null
   }
 
   abstract execute(params: OrderParams): Promise<BrokerResult>
