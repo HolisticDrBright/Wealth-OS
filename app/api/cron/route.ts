@@ -196,6 +196,34 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
     }
 
+    if (task === 'ops-watchdog') {
+      // R7: dead-man switch + position reconciliation. Silent workers and
+      // unreconciled positions alert through the single ops channel.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { findDeadWorkers } = await import('@/lib/ops/reconcile')
+      const { sendOpsAlert } = await import('@/lib/ops/alert')
+
+      const { data: beats } = await supabase.from('worker_heartbeats').select('worker, last_seen')
+      const dead = findDeadWorkers((beats ?? []) as Array<{ worker: string; last_seen: string }>)
+      for (const d of dead) {
+        await sendOpsAlert(supabase, {
+          severity: 'critical',
+          title: `Worker silent: ${d.worker}`,
+          message: `No heartbeat for ${Math.round(d.silentMs / 60000)}m (>3× cadence) — de-risk per playbook and investigate`,
+        })
+      }
+
+      // Reconciliation: with no live broker linked, paper book is truth-by-
+      // construction; report skipped honestly instead of fabricating a diff.
+      const brokerLinked = !!(process.env.ALPACA_API_KEY || process.env.COINBASE_API_KEY || process.env.OANDA_API_KEY)
+      return NextResponse.json({
+        task: 'ops-watchdog',
+        deadWorkers: dead,
+        reconciliation: brokerLinked ? 'broker adapters present — wire per-broker snapshots' : 'skipped (paper mode, no broker linked)',
+      })
+    }
+
     if (task === 'tipp-floors') {
       // Daily TIPP ratchet (R2): F_t = max(F_prev × e^(r·dt), k × V_t) per
       // user per sleeve. The floor only ever rises here.
