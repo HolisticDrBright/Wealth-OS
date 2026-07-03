@@ -9,8 +9,20 @@
  * All calls are cached for 60 seconds to stay within free-tier rate limits.
  */
 
+import { preFilter } from '@/lib/ingest/sanitize'
+
 const BASE_URL = 'https://cryptopanic.com/api/v1'
 const CACHE_TTL_MS = 60_000
+
+/**
+ * Headlines are UNTRUSTED external text that can reach agent prompts. Strip
+ * hidden-payload carriers and drop injection-flagged titles entirely.
+ */
+function sanitizeHeadline(title: string): string {
+  const { text, flags } = preFilter(title)
+  if (flags.some(f => f !== 'html_comment')) return '[headline quarantined]'
+  return text.slice(0, 200)
+}
 
 interface CacheEntry { data: unknown; ts: number }
 const CACHE = new Map<string, CacheEntry>()
@@ -117,7 +129,7 @@ export async function topMovers(lookback: Lookback): Promise<MoverResult[]> {
     for (const post of results) {
       for (const currency of post.currencies ?? []) {
         const sym = currency.code.toUpperCase()
-        const entry = bySymbol.get(sym) ?? { bullish: 0, bearish: 0, total: 0, headline: post.title }
+        const entry = bySymbol.get(sym) ?? { bullish: 0, bearish: 0, total: 0, headline: sanitizeHeadline(post.title) }
         entry.total++
         if (post.votes.positive > post.votes.negative) entry.bullish++
         else if (post.votes.negative > post.votes.positive) entry.bearish++

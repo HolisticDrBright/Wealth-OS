@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { canIncreaseRisk } from '@/lib/ingest/sanitize'
 
 export interface SentimentResult {
   score: number                             // -1.0 to +1.0
@@ -17,6 +18,8 @@ export interface SentimentResult {
   mentionCount: number
   confidence: 'high' | 'medium' | 'low'
   sources: string[]
+  /** Subset of `sources` that are admitted-on-evidence in source_scores. */
+  admittedSources?: string[]
   fetchedFromDb: boolean
 }
 
@@ -81,12 +84,26 @@ async function getDbSentiment(
   }
 
   const score = totalWeight > 0 ? Math.max(-1, Math.min(1, weightedScore / totalWeight)) : 0
+
+  // Which of these sources are admitted-on-evidence? (fail-closed: none)
+  let admittedSources: string[] = []
+  try {
+    const { data: scores } = await supabase
+      .from('source_scores')
+      .select('source_id, admitted')
+      .in('source_id', [...sources])
+    admittedSources = ((scores ?? []) as Array<{ source_id: string; admitted: boolean }>)
+      .filter(s => s.admitted)
+      .map(s => s.source_id)
+  } catch { /* table missing → no source is admitted */ }
+
   return {
     score,
     sentiment: score > 0.15 ? 'bullish' : score < -0.15 ? 'bearish' : 'neutral',
     mentionCount: totalMentions,
     confidence: data.length >= 5 ? 'high' : data.length >= 2 ? 'medium' : 'low',
     sources: [...sources],
+    admittedSources,
     fetchedFromDb: true,
   }
 }
@@ -145,7 +162,9 @@ export async function getSentimentScore(
  * Apply a sentiment score as a strength multiplier.
  *
  * Rules:
- *   - Aligned (gap dir matches sentiment): boost ×1.3, capped at 1.0
+ *   - Aligned (gap dir matches sentiment): boost ×1.3, capped at 1.0 —
+ *     ONLY when ≥2 independent ADMITTED sources agree (canIncreaseRisk).
+ *     Risk-reducing effects (dampen/block) never require admission.
  *   - Neutral sentiment: no change
  *   - Contrary (moderate bearish vs long gap): dampen ×0.75
  *   - Strongly contrary (score ≤ -0.4 vs long, or ≥ +0.4 vs short): return null to block
@@ -169,6 +188,18 @@ export function applySentimentToStrength(
 
   if (strong && sentiment.confidence !== 'low') return null   // block
   if (contrary) return strength * 0.75
-  if (aligned)  return Math.min(1, strength * 1.30)
+  if (aligned) {
+    // Boosting exposure on external text requires the assembly gate: ≥2
+    // distinct admitted sources agreeing on direction. Fake headlines from a
+    // single (or unadmitted) source can never INCREASE risk.
+    const admitted = new Set(sentiment.admittedSources ?? [])
+    const gate = canIncreaseRisk(sentiment.sources.map(src => ({
+      source_id: src,
+      direction: (isLong ? 1 : -1) as 1 | -1,
+      sourceAdmitted: admitted.has(src),
+    })))
+    if (!gate.allowed) return strength   // no boost — but no penalty either
+    return Math.min(1, strength * 1.30)
+  }
   return strength
 }

@@ -80,12 +80,32 @@ describe('getSentimentScore', () => {
 })
 
 describe('applySentimentToStrength', () => {
-  it('4. boosts strength when long direction matches bullish sentiment', () => {
-    const sentiment = { score: 0.5, sentiment: 'bullish' as const, mentionCount: 10, confidence: 'high' as const, sources: ['reddit'], fetchedFromDb: true }
-    const result = applySentimentToStrength(0.6, 'long', sentiment)
-    expect(result).not.toBeNull()
-    expect(result!).toBeGreaterThan(0.6)
-    expect(result!).toBeLessThanOrEqual(1.0)
+  it('4. boosts strength ONLY when ≥2 admitted sources agree (canIncreaseRisk gate)', () => {
+    // Two independent admitted sources agreeing → boost allowed.
+    const admitted = {
+      score: 0.5, sentiment: 'bullish' as const, mentionCount: 10, confidence: 'high' as const,
+      sources: ['reuters', 'bloomberg'], admittedSources: ['reuters', 'bloomberg'], fetchedFromDb: true,
+    }
+    const boosted = applySentimentToStrength(0.6, 'long', admitted)
+    expect(boosted).not.toBeNull()
+    expect(boosted!).toBeGreaterThan(0.6)
+    expect(boosted!).toBeLessThanOrEqual(1.0)
+  })
+
+  it('4b. never boosts on a single or unadmitted source — fake headlines cannot increase risk', () => {
+    // Single admitted source → no boost.
+    const single = {
+      score: 0.5, sentiment: 'bullish' as const, mentionCount: 10, confidence: 'high' as const,
+      sources: ['reuters'], admittedSources: ['reuters'], fetchedFromDb: true,
+    }
+    expect(applySentimentToStrength(0.6, 'long', single)).toBe(0.6)
+
+    // Multiple sources, none admitted → no boost.
+    const unadmitted = {
+      score: 0.5, sentiment: 'bullish' as const, mentionCount: 10, confidence: 'high' as const,
+      sources: ['reddit', 'x'], admittedSources: [], fetchedFromDb: true,
+    }
+    expect(applySentimentToStrength(0.6, 'long', unadmitted)).toBe(0.6)
   })
 
   it('5. dampens strength when long direction contradicts bearish sentiment', () => {

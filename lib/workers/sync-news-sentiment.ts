@@ -12,6 +12,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { CamofoxClient } from '@/lib/integrations/camofox/CamofoxClient'
+import { preFilter } from '@/lib/ingest/sanitize'
 
 const REDDIT_SUBS = ['stocks', 'wallstreetbets', 'investing', 'CryptoCurrency']
 const SENTIMENT_KEYWORDS = {
@@ -45,7 +46,15 @@ export async function runSyncNewsSentiment(
       continue
     }
 
-    const posts = parseRedditText(res.result.text, symbols)
+    // Adversarial ingest gate — scraped text is UNTRUSTED. Injection-flagged
+    // pages are quarantined and never parsed; only pre-filtered text proceeds.
+    const gated = await gateScrapedText(supabase, `reddit/${sub}`, res.result.text)
+    if (!gated.ok) {
+      errors.push(`reddit/${sub}: quarantined (${gated.flags.join(',')})`)
+      continue
+    }
+
+    const posts = parseRedditText(gated.text, symbols)
     postsScraped += posts.length
     for (const p of posts) symbolsFound.add(p.symbol)
     allRows.push(...posts)
@@ -58,7 +67,12 @@ export async function runSyncNewsSentiment(
       errors.push(`x/${sym}: ${res.reason}`)
       continue
     }
-    const posts = parseTweetText(res.result.text, sym)
+    const gated = await gateScrapedText(supabase, `x/${sym}`, res.result.text)
+    if (!gated.ok) {
+      errors.push(`x/${sym}: quarantined (${gated.flags.join(',')})`)
+      continue
+    }
+    const posts = parseTweetText(gated.text, sym)
     postsScraped += posts.length
     if (posts.length > 0) symbolsFound.add(sym)
     allRows.push(...posts)
@@ -81,6 +95,30 @@ export async function runSyncNewsSentiment(
     symbolsFound: Array.from(symbolsFound),
     errors,
   }
+}
+
+/**
+ * Pre-filter one scraped page. Injection-flagged content (anything beyond a
+ * plain html_comment) is quarantined and NEVER parsed into sentiment rows —
+ * the rows land in agent-visible prompts downstream.
+ */
+export async function gateScrapedText(
+  supabase: SupabaseClient,
+  sourceId: string,
+  raw: string
+): Promise<{ ok: true; text: string } | { ok: false; flags: string[] }> {
+  const { text, flags } = preFilter(raw)
+  const hardFlags = flags.filter(f => f !== 'html_comment')
+  if (hardFlags.length === 0) return { ok: true, text }
+  try {
+    await supabase.from('ingest_quarantine').insert({
+      source_id: sourceId,
+      raw_content: raw.slice(0, 10_000),
+      flags,
+      reason: 'sync-news-sentiment pre-filter flagged scraped page',
+    })
+  } catch { /* quarantine is best-effort; the drop below is the guarantee */ }
+  return { ok: false, flags: hardFlags }
 }
 
 // ─── Types + parsers ──────────────────────────────────────────────────────────

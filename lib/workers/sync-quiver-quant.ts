@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { FeatureFlagService } from '@/lib/feature-flags/FeatureFlagService'
 import { getLiveCongressTrades } from '@/lib/market-data/quiver'
 import { CamofoxClient } from '@/lib/integrations/camofox/CamofoxClient'
+import { gateScrapedText } from '@/lib/workers/sync-news-sentiment'
 
 const QUIVER_COST_CENTS = 2   // $0.02 per quiver API call
 
@@ -56,7 +57,13 @@ export async function runSyncQuiverQuant(
     return { tradesUpserted: 0, source: 'skipped', errors: [...errors, scrape.reason] }
   }
 
-  const trades = parseCapitolTradesPage(scrape.result.text)
+  // Adversarial ingest gate — the scrape is UNTRUSTED web text.
+  const gated = await gateScrapedText(supabase, 'capitoltrades.com', scrape.result.text)
+  if (!gated.ok) {
+    return { tradesUpserted: 0, source: 'skipped', errors: [...errors, `capitoltrades quarantined (${gated.flags.join(',')})`] }
+  }
+
+  const trades = parseCapitolTradesPage(gated.text)
   if (trades.length === 0) {
     errors.push('camofox_scrape: no trades parsed from capitoltrades.com')
     return { tradesUpserted: 0, source: 'camofox_scrape', errors }
