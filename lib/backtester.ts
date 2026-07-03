@@ -18,6 +18,7 @@
  */
 import type { BacktestJob, BacktestResult, BacktestTrade } from './types'
 import type { BaseStrategy, StrategySignal } from './strategies/base-strategy'
+import type { PitStore } from './data/pit'
 
 export interface PriceBar {
   date: string        // YYYY-MM-DD
@@ -45,6 +46,12 @@ export interface BacktestConfig {
    * ('momentum' when unset).
    */
   strategy?: BaseStrategy
+  /**
+   * Point-in-time fact store: per-symbol metadata is assembled AS-OF each
+   * bar date — facts ingested later are invisible to earlier decisions
+   * (no restatement/survivorship cheating).
+   */
+  pit?: PitStore
 }
 
 export interface BacktestOutput {
@@ -305,7 +312,10 @@ export async function runBacktest(config: BacktestConfig): Promise<BacktestOutpu
 
         let signal: StrategySignal | null = null
         try {
-          signal = await strategy.generateSignal(sym, history, job.metadata)
+          const meta = config.pit
+            ? { ...job.metadata, ...config.pit.entityFacts(sym, date) }
+            : job.metadata
+          signal = await strategy.generateSignal(sym, history, meta)
         } catch (err) {
           if (err instanceof LookaheadError) throw err
           continue  // a strategy error on one symbol must not kill the run

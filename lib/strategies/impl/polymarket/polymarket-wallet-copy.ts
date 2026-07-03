@@ -73,6 +73,35 @@ interface WalletStats {
 
 export const walletStatsCache = new Map<string, { stats: WalletStats; cachedAt: number }>()
 const STATS_CACHE_TTL_MS = 30 * 60 * 1000  // 30 min
+const RECERT_WINDOW_MS = 30 * 86_400_000   // 30-day recertification standard
+
+/** Real rolling stats from the corpus aggregates; null when absent/stale. */
+export async function fetchCorpusWalletStats(
+  supabase: SupabaseClient,
+  wallet: string
+): Promise<WalletStats | null> {
+  try {
+    const { data } = await supabase
+      .from('wallet_stats')
+      .select('win_rate_30d, sharpe_60d, n_trades, recertified_at')
+      .eq('wallet', wallet)
+      .maybeSingle()
+    if (!data || data.win_rate_30d == null) return null
+    // Stale certification = not admitted; fall back to estimates.
+    if (!data.recertified_at || Date.now() - new Date(data.recertified_at).getTime() > RECERT_WINDOW_MS) {
+      return null
+    }
+    return {
+      winRate: Math.max(0, Math.min(1, Number(data.win_rate_30d))),
+      maxDD: 0.25,
+      avgHoldHours: 48,
+      tradeCount: Number(data.n_trades ?? 0),
+      isEstimated: false,   // real history → the strict binomial gate applies
+    }
+  } catch {
+    return null
+  }
+}
 
 function estimateWalletStats(recentTrades: { side: 'buy' | 'sell' | 'YES' | 'NO'; price: number }[]): WalletStats {
   // Simplified stats from available CLOB data — real implementation uses Dune
@@ -154,15 +183,17 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
         if (hoursLeft < MIN_HOURS_TO_RESOLVE) continue
       }
 
-      // Wallet performance gate (estimates from CLOB; Dune gated if flag enabled)
+      // Wallet performance gate — REAL corpus stats first (wallet_stats
+      // aggregates from the parquet lake: 60d-Sharpe admission + 30d
+      // recertification), CLOB estimates only as the cold-start fallback.
       const cachedEntry = walletStatsCache.get(trade.wallet)
       const tradeSide = trade.side === 'YES' ? 'buy' : 'sell'
       let stats: WalletStats
       if (cachedEntry && Date.now() - cachedEntry.cachedAt < STATS_CACHE_TTL_MS) {
         stats = cachedEntry.stats
       } else {
-        stats = estimateWalletStats([{ side: tradeSide, price }])
-        // Cache estimate so later calls within the TTL window avoid redundant computation
+        const real = supabase ? await fetchCorpusWalletStats(supabase, trade.wallet) : null
+        stats = real ?? estimateWalletStats([{ side: tradeSide, price }])
         walletStatsCache.set(trade.wallet, { stats, cachedAt: Date.now() })
       }
 
