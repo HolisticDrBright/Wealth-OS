@@ -24,6 +24,7 @@ import { AiUsagePanel } from './command-center/AiUsagePanel'
 import { ShadowPortfolioPanel } from './command-center/ShadowPortfolioPanel'
 import { EquityCurvePanel } from './command-center/EquityCurvePanel'
 import { RunHistoryStrip } from './command-center/RunHistoryStrip'
+import { TradeTapePanel } from './command-center/TradeTapePanel'
 
 export function DashboardClient({ data }: { data: CommandCenterData }) {
   return (
@@ -49,6 +50,9 @@ export function DashboardClient({ data }: { data: CommandCenterData }) {
       {/* 4.5 — Last paper run breakdown + run history trend */}
       <PaperRunPanel lastRun={data.paper.lastRun} />
       <RunHistoryStrip runs={data.paper.runHistory} />
+
+      {/* 4.7 — Trade tape: every fill with its reasoning (provenance) */}
+      <TradeTapePanel fills={data.tape} />
 
       {/* 5 — Shadow portfolio: "were your gates right?" */}
       <ShadowPortfolioPanel data={data.shadow} />

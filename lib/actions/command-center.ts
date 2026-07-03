@@ -27,6 +27,7 @@ import {
   type PaperRunView,
 } from '@/lib/actions/paper-trading'
 import { getEquityCurve, type EquityCurveView } from '@/lib/actions/equity-curve'
+import { getTradeTape, type TapeFill } from '@/lib/actions/trade-tape'
 import { getRiskSummary, getRiskControls, type RiskSummary } from '@/lib/actions/risk'
 import { getOpportunities } from '@/lib/actions/opportunities'
 import {
@@ -110,6 +111,7 @@ export interface CommandCenterData {
   paper: PaperView
   shadow: ShadowPortfolioSummary | null
   equityCurve: EquityCurveView | null
+  tape: TapeFill[]
   allocationProfileKey: string
   allocationProfile: RiskProfileRow | null
   trust: TrustView
@@ -412,7 +414,7 @@ async function loadAiUsage(): Promise<AiUsageView> {
 // ─── Public entry point ─────────────────────────────────────────────────────
 
 export async function getCommandCenterData(): Promise<CommandCenterData> {
-  const [regime, risk, riskControls, opportunities, noTrade, paper, shadow, equityCurve, allocation, trust] =
+  const [regime, risk, riskControls, opportunities, noTrade, paper, shadow, equityCurve, allocation, trust, tape] =
     await Promise.all([
       loadRegime(),
       loadRisk(),
@@ -424,6 +426,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
       getEquityCurve().catch(() => null),
       loadAllocation(),
       loadTrust(),
+      getTradeTape().catch(() => []),
     ])
 
   const [decisions, aiUsage] = await Promise.all([
@@ -440,6 +443,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
     paper,
     shadow,
     equityCurve,
+    tape,
     allocationProfileKey: allocation.profileKey,
     allocationProfile: allocation.profile,
     trust,

@@ -11,9 +11,18 @@ import { EmptyState } from '@/components/ui/states'
 import { cn } from '@/lib/utils'
 import { LineChart as LineChartIcon } from 'lucide-react'
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
+  ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
 } from 'recharts'
 import type { EquityCurveView } from '@/lib/actions/equity-curve'
+
+/** Underwater series: distance below the running high-water mark (≤ 0). */
+function withUnderwater(points: EquityCurveView['points']) {
+  let peak = -Infinity
+  return points.map(p => {
+    peak = Math.max(peak, p.realUsd)
+    return { ...p, underwaterUsd: Math.round((p.realUsd - peak) * 100) / 100 }
+  })
+}
 
 function fmt(usd: number): string {
   const abs = Math.abs(usd)
@@ -52,7 +61,7 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
         <div className="space-y-2">
           <div className="h-44" style={{ minHeight: 176 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <ComposedChart data={withUnderwater(data.points)} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} minTickGap={40} />
                 <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} width={46}
@@ -62,13 +71,18 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
                   labelStyle={{ color: '#9ca3af' }}
                   formatter={(value, name) => [
                     `$${Number(value).toFixed(2)}`,
-                    name === 'realUsd' ? 'Real (accepted)' : 'Shadow (rejected)',
+                    name === 'realUsd' ? 'Real (accepted)'
+                      : name === 'underwaterUsd' ? 'Drawdown from peak'
+                      : 'Shadow (rejected)',
                   ]}
                 />
                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
+                {/* Underwater drawdown shading — always ≤ 0 */}
+                <Area type="monotone" dataKey="underwaterUsd" stroke="none"
+                  fill="rgba(248,113,113,0.18)" />
                 <Line type="monotone" dataKey="realUsd" stroke="#34d399" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="shadowUsd" stroke="#818cf8" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
           <div className="flex items-center gap-4 text-[11px] text-gray-600">
