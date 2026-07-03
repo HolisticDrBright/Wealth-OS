@@ -13,6 +13,12 @@ export interface OrderParams {
   broker_override?: string
   /** ISO-3166-1 alpha-2 country code of the user's jurisdiction */
   jurisdiction?: string
+  /**
+   * Deterministic idempotency key (wos-<sha256(opportunityId:leg)[0:20]>).
+   * Retries and concurrent workers MUST reuse the same id so the broker
+   * dedupes. Set by lib/broker-adapters/order-intents.ts.
+   */
+  client_order_id?: string
 }
 
 /**
@@ -41,6 +47,8 @@ export interface BracketParams {
   trail_pct?: number
   time_in_force?: 'day' | 'gtc'
   jurisdiction?: string
+  /** Deterministic idempotency key for the ENTRY leg (see OrderParams). */
+  client_order_id?: string
 }
 
 export interface BracketResult {

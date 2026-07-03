@@ -31,6 +31,7 @@ import { preTradeRiskCheck } from '@/lib/risk/kill-switch'
 import { edgeClearsCosts } from '@/lib/costs/transaction-costs'
 import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { getPortfolioUsd } from '@/lib/strategies/risk-controls'
+import { executeIdempotent, placeBracketIdempotent } from '@/lib/broker-adapters/order-intents'
 import type {
   Opportunity,
   OpportunityContext,
@@ -461,7 +462,9 @@ export abstract class BasePipelineStrategy {
         time_in_force: 'gtc',
         jurisdiction,
       }
-      const result = await adapter.placeBracketOrder(bracketParams)
+      const result = await placeBracketIdempotent(adapter, bracketParams, {
+        supabase, userId, opportunityId: opp.id,
+      })
       return {
         status: result.status === 'submitted' ? 'submitted' : result.status === 'skipped' ? 'skipped' : 'failed',
         broker,
@@ -470,12 +473,12 @@ export abstract class BasePipelineStrategy {
       }
     }
 
-    const result = await adapter.execute({
+    const result = await executeIdempotent(adapter, {
       symbol: opp.symbol,
       asset_class: opp.assetClass,
       side: opp.direction === 'short' ? 'sell' : 'buy',
       notional_usd: size.notionalUsd,
-    })
+    }, { supabase, userId, opportunityId: opp.id })
 
     const status: ExecutionResult['status'] =
       result.status === 'open' || result.status === 'submitted' ? 'submitted'

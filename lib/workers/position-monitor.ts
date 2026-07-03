@@ -211,6 +211,23 @@ export class PositionMonitor {
   }
 
   private async sweep(): Promise<void> {
+    // OCO reconciliation from order_intents: verify bracket legs after entry
+    // fills, cancel siblings on stop/TP fills, resize legs on partial fills.
+    try {
+      const { reconcileOrderIntents } = await import('@/lib/broker-adapters/reconciler')
+      const { defaultReconcilerOps } = await import('@/lib/broker-adapters/reconciler-ops')
+      const report = await reconcileOrderIntents(this.supabase as never, defaultReconcilerOps())
+      if (report.cancelled || report.reduced || report.missingLegs || report.errors.length) {
+        console.log(
+          `[PositionMonitor] reconcile: scanned=${report.scanned} cancelled=${report.cancelled} ` +
+          `reduced=${report.reduced} missingLegs=${report.missingLegs} errors=${report.errors.length}`
+        )
+        for (const e of report.errors) console.warn(`[PositionMonitor] reconcile error: ${e}`)
+      }
+    } catch (err) {
+      console.warn('[PositionMonitor] reconcile pass failed:', err)
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: rawRows, error } = await (this.supabase.from('paper_positions') as any)
       .select('id, user_id, strategy_key, symbol, asset_class, direction, entry_price, current_price, quantity, notional_usd, stop_loss_pct, take_profit_pct, max_hold_hours, opened_at, metadata')

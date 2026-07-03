@@ -1,6 +1,16 @@
-import { createHash, createHmac } from 'crypto'
+import { createHash, createHmac, randomUUID } from 'crypto'
 import type { OrderParams, BrokerResult, BrokerConfig, BracketParams, BracketResult } from './types'
 import { BrokerAdapter } from './types'
+
+/**
+ * Client order id for brokers that require one. Callers going through
+ * lib/broker-adapters/order-intents.ts pass a DETERMINISTIC id (idempotent
+ * retries); direct calls get a random UUID — never a timestamp, which
+ * collides across workers and changes on every retry.
+ */
+function cidOrRandom(provided: string | undefined, suffix = ''): string {
+  return provided ? `${provided}${suffix}` : `wos-${randomUUID().slice(0, 20)}${suffix}`
+}
 
 // ─── Alpaca (US stocks, ETFs, crypto) ────────────────────────────────────────
 
@@ -306,7 +316,7 @@ export class CoinbaseAdapter extends BrokerAdapter {
       const ts = Math.floor(Date.now() / 1000).toString()
       const path = '/api/v3/brokerage/orders'
       const body = JSON.stringify({
-        client_order_id: `wos-${Date.now()}`,
+        client_order_id: cidOrRandom(params.client_order_id),
         product_id: `${params.symbol}-USD`,
         side: params.side.toUpperCase(),
         order_configuration: {
@@ -353,8 +363,11 @@ export class CoinbaseAdapter extends BrokerAdapter {
 
     try {
       const productId = `${params.symbol}-USD`
+      // Deterministic per-leg ids derived from the entry id so a retried
+      // bracket reuses ALL THREE ids and the broker dedupes every leg.
+      const entryCid = cidOrRandom(params.client_order_id)
       const entryBody = JSON.stringify({
-        client_order_id: `wos-entry-${Date.now()}`,
+        client_order_id: entryCid,
         product_id: productId,
         side: params.side.toUpperCase(),
         order_configuration: {
@@ -373,7 +386,7 @@ export class CoinbaseAdapter extends BrokerAdapter {
       let stopOrderId: string | undefined
       if (params.stop_price && params.quantity) {
         const stopBody = JSON.stringify({
-          client_order_id: `wos-stop-${Date.now()}`,
+          client_order_id: `${entryCid}-s`,
           product_id: productId,
           side: params.side === 'buy' ? 'SELL' : 'BUY',
           order_configuration: {
@@ -393,7 +406,7 @@ export class CoinbaseAdapter extends BrokerAdapter {
       let takeProfitOrderId: string | undefined
       if (params.take_profit_price && params.quantity) {
         const tpBody = JSON.stringify({
-          client_order_id: `wos-tp-${Date.now()}`,
+          client_order_id: `${entryCid}-t`,
           product_id: productId,
           side: params.side === 'buy' ? 'SELL' : 'BUY',
           order_configuration: {

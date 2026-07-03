@@ -6,6 +6,7 @@
  * API docs: https://trading-api.readme.io/reference/getting-started
  */
 
+import { randomUUID } from 'crypto'
 import type { OrderParams, BrokerResult, BrokerConfig } from '@/lib/broker-adapters/types'
 import { BrokerAdapter } from '@/lib/broker-adapters/types'
 
@@ -41,7 +42,9 @@ export class KalshiAdapter extends BrokerAdapter {
 
       const body = {
         ticker,
-        client_order_id: `wos-${Date.now()}`,
+        // Idempotency: deterministic id from order-intents when provided;
+        // random UUID otherwise — never a timestamp (collides across workers).
+        client_order_id: params.client_order_id ?? `wos-${randomUUID().slice(0, 20)}`,
         side: params.side === 'buy' ? 'yes' : 'no',
         action: 'buy',
         count,
