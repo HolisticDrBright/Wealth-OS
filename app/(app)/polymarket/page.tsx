@@ -13,6 +13,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
 import { AssetRiskProfile } from '@/components/risk-profile/AssetRiskProfile'
 import { getAssetRiskProfileData } from '@/lib/actions/asset-risk-profile'
+import { getFairValuePoints, type FairValuePoint } from '@/lib/actions/fair-value'
+import { FairValuePanel } from './FairValuePanel'
 import { Terminal, ExternalLink, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getUserStateOfResidence, isVenueAllowedInState } from '@/lib/risk-profile/state-gate'
@@ -45,6 +47,7 @@ export default async function PolymarketPage() {
       Promise.resolve(getCircuitState()),
       getAssetRiskProfileData('polymarket').catch(() => ({ profiles: [], userProfile: null, strategyDefs: [], migrationApplied: false })),
     ])
+  const fairValuePoints = await getFairValuePoints().catch(() => [])
 
   const riskPanel = (
     <div className="px-4 pt-6 pb-2 max-w-4xl mx-auto">
@@ -82,7 +85,7 @@ export default async function PolymarketPage() {
       <div className="flex flex-col">
         {riskPanel}
         {stateBanBanner}
-        <SetupGuide errorCode={healthRes.error.code} errorMessage={healthRes.error.message} />
+        <SetupGuide errorCode={healthRes.error.code} errorMessage={healthRes.error.message} fairValuePoints={fairValuePoints} />
       </div>
     )
   }
@@ -102,11 +105,14 @@ export default async function PolymarketPage() {
         circuitOpen={circuit.open}
         circuitRetriesInMs={circuit.retriesInMs}
       />
+      <div className="px-6 pb-6">
+        <FairValuePanel points={fairValuePoints} />
+      </div>
     </div>
   )
 }
 
-function SetupGuide({ errorCode, errorMessage }: { errorCode: string; errorMessage: string }) {
+function SetupGuide({ errorCode, errorMessage, fairValuePoints }: { errorCode: string; errorMessage: string; fairValuePoints: FairValuePoint[] }) {
   const isUnreachable = errorCode === 'UNREACHABLE' || errorCode === 'TIMEOUT'
   const isCircuitOpen = errorCode === 'CIRCUIT_OPEN'
 
@@ -172,6 +178,7 @@ function SetupGuide({ errorCode, errorMessage }: { errorCode: string; errorMessa
       {/* Paper trading toggles — available even when sidecar is offline */}
       <div className="px-6 pb-6">
         <AssetStrategyPanel assetClasses={['polymarket']} />
+        <FairValuePanel points={fairValuePoints} />
       </div>
     </div>
   )

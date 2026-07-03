@@ -28,6 +28,7 @@ import {
 } from '@/lib/actions/paper-trading'
 import { getEquityCurve, type EquityCurveView } from '@/lib/actions/equity-curve'
 import { getTradeTape, type TapeFill } from '@/lib/actions/trade-tape'
+import { getDecisionReasoning, type DecisionReasoningRow } from '@/lib/actions/decision-reasoning'
 import { getRiskSummary, getRiskControls, type RiskSummary } from '@/lib/actions/risk'
 import { getOpportunities } from '@/lib/actions/opportunities'
 import {
@@ -112,6 +113,7 @@ export interface CommandCenterData {
   shadow: ShadowPortfolioSummary | null
   equityCurve: EquityCurveView | null
   tape: TapeFill[]
+  reasoning: DecisionReasoningRow[]
   allocationProfileKey: string
   allocationProfile: RiskProfileRow | null
   trust: TrustView
@@ -414,7 +416,7 @@ async function loadAiUsage(): Promise<AiUsageView> {
 // ─── Public entry point ─────────────────────────────────────────────────────
 
 export async function getCommandCenterData(): Promise<CommandCenterData> {
-  const [regime, risk, riskControls, opportunities, noTrade, paper, shadow, equityCurve, allocation, trust, tape] =
+  const [regime, risk, riskControls, opportunities, noTrade, paper, shadow, equityCurve, allocation, trust, tape, reasoning] =
     await Promise.all([
       loadRegime(),
       loadRisk(),
@@ -427,6 +429,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
       loadAllocation(),
       loadTrust(),
       getTradeTape().catch(() => []),
+      getDecisionReasoning().catch(() => []),
     ])
 
   const [decisions, aiUsage] = await Promise.all([
@@ -444,6 +447,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
     shadow,
     equityCurve,
     tape,
+    reasoning,
     allocationProfileKey: allocation.profileKey,
     allocationProfile: allocation.profile,
     trust,

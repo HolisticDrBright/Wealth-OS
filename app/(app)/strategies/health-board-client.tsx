@@ -31,6 +31,8 @@ import type { PromotionPipelineRow } from '@/lib/actions/promotion-readiness'
 import { AIStrategiesClient } from './ai-strategies-client'
 import { BookAllocationPanel } from './BookAllocationPanel'
 import { PromotionPipelinePanel } from './PromotionPipelinePanel'
+import { LeaderboardPanel } from './LeaderboardPanel'
+import type { StrategyMetrics } from '@/lib/actions/strategy-metrics'
 
 // ─── Tabs shell ───────────────────────────────────────────────────────────────
 
@@ -41,11 +43,13 @@ export function StrategiesTabs({
   configureProps,
   bookAllocation = null,
   promotionPipeline = [],
+  metrics = [],
 }: {
   rows: StrategyHealthRow[]
   configureProps: AIStrategiesProps
   bookAllocation?: BookAllocationView | null
   promotionPipeline?: PromotionPipelineRow[]
+  metrics?: StrategyMetrics[]
 }) {
   const [tab, setTab] = useState<'health' | 'configure'>('health')
 
@@ -76,6 +80,7 @@ export function StrategiesTabs({
         ? (
           <div className="space-y-3">
             {bookAllocation && <BookAllocationPanel data={bookAllocation} />}
+            <LeaderboardPanel metrics={metrics} />
             <PromotionPipelinePanel rows={promotionPipeline} />
             <HealthBoard rows={rows} />
           </div>

@@ -13,6 +13,8 @@ import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { StrategyKey } from '@/lib/strategies/strategy-registry'
 import { detectRegime, CrossAssetRegime } from '@/lib/regime/cross-asset-regime'
 import { getRollingBrier } from '@/lib/learning/rolling-brier'
+import { getCalibrationReliability } from '@/lib/actions/calibration-reliability'
+import { ReliabilityPanel } from './ReliabilityPanel'
 
 // Hoisted clock read. Server components render once per request, so reading the
 // clock is safe; the helper keeps the call out of the render-purity analysis.
@@ -189,10 +191,11 @@ function regimeBadge(regime: CrossAssetRegime): { label: string; cls: string } {
 
 export default async function CalibrationPage() {
   const supabase = await createClient()
-  const [rows, brierMap, regimeReading] = await Promise.all([
+  const [rows, brierMap, regimeReading, reliability] = await Promise.all([
     getCalibrationData(),
     getBrierRows(supabase),
     detectRegime().catch(() => ({ regime: CrossAssetRegime.NEUTRAL, vix: null, hyOas: null, resolvedAt: nowMs() })),
+    getCalibrationReliability().catch(() => null),
   ])
 
   const assetGroups = ['stocks', 'options', 'crypto', 'forex', 'polymarket', 'multi-asset']
@@ -223,6 +226,9 @@ export default async function CalibrationPage() {
             </div>
           </div>
         </div>
+
+        {/* Reliability diagram + live sizer inputs (widget 7) */}
+        <ReliabilityPanel data={reliability} />
 
         {/* Legend */}
         <div className="flex gap-6 text-xs text-gray-400">

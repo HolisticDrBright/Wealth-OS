@@ -25,6 +25,7 @@ import { ShadowPortfolioPanel } from './command-center/ShadowPortfolioPanel'
 import { EquityCurvePanel } from './command-center/EquityCurvePanel'
 import { RunHistoryStrip } from './command-center/RunHistoryStrip'
 import { TradeTapePanel } from './command-center/TradeTapePanel'
+import { AgentReasoningPanel } from './command-center/AgentReasoningPanel'
 
 export function DashboardClient({ data }: { data: CommandCenterData }) {
   return (
@@ -51,8 +52,11 @@ export function DashboardClient({ data }: { data: CommandCenterData }) {
       <PaperRunPanel lastRun={data.paper.lastRun} />
       <RunHistoryStrip runs={data.paper.runHistory} />
 
-      {/* 4.7 — Trade tape: every fill with its reasoning (provenance) */}
-      <TradeTapePanel fills={data.tape} />
+      {/* 4.7 — Trade tape + agent reasoning: provenance for every fill */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <TradeTapePanel fills={data.tape} />
+        <AgentReasoningPanel decisions={data.reasoning} />
+      </div>
 
       {/* 5 — Shadow portfolio: "were your gates right?" */}
       <ShadowPortfolioPanel data={data.shadow} />

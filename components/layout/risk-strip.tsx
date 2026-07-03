@@ -16,6 +16,7 @@ import {
   getRiskStripData, getHaltImpact, setTradingHalted,
   type RiskStripData, type HaltImpact,
 } from '@/lib/actions/risk-strip'
+import { DensityToggle } from '@/components/layout/density-provider'
 
 const POLL_MS = 30_000
 const RESUME_PHRASE = 'RESUME TRADING'
@@ -115,7 +116,8 @@ export function RiskStrip() {
         ))}
       </span>
 
-      <span className="ml-auto">
+      <span className="ml-auto flex items-center gap-2">
+        <DensityToggle />
         {halted ? (
           <span className="flex items-center gap-1.5">
             <input
