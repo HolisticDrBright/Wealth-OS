@@ -26,6 +26,7 @@ import { isStrategyKey } from '@/lib/strategies/strategy-registry'
 import { miroFishClient, simulateWithClaude } from '@/lib/agents/mirofish-client'
 import { selectBroker, submitOrder } from '@/lib/broker-adapters/router'
 import { edgeClearsCosts } from '@/lib/costs/transaction-costs'
+import { computeEmpiricalSize } from '@/lib/risk/empirical-sizing'
 import type { TradeContext } from '@/lib/agents/types'
 import type { SimulationReport } from '@/lib/agents/types'
 
@@ -149,9 +150,20 @@ export class StrategyOrchestrator {
     }
 
     // ── Stage 6: Risk / Size ─────────────────────────────────────────────────
-    const kellyFraction = computeKellyFraction(signal.expectedReturn, signal.strength)
-    const sizeFraction = Math.min(kellyFraction, 0.10)  // cap at 10% of capital
-    trail.push(`[risk] kelly=${(kellyFraction * 100).toFixed(1)}% capped=${(sizeFraction * 100).toFixed(1)}%`)
+    // Shared empirical-Kelly path: calibrated win rate (or maturity-floor
+    // probe) — never signal strength — sized against REAL account equity.
+    const sized = await computeEmpiricalSize({
+      supabase,
+      userId,
+      strategyKey: strategy.id,
+      opp: { symbol },
+    })
+    if (sized.blocked) {
+      trail.push(`[risk] BLOCKED: ${sized.reason}`)
+      return buildResult(signal, 'block', 0, score, trail, miroFishReport, miroFishScore, undefined, sized.reason)
+    }
+    const sizeFraction = Math.min(sized.fraction, 0.10)  // cap at 10% of capital
+    trail.push(`[risk] ${sized.rationale} capped=${(sizeFraction * 100).toFixed(1)}%`)
 
     const decision = score >= 65 ? 'execute' : score >= 45 ? 'reduce' : 'block'
     trail.push(`[decision] ${decision.toUpperCase()} score=${score.toFixed(0)}`)
@@ -170,11 +182,13 @@ export class StrategyOrchestrator {
         return buildResult(signal, 'block', 0, score, trail, miroFishReport, miroFishScore, undefined, `kill_switch: ${killSwitch.reason}`)
       }
 
+      // Notional from the empirical sizing result — real equity, no defaults.
+      const notionalUsd = sized.notionalUsd
       const broker = selectBroker({
         symbol,
         asset_class: signal.assetClass,
         side: signal.side,
-        notional_usd: sizeFraction * (tradeContext?.user?.total_net_worth ?? 10000),
+        notional_usd: notionalUsd,
         jurisdiction,
       })
 
@@ -184,7 +198,7 @@ export class StrategyOrchestrator {
             symbol,
             asset_class: signal.assetClass,
             side: signal.side,
-            notional_usd: sizeFraction * (tradeContext?.user?.total_net_worth ?? 10000),
+            notional_usd: notionalUsd,
             jurisdiction,
           })
           trail.push(`[execute] broker=${result.broker} status=${result.status} order=${result.broker_order_id ?? 'n/a'}`)
@@ -212,13 +226,6 @@ function computeBaseScore(signal: StrategySignal, miroFishScore?: number): numbe
   const edgeScore = Math.min(20, Math.abs(signal.expectedReturn) * 500)
   const mfBonus = miroFishScore !== undefined ? (miroFishScore - 50) * 0.4 : 0  // ±20 from MiroFish
   return Math.max(0, Math.min(100, signalScore + edgeScore + mfBonus))
-}
-
-function computeKellyFraction(expectedReturn: number, winProbability: number): number {
-  const q = 1 - winProbability
-  const b = Math.abs(expectedReturn) / 0.02  // assume 2% risk per unit
-  if (b <= 0 || winProbability <= 0) return 0
-  return Math.max(0, (winProbability * b - q) / b)
 }
 
 function buildTradeContext(signal: StrategySignal, partial?: Partial<TradeContext>): TradeContext {

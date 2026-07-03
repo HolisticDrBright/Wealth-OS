@@ -32,6 +32,7 @@ import type {
   ExecutionResult,
 } from '../../pipeline-types'
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import { randomUUID } from 'crypto'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -244,7 +245,10 @@ export class CexLatencyArbStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
 
     // Per-leg: 0.25% of book; both legs combined = 0.5% per symbol
@@ -253,11 +257,13 @@ export class CexLatencyArbStrategy extends BasePipelineStrategy {
       fraction = Math.min(fraction, rc.max_single_position_pct / 100 / 2)  // halved for each leg
     }
     fraction = Math.min(fraction, HARD_CAP_PCT / 2)  // hard cap split across legs
+    const hc = await applyEmpiricalHaircuts(fraction, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
 
     return {
-      fraction,
-      notionalUsd: fraction * portfolio,
-      rationale: `CEX latency arb: ${(fraction * 100).toFixed(2)}% per leg (${(opp.metadata.netBpsAfterFees as number).toFixed(1)} bps net)`,
+      fraction: hc.fraction,
+      notionalUsd: hc.fraction * portfolio,
+      rationale: `CEX latency arb: ${(hc.fraction * 100).toFixed(2)}% per leg (${(opp.metadata.netBpsAfterFees as number).toFixed(1)} bps net)`,
     }
   }
 

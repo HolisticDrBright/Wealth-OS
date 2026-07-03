@@ -91,19 +91,25 @@ export function applyConfluenceHaircut(
 
 /**
  * Fetch the user's total portfolio value from the assets table.
- * Falls back to $10,000 if not available.
+ *
+ * Returns null when equity cannot be established (query error, no assets,
+ * zero value). Callers must REFUSE to size on null — sizing off a default
+ * means live orders sized off fiction.
  */
 export async function getPortfolioUsd(
   supabase: SupabaseClient,
   userId: string
-): Promise<number> {
+): Promise<number | null> {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('assets')
       .select('current_value')
       .eq('user_id', userId)
-    return (data ?? []).reduce((s: number, r: { current_value: number }) => s + r.current_value, 0) || 10_000
+    if (error) return null
+    const total = (data ?? []).reduce(
+      (s: number, r: { current_value: number }) => s + (r.current_value ?? 0), 0)
+    return total > 0 ? total : null
   } catch {
-    return 10_000
+    return null
   }
 }

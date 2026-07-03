@@ -28,6 +28,7 @@ import type {
   ManageAction,
 } from '../../pipeline-types'
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import {
   isLastBusinessDayOfMonth,
   utcHourDecimal,
@@ -167,18 +168,23 @@ export class London4pmFixEndmonthStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
     const riskPct = (opp.metadata.riskPct as number | undefined) ?? 0.02
-    const fraction = Math.min(riskPct, maxSinglePct / 100)
-    const notionalUsd = fraction * portfolio
+    const structural = Math.min(riskPct, maxSinglePct / 100)
+    const hc = await applyEmpiricalHaircuts(structural, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
+    const notionalUsd = hc.fraction * portfolio
 
     return {
-      fraction,
+      fraction: hc.fraction,
       notionalUsd,
-      rationale: `London fix ${opp.metadata.subSignal === 'pre_fix' ? '2%' : '1.5%'} risk`,
+      rationale: `London fix ${opp.metadata.subSignal === 'pre_fix' ? '2%' : '1.5%'} risk × empirical haircuts`,
     }
   }
 

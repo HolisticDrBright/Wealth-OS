@@ -347,7 +347,7 @@ Write a CIO synthesis as JSON:
           (opp.direction === 'long'  && imbalance.signal === 'bear') ||
           (opp.direction === 'short' && imbalance.signal === 'bull')
         if (opposes) {
-          const size = await strat.sizePosition(opp, verdicts, userId)
+          const size = await strat.sizePosition(opp, verdicts, userId, supabase)
           const decision = {
             action: 'reduce_size' as const,
             reason: `order book imbalance opposes ${opp.direction} (${imbalance.signal}, ratio=${imbalance.ratio.toFixed(2)})`,
@@ -361,7 +361,7 @@ Write a CIO synthesis as JSON:
 
     // Gate 2 — MiroFish bear opposes long
     if (mirofish?.scenario === 'bear' && opp.direction === 'long') {
-      const size = await strat.sizePosition(opp, verdicts, userId)
+      const size = await strat.sizePosition(opp, verdicts, userId, supabase)
       const decision = { action: 'reduce_size' as const, reason: 'mirofish bear scenario', size }
       await strat.logAudit(opp, decision, verdicts, supabase, userId)
       return decision
@@ -383,7 +383,7 @@ Write a CIO synthesis as JSON:
         await strat.logAudit(opp, decision, verdicts, supabase, userId)
         return decision
       }
-      const size = await strat.sizePosition(opp, verdicts, userId)
+      const size = await strat.sizePosition(opp, verdicts, userId, supabase)
       const decision = { action: 'reduce_size' as const, reason: redTeam.reason ?? 'red team score low', size }
       await strat.logAudit(opp, decision, verdicts, supabase, userId)
       return decision

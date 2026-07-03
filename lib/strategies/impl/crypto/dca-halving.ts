@@ -24,7 +24,8 @@ import type {
   AllVerdicts,
   PositionSize,
 } from '../../pipeline-types'
-import { getRiskControl, getPortfolioUsd, quarterKelly, applyConfluenceHaircut } from '../../risk-controls'
+import { getRiskControl, applyConfluenceHaircut } from '../../risk-controls'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { getHalvingCycleState, getDCASignal } from '@/lib/market-data/halving'
 import type { HalvingPhase } from '@/lib/market-data/halving'
 import { randomUUID } from 'crypto'
@@ -293,7 +294,11 @@ export class DcaHalvingStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const sized = await computeEmpiricalSize({ supabase, userId, strategyKey: this.key, opp })
+    if (sized.blocked || sized.portfolioUsd == null) {
+      return zeroSize(sized.reason ?? 'refusing to size')
+    }
+    const portfolio = sized.portfolioUsd
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
@@ -301,7 +306,7 @@ export class DcaHalvingStrategy extends BasePipelineStrategy {
     const trigger = opp.metadata.triggerType as string | undefined
     const phaseMultiplier = phaseRiskMultiplier(phase)
 
-    // Weekly DCA base: fixed 0.25% regardless of Kelly
+    // Weekly DCA base: fixed 0.25% schedule — still bounded by empirical Kelly haircuts
     if (trigger === 'weekly_dca') {
       const fraction = Math.min(WEEKLY_DCA_PCT * phaseMultiplier, maxSinglePct / 100)
       return {
@@ -311,18 +316,17 @@ export class DcaHalvingStrategy extends BasePipelineStrategy {
       }
     }
 
-    // Dip buy: quarter-Kelly based on expected recovery
+    // Dip buy: empirical Kelly (calibration or maturity floor — never strength)
     const riskPct = (phase === 'expansion' ? EXPANSION_RISK_PCT : TRADE_RISK_PCT) * phaseMultiplier
-    const qk = quarterKelly(opp.strength, opp.expectedReturn / 0.02)
+    const qk = sized.fraction
     let fraction = Math.min(qk, riskPct, maxSinglePct / 100)
     fraction = applyConfluenceHaircut(fraction, verdicts.mirofish?.score ?? null, verdicts.kronos?.pass ?? null)
-    fraction = Math.max(fraction, 0.003)
 
     const notionalUsd = fraction * portfolio
     return {
       fraction,
       notionalUsd,
-      rationale: `QK=${(qk * 100).toFixed(1)}% dip-buy, phase=${phase}, dip=${((opp.metadata.dipPct as number | undefined ?? 0) * 100).toFixed(1)}%`,
+      rationale: `${sized.rationale} dip-buy, phase=${phase}, dip=${((opp.metadata.dipPct as number | undefined ?? 0) * 100).toFixed(1)}%`,
     }
   }
 }

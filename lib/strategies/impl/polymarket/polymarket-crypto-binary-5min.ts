@@ -37,7 +37,8 @@ import type {
   PositionSize,
   ExecutionResult,
 } from '../../pipeline-types'
-import { getRiskControl, getPortfolioUsd, quarterKelly, applyConfluenceHaircut } from '../../risk-controls'
+import { getRiskControl, applyConfluenceHaircut } from '../../risk-controls'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { PolymarketEngineClient } from '@/lib/integrations/polymarket-engine/PolymarketEngineClient'
 import type { Market, OrderBook } from '@/lib/integrations/polymarket-engine/PolymarketEngineClient'
 import { randomUUID } from 'crypto'
@@ -348,19 +349,27 @@ export class PolymarketCryptoBinary5MinStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
-    const rc = supabase ? await getRiskControl(supabase, userId) : undefined
-
     const onChain = opp.metadata.onChainPrice as number
     const deviation = opp.metadata.offChainDeviation as number
 
-    // Edge estimate: implied win probability from deviation
-    // $50 deviation → ~62% win prob; $200 deviation → ~80%
+    // Edge estimate: implied win probability from deviation — a real model
+    // probability (not signal strength), so it feeds the shared empirical
+    // path as modelWinProb until rolling calibration takes over.
     const estWinProb  = Math.min(0.85, 0.55 + deviation / 500)
     const estWinLoss  = (ENTRY_TARGET_PRICE - onChain) / onChain   // reward-to-risk ratio
-    const qk = quarterKelly(estWinProb, Math.max(0.5, estWinLoss))
 
-    let fraction = Math.min(qk, MAX_POSITION_PCT)
+    const sized = await computeEmpiricalSize({
+      supabase, userId, strategyKey: this.key, opp,
+      modelWinProb: estWinProb,
+      winLossRatio: Math.max(0.5, estWinLoss),
+      capFraction: MAX_POSITION_PCT,
+    })
+    if (sized.blocked || sized.portfolioUsd == null) {
+      return zeroSize(sized.reason ?? 'refusing to size')
+    }
+    const rc = supabase ? await getRiskControl(supabase, userId) : undefined
+
+    let fraction = Math.min(sized.fraction, MAX_POSITION_PCT)
     if (rc?.max_single_position_pct) {
       fraction = Math.min(fraction, rc.max_single_position_pct / 100)
     }
@@ -372,12 +381,10 @@ export class PolymarketCryptoBinary5MinStrategy extends BasePipelineStrategy {
     if (verdicts.mirofish?.scenario === 'bear' && opp.direction === 'long') fraction *= 0.5
     if (verdicts.mirofish?.scenario === 'bear' && opp.direction === 'short') fraction *= 0.5
 
-    fraction = Math.max(fraction, 0.001)  // floor at 0.1%
-
     return {
       fraction,
-      notionalUsd: fraction * portfolio,
-      rationale: `QK=${(qk * 100).toFixed(2)}%, deviation=$${deviation.toFixed(0)}, estWin=${(estWinProb * 100).toFixed(0)}%`,
+      notionalUsd: fraction * sized.portfolioUsd,
+      rationale: `${sized.rationale}, deviation=$${deviation.toFixed(0)}, estWin=${(estWinProb * 100).toFixed(0)}%`,
     }
   }
 

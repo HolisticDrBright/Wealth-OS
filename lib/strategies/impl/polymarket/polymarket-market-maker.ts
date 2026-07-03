@@ -25,7 +25,8 @@ import type {
   AllVerdicts,
   PositionSize,
 } from '../../pipeline-types'
-import { getRiskControl, getPortfolioUsd } from '../../risk-controls'
+import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // --- Thresholds ---------------------------------------------------------------
@@ -180,16 +181,21 @@ export class PolymarketMarketMakerStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 5
 
-    // Income strategy: size by inventory cap, not Kelly
+    // Income strategy: size by inventory cap, empirical haircuts still apply
     let fraction = Math.min(TRADE_RISK_PCT, maxSinglePct / 100)
     if (verdicts.mirofish) fraction *= (verdicts.mirofish.score / 100)
+    const hc = await applyEmpiricalHaircuts(fraction, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
 
     const notionalUsd = Math.min(
-      fraction * portfolio,
+      hc.fraction * portfolio,
       INVENTORY_CAP_USD,
       portfolio * maxSinglePct / 100
     )

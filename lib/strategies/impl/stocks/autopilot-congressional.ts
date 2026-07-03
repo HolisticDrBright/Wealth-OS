@@ -25,7 +25,8 @@ import type {
   AllVerdicts,
   PositionSize,
 } from '../../pipeline-types'
-import { getRiskControl, getPortfolioUsd, quarterKelly, applyConfluenceHaircut } from '../../risk-controls'
+import { getRiskControl, applyConfluenceHaircut } from '../../risk-controls'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { getLiveCongressTrades } from '@/lib/market-data/quiver'
 import type { CongressTrade } from '@/lib/market-data/quiver'
 import { getSentimentScore, applySentimentToStrength } from '@/lib/market-data/news-sentiment'
@@ -368,21 +369,23 @@ export class AutopilotCongressionalStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const sized = await computeEmpiricalSize({ supabase, userId, strategyKey: this.key, opp })
+    if (sized.blocked || sized.portfolioUsd == null) {
+      return zeroSize(sized.reason ?? 'refusing to size')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
-    // Recipe: 0.5% per trade, quarter-Kelly overlay
-    const qk = quarterKelly(opp.strength, opp.expectedReturn / 0.015)
+    // Empirical Kelly (calibration or maturity floor — never strength), 0.5%/trade cap
+    const qk = sized.fraction
     let fraction = Math.min(qk, TRADE_RISK_PCT, maxSinglePct / 100)
     fraction = applyConfluenceHaircut(fraction, verdicts.mirofish?.score ?? null, verdicts.kronos?.pass ?? null)
-    fraction = Math.max(fraction, 0.003)  // minimum 0.3%
 
-    const notionalUsd = fraction * portfolio
+    const notionalUsd = fraction * sized.portfolioUsd
     return {
       fraction,
       notionalUsd,
-      rationale: `QK=${(qk * 100).toFixed(1)}% flow-edge, congress lag=${opp.metadata.filingLagDays}d, amount=$${((opp.metadata.tradeAmount as number) / 1000).toFixed(0)}k`,
+      rationale: `${sized.rationale} flow-edge, congress lag=${opp.metadata.filingLagDays}d, amount=$${((opp.metadata.tradeAmount as number) / 1000).toFixed(0)}k`,
     }
   }
 }

@@ -35,6 +35,7 @@ import {
 } from '@/lib/market-data/sportsbook'
 import { getMarketDetails, scanTrackedWalletTrades } from '@/lib/market-data/polymarket-wallets'
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import { randomUUID } from 'crypto'
 
 // ─── Thresholds ────────────────────────────────────────────────────────────────
@@ -155,18 +156,23 @@ export class PredictionMarketSportsbookArbStrategy extends BasePipelineStrategy 
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
     const maxSizeUsd = (opp.metadata.maxSizeUsd as number | undefined) ?? 0
-    const fraction = Math.min(TRADE_RISK_PCT, maxSinglePct / 100)
-    const notionalUsd = Math.min(fraction * portfolio, maxSizeUsd)
+    const structural = Math.min(TRADE_RISK_PCT, maxSinglePct / 100)
+    const hc = await applyEmpiricalHaircuts(structural, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
+    const notionalUsd = Math.min(hc.fraction * portfolio, maxSizeUsd)
 
     return {
       fraction: portfolio > 0 ? notionalUsd / portfolio : 0,
       notionalUsd,
-      rationale: `PM/SB arb 2%, margin ${((opp.metadata.margin as number) * 100).toFixed(1)}%`,
+      rationale: `PM/SB arb 2% × empirical haircuts, margin ${((opp.metadata.margin as number) * 100).toFixed(1)}%`,
     }
   }
 

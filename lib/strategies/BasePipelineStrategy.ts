@@ -29,6 +29,8 @@ import {
 import { resolveAndFetchImbalance, type ImbalanceVerdict } from '@/lib/confluence/order-book-imbalance'
 import { preTradeRiskCheck } from '@/lib/risk/kill-switch'
 import { edgeClearsCosts } from '@/lib/costs/transaction-costs'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
+import { getPortfolioUsd } from '@/lib/strategies/risk-controls'
 import type {
   Opportunity,
   OpportunityContext,
@@ -309,39 +311,73 @@ export abstract class BasePipelineStrategy {
 
   // ── Stage 6: Risk ────────────────────────────────────────────────────────────
 
+  /**
+   * Kelly fraction from the shared empirical path: win probability comes from
+   * the strategy's rolling calibration (or the maturity-floor probe when
+   * uncalibrated) — NEVER from signal strength, which is a heuristic.
+   */
   async runRiskCheck(
     opp: Opportunity,
-    _userId: string,
-    _supabase?: SupabaseClient
+    userId: string,
+    supabase?: SupabaseClient
   ): Promise<RiskVerdict> {
-    const q = 1 - opp.strength
-    const b = Math.abs(opp.expectedReturn) / 0.02  // assume 2% risk unit
-    const kelly = b > 0 && opp.strength > 0 ? Math.max(0, (opp.strength * b - q) / b) : 0
-    const veto = kelly <= 0 || opp.strength < 0.1
+    const sized = await computeEmpiricalSize({
+      supabase,
+      userId,
+      strategyKey: this.key,
+      opp,
+    })
+    const veto = sized.blocked || sized.fraction <= 0
     return {
       veto,
-      kellyFraction: kelly,
-      reason: veto ? `Kelly=${kelly.toFixed(3)} — negative or zero edge` : undefined,
+      kellyFraction: sized.fraction,
+      reason: veto ? (sized.reason ?? 'empirical Kelly fraction is zero') : undefined,
     }
   }
 
   // ── Stage 7: Size ────────────────────────────────────────────────────────────
 
   async sizePosition(
-    _opp: Opportunity,
+    opp: Opportunity,
     verdicts: AllVerdicts,
-    _userId: string,
-    _supabase?: SupabaseClient
+    userId: string,
+    supabase?: SupabaseClient
   ): Promise<PositionSize> {
     let fraction = verdicts.risk.kellyFraction
     if (verdicts.mirofish) fraction *= verdicts.mirofish.score / 100
     if (verdicts.kronos && !verdicts.kronos.pass) fraction *= 0.5
     fraction = Math.min(fraction, 0.10)
-    const notionalUsd = fraction * 10000
+
+    // Real account equity only — refuse to size when it cannot be fetched.
+    const portfolioUsd = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolioUsd == null) {
+      const reason = 'equity_unavailable: refusing to size — never default equity'
+      if (supabase) {
+        try {
+          await supabase.from('audit_logs').insert({
+            user_id: userId,
+            strategy_key: this.key,
+            symbol: opp.symbol,
+            decision: 'block',
+            size_fraction: 0,
+            mirofish_used: false,
+            kronos_used: false,
+            decided_at: new Date().toISOString(),
+            metadata: { blocked_by: 'sizePosition', reason },
+          })
+        } catch (err) {
+          console.warn('[sizePosition] audit insert failed:', err)
+        }
+      }
+      console.warn(`[sizePosition] ${this.key} ${opp.symbol}: ${reason}`)
+      return zeroSize(reason)
+    }
+
+    const notionalUsd = fraction * portfolioUsd
     return {
       fraction,
       notionalUsd,
-      rationale: `Kelly=${(verdicts.risk.kellyFraction * 100).toFixed(1)}% → capped ${(fraction * 100).toFixed(1)}%`,
+      rationale: `Kelly=${(verdicts.risk.kellyFraction * 100).toFixed(1)}% → capped ${(fraction * 100).toFixed(1)}% of $${Math.round(portfolioUsd).toLocaleString()}`,
     }
   }
 

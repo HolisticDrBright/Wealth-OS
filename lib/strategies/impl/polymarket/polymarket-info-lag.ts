@@ -25,7 +25,8 @@ import type {
   AllVerdicts,
   PositionSize,
 } from '../../pipeline-types'
-import { getRiskControl, getPortfolioUsd, quarterKelly, applyConfluenceHaircut } from '../../risk-controls'
+import { getRiskControl, applyConfluenceHaircut } from '../../risk-controls'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { randomUUID } from 'crypto'
 
 // ─── Thresholds (per vault recipe) ────────────────────────────────────────────
@@ -264,21 +265,22 @@ export class PolymarketInfoLagStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const sized = await computeEmpiricalSize({ supabase, userId, strategyKey: this.key, opp })
+    if (sized.blocked || sized.portfolioUsd == null) {
+      return zeroSize(sized.reason ?? 'refusing to size')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
-    // Quarter-Kelly based on estimated lag edge
-    const qk = quarterKelly(opp.strength, opp.expectedReturn / 0.02)
+    const qk = sized.fraction  // empirical Kelly: calibration or maturity floor, never strength
     let fraction = Math.min(qk, TRADE_RISK_PCT, maxSinglePct / 100)
     fraction = applyConfluenceHaircut(fraction, verdicts.mirofish?.score ?? null, verdicts.kronos?.pass ?? null)
-    fraction = Math.max(fraction, 0.005)
 
-    const notionalUsd = fraction * portfolio
+    const notionalUsd = fraction * sized.portfolioUsd
     return {
       fraction,
       notionalUsd,
-      rationale: `QK=${(qk * 100).toFixed(1)}% lag-edge, lag=${((opp.metadata.lag as number) * 100).toFixed(1)}c`,
+      rationale: `${sized.rationale} lag=${((opp.metadata.lag as number) * 100).toFixed(1)}c`,
     }
   }
 }

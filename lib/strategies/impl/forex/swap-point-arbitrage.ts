@@ -28,6 +28,7 @@ import type {
   ManageAction,
 } from '../../pipeline-types'
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import { isPreOvernightRoll } from '../../cadence-helpers'
 import { randomUUID } from 'crypto'
 
@@ -144,17 +145,22 @@ export class SwapPointArbitrageStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
-    const fraction = Math.min(0.005, maxSinglePct / 100)   // 0.5% — tiny position
-    const notionalUsd = fraction * portfolio
+    const structural = Math.min(0.005, maxSinglePct / 100)   // 0.5% — tiny position
+    const hc = await applyEmpiricalHaircuts(structural, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
+    const notionalUsd = hc.fraction * portfolio
 
     return {
-      fraction,
+      fraction: hc.fraction,
       notionalUsd,
-      rationale: `Swap arb 0.5%, edge ${((opp.metadata.totalEdge as number) * 10000).toFixed(1)} pips`,
+      rationale: `Swap arb 0.5% × empirical haircuts, edge ${((opp.metadata.totalEdge as number) * 10000).toFixed(1)} pips`,
     }
   }
 

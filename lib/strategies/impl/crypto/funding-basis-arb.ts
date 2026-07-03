@@ -26,7 +26,8 @@ import type {
   PriceTick,
   ManageAction,
 } from '../../pipeline-types'
-import { getRiskControl, getPortfolioUsd, quarterKelly } from '../../risk-controls'
+import { getRiskControl } from '../../risk-controls'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { getFundingRate } from '@/lib/market-data/funding-rates'
 import type { BrokerCache } from '@/lib/brokers/BrokerFactory'
 import { selectBroker } from '@/lib/brokers/asset-broker-routing'
@@ -197,24 +198,26 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const sized = await computeEmpiricalSize({ supabase, userId, strategyKey: this.key, opp })
+    if (sized.blocked || sized.portfolioUsd == null) {
+      return zeroSize(sized.reason ?? 'refusing to size')
+    }
+    const portfolio = sized.portfolioUsd
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
     const capNotional = (opp.metadata.capNotional as number | undefined) ?? MAX_NOTIONAL_USD
 
-    // Quarter-Kelly on carry edge (no MiroFish/Kronos haircut for structural strategies)
-    const qk = quarterKelly(opp.strength, opp.expectedReturn / 0.002)
-    let fraction = Math.min(qk, TRADE_RISK_PCT, maxSinglePct / 100)
-    fraction = Math.max(fraction, 0.005)
+    // Empirical Kelly on carry (calibration or maturity floor — never strength)
+    const fraction = Math.min(sized.fraction, TRADE_RISK_PCT, maxSinglePct / 100)
 
     const kellyNotional = fraction * portfolio
     const notionalUsd   = Math.min(kellyNotional, capNotional, MAX_NOTIONAL_USD)
 
     return {
-      fraction: notionalUsd / portfolio,
+      fraction: portfolio > 0 ? notionalUsd / portfolio : 0,
       notionalUsd,
-      rationale: `QK=${(qk * 100).toFixed(1)}% carry, book-cap=$${(capNotional / 1000).toFixed(0)}k, rate=${((opp.metadata.fundingRate as number) * 100).toFixed(4)}%/8h`,
+      rationale: `${sized.rationale} carry, book-cap=$${(capNotional / 1000).toFixed(0)}k, rate=${((opp.metadata.fundingRate as number) * 100).toFixed(4)}%/8h`,
     }
   }
 

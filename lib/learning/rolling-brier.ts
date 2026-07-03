@@ -27,6 +27,12 @@ export interface RollingBrierResult {
   brierScore: number
   sampleCount: number
   sizingMultiplier: number
+  /**
+   * Empirical win rate over the window [0,1] — the calibrated win-probability
+   * input for Kelly sizing (never use signal strength as a probability).
+   * Null when outcome directions aren't recorded.
+   */
+  winRate: number | null
 }
 
 const MIN_SAMPLES = 10
@@ -56,7 +62,7 @@ export async function getRollingBrier(
     }
   })
     .from('outcome_log')
-    .select('brier_score, created_at, decision:decision_log!inner(strategy, created_at)')
+    .select('brier_score, actual_direction, created_at, decision:decision_log!inner(strategy, created_at)')
     .eq('decision.strategy', strategyKey)
     .gte('created_at', since)
     .order('created_at', { ascending: false })
@@ -64,13 +70,21 @@ export async function getRollingBrier(
 
   if (error || !data || data.length < MIN_SAMPLES) return null
 
-  const brierScores = (data as Array<{ brier_score: number }>)
+  const rows = data as Array<{ brier_score: number; actual_direction?: number | null }>
+  const brierScores = rows
     .map(r => r.brier_score)
     .filter((b): b is number => typeof b === 'number')
 
   if (brierScores.length < MIN_SAMPLES) return null
 
   const brierScore = brierScores.reduce((s, b) => s + b, 0) / brierScores.length
+
+  const directions = rows
+    .map(r => r.actual_direction)
+    .filter((d): d is number => d === 0 || d === 1)
+  const winRate = directions.length >= MIN_SAMPLES
+    ? directions.reduce((s, d) => s + d, 0) / directions.length
+    : null
 
   const sizingMultiplier =
     brierScore > 0.25 ? 0.5
@@ -84,5 +98,6 @@ export async function getRollingBrier(
     brierScore,
     sampleCount: brierScores.length,
     sizingMultiplier,
+    winRate,
   }
 }

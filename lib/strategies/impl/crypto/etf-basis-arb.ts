@@ -26,6 +26,7 @@ import type {
 } from '../../pipeline-types'
 import { getFundingApr } from '@/lib/market-data/coinglass'
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import { randomUUID } from 'crypto'
 
 // ─── ETF / Perp pairs ─────────────────────────────────────────────────────────
@@ -130,17 +131,22 @@ export class EtfBasisArbStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
-    const fraction = Math.min(TRADE_RISK_PCT, maxSinglePct / 100)
-    const notionalUsd = fraction * portfolio
+    const structural = Math.min(TRADE_RISK_PCT, maxSinglePct / 100)
+    const hc = await applyEmpiricalHaircuts(structural, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
+    const notionalUsd = hc.fraction * portfolio
 
     return {
-      fraction,
+      fraction: hc.fraction,
       notionalUsd,
-      rationale: `5% structural carry, funding ${((opp.metadata.fundingApr as number) * 100).toFixed(1)}% APR`,
+      rationale: `structural carry × empirical haircuts, funding ${((opp.metadata.fundingApr as number) * 100).toFixed(1)}% APR`,
     }
   }
 

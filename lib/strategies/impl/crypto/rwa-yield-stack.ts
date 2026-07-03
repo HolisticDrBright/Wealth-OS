@@ -26,6 +26,7 @@ import type {
 import { getRwaApy, getBestAaveStablecoinApy } from '@/lib/market-data/defi-llama'
 import { getTbill4WeekYield } from '@/lib/market-data/fred-api'
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import { isMondayEt } from '../../cadence-helpers'
 import { randomUUID } from 'crypto'
 
@@ -112,17 +113,22 @@ export class RwaYieldStackStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
-    const fraction = Math.min(TRADE_RISK_PCT, MAX_SINGLE_PCT, maxSinglePct / 100)
-    const notionalUsd = fraction * portfolio
+    const structural = Math.min(TRADE_RISK_PCT, MAX_SINGLE_PCT, maxSinglePct / 100)
+    const hc = await applyEmpiricalHaircuts(structural, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
+    const notionalUsd = hc.fraction * portfolio
 
     return {
-      fraction,
+      fraction: hc.fraction,
       notionalUsd,
-      rationale: `RWA stable carry, APY ${((opp.metadata.apy as number) * 100).toFixed(2)}%`,
+      rationale: `RWA stable carry × empirical haircuts, APY ${((opp.metadata.apy as number) * 100).toFixed(2)}%`,
     }
   }
 

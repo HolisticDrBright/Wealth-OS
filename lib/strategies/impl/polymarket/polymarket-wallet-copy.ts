@@ -30,10 +30,9 @@ import {
 } from '@/lib/market-data/polymarket-wallets'
 import {
   getRiskControl,
-  getPortfolioUsd,
-  quarterKelly,
   applyConfluenceHaircut,
 } from '../../risk-controls'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { randomUUID } from 'crypto'
 
 // ─── Thresholds (per vault recipe) ────────────────────────────────────────────
@@ -261,17 +260,18 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const sized = await computeEmpiricalSize({ supabase, userId, strategyKey: this.key, opp })
+    if (sized.blocked || sized.portfolioUsd == null) {
+      return zeroSize(sized.reason ?? 'refusing to size')
+    }
+    const portfolio = sized.portfolioUsd
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
 
     const maxSinglePct = rc?.max_single_position_pct ?? 10
     const perTradeRisk = TRADE_RISK_PCT  // recipe: 2% per trade
 
-    let fraction = Math.min(perTradeRisk, maxSinglePct / 100)
-
-    // Quarter-Kelly overlay
-    const qk = quarterKelly(opp.strength, opp.expectedReturn / 0.02)
-    fraction = Math.min(fraction, Math.max(qk, 0.005))  // never less than 0.5%
+    // Empirical Kelly (calibration or maturity floor — never strength), then caps
+    let fraction = Math.min(sized.fraction, perTradeRisk, maxSinglePct / 100)
 
     // Confluence haircuts
     fraction = applyConfluenceHaircut(
@@ -285,7 +285,7 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
     return {
       fraction: notionalUsd / portfolio,
       notionalUsd,
-      rationale: `2% risk cap, QK=${(qk * 100).toFixed(1)}%, portfolio=$${portfolio.toFixed(0)}`,
+      rationale: `2% risk cap, ${sized.rationale}, portfolio=$${portfolio.toFixed(0)}`,
     }
   }
 

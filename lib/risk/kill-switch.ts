@@ -193,8 +193,10 @@ export async function preTradeRiskCheck(ctx: PreTradeContext): Promise<RiskCheck
     const unrealized = ((openRes.data ?? []) as OpenRow[])
       .reduce((s, r) => s + (r.unrealized_pnl_usd ?? 0), 0)
 
+    // Null equity → drawdown ratio can't be computed (sizing refuses to trade
+    // in that state anyway); the flag/sleeve/daily-loss checks still apply.
     const baseEquityUsd = await getPortfolioUsd(supabase, userId)
-    drawdownPct = computeDrawdownPct(baseEquityUsd, series, unrealized)
+    drawdownPct = computeDrawdownPct(baseEquityUsd ?? 0, series, unrealized)
   } catch (err) {
     return { allowed: false, reason: `kill_switch_unavailable: ${err instanceof Error ? err.message : err}` }
   }

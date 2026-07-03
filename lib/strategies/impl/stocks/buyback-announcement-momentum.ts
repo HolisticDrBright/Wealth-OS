@@ -30,7 +30,8 @@ import {
   isExtensionOfExistingProgram,
   checkDebtFunded,
 } from '@/lib/market-data/buyback-scanner'
-import { getRiskControl, getPortfolioUsd, quarterKelly } from '../../risk-controls'
+import { getRiskControl } from '../../risk-controls'
+import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { isAfterMarketClose } from '../../cadence-helpers'
 import { randomUUID } from 'crypto'
 
@@ -121,18 +122,21 @@ export class BuybackAnnouncementMomentumStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const sized = await computeEmpiricalSize({ supabase, userId, strategyKey: this.key, opp })
+    if (sized.blocked || sized.portfolioUsd == null) {
+      return zeroSize(sized.reason ?? 'refusing to size')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
-    const qk = quarterKelly(opp.strength, opp.expectedReturn / 0.02)
+    const qk = sized.fraction  // empirical Kelly: calibration or maturity floor, never strength
     const fraction = Math.min(qk, TRADE_RISK_PCT, maxSinglePct / 100)
-    const notionalUsd = fraction * portfolio
+    const notionalUsd = fraction * sized.portfolioUsd
 
     return {
       fraction,
       notionalUsd,
-      rationale: `QK=${(qk * 100).toFixed(1)}%, buyback ${((opp.metadata.buybackPct as number) * 100).toFixed(1)}%`,
+      rationale: `${sized.rationale}, buyback ${((opp.metadata.buybackPct as number) * 100).toFixed(1)}%`,
     }
   }
 

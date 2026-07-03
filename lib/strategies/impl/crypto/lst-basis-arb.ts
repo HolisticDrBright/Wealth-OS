@@ -30,6 +30,7 @@ import {
   getAccumulatedYieldRatio,
 } from '@/lib/market-data/lido-protocol'
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
+import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import { randomUUID } from 'crypto'
 
 // ─── LST pool definitions ─────────────────────────────────────────────────────
@@ -109,17 +110,22 @@ export class LstBasisArbStrategy extends BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<PositionSize> {
-    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : 10_000
+    const portfolio = supabase ? await getPortfolioUsd(supabase, userId) : null
+    if (portfolio == null) {
+      return zeroSize('equity_unavailable: refusing to size — never default equity')
+    }
     const rc = supabase ? await getRiskControl(supabase, userId) : undefined
     const maxSinglePct = rc?.max_single_position_pct ?? 10
 
-    const fraction = Math.min(TRADE_RISK_PCT, maxSinglePct / 100)
-    const notionalUsd = fraction * portfolio
+    const structural = Math.min(TRADE_RISK_PCT, maxSinglePct / 100)
+    const hc = await applyEmpiricalHaircuts(structural, { supabase, strategyKey: this.key })
+    if (hc.blocked) return zeroSize(hc.reason ?? 'maturity blocked')
+    const notionalUsd = hc.fraction * portfolio
 
     return {
-      fraction,
+      fraction: hc.fraction,
       notionalUsd,
-      rationale: `5% structural LST basis, ${((opp.metadata.discountPct as number) * 100).toFixed(2)}% discount`,
+      rationale: `structural LST basis × empirical haircuts, ${((opp.metadata.discountPct as number) * 100).toFixed(2)}% discount`,
     }
   }
 
