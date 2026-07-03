@@ -196,6 +196,45 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
     }
 
+    if (task === 'regime-allocator') {
+      // R4: daily allocator-regime classification from observable inputs,
+      // persisted to regime_state for regime-conditional capital weights.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { classifyAllocatorRegime } = await import('@/lib/regime/allocator')
+      const { detectRegime } = await import('@/lib/regime/cross-asset-regime')
+
+      // Curve via FRED (2s10s); vol/credit reuse the pipeline regime reading.
+      let curve2s10s: number | null = null
+      const fredKey = process.env.FRED_API_KEY
+      if (fredKey) {
+        try {
+          const res = await fetch(
+            `https://api.stlouisfed.org/fred/series/observations?series_id=T10Y2Y&api_key=${fredKey}&file_type=json&limit=1&sort_order=desc`,
+            { signal: AbortSignal.timeout(6_000) })
+          if (res.ok) {
+            const d = await res.json() as { observations?: Array<{ value?: string }> }
+            const v = parseFloat(d.observations?.[0]?.value ?? '')
+            if (Number.isFinite(v)) curve2s10s = v
+          }
+        } catch { /* input stays null — classifier tolerates gaps */ }
+      }
+      const reading = await detectRegime().catch(() => null)
+      const inputs = {
+        curve2s10s,
+        hyOasBps: reading?.hyOas ?? null,
+        realizedVolRatio: reading?.vix != null && reading.thresholds
+          ? reading.vix / Math.max(1, reading.thresholds.riskOffVix / 1.5)
+          : null,
+        breadth: null,   // wired when sleeve 200dma breadth lands
+      }
+      const regime = classifyAllocatorRegime(inputs)
+      await supabase.from('regime_state').upsert({
+        as_of: new Date().toISOString().slice(0, 10), regime, inputs,
+      }, { onConflict: 'as_of' })
+      return NextResponse.json({ task: 'regime-allocator', regime, inputs })
+    }
+
     if (task === 'ops-watchdog') {
       // R7: dead-man switch + position reconciliation. Silent workers and
       // unreconciled positions alert through the single ops channel.
