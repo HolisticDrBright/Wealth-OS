@@ -1,5 +1,38 @@
 # Wealth OS Changelog
 
+## 2026-07-03 — Gap Top Three + Remaining Items (R1–R8)
+
+**Gap Top Three brief:** Item B adversarial defense (typed extraction sandbox,
+ingest_quarantine, source admission, canIncreaseRisk assembly gate, 46-case
+red-team CI corpus) · Item A point-in-time layer (pit_facts append-only store,
+backtester as-of metadata, invisibility CI test) + corpus tooling
+(to_parquet/build_views/aggregate.py, wallet_stats/category_bias/
+hourly_liquidity aggregates, wallet-copy reads real recertified stats,
+Kelly priors from measured category bias, shadow-only fallback) · Item C
+block-bootstrap household Monte Carlo (lib/planning, known-answer annuity
+tests, PlanningCard with P(goal) + ΔP chips).
+
+**Remaining Items brief:** R2 persisted TIPP floors (sleeve_floors + daily
+ratchet cron; sweep reads real state) · R3 TCA surface + measured cost
+overrides into the edge gate + Discuss-with-AI + deadline reminders +
+provider_options · R1 corpus scripts complete · R7 ops hardening
+(reconciliation diff, dead-man switch, key-hygiene CI grep, chaos test) ·
+R4 regime allocator (observable-input classifier tested on 2020/2022/2024
+fixtures, regime-conditional softmax weights, four crisis playbooks as code)
+· R6 auto-retirement funnel (two failing quarters vs passive benchmark →
+automatic demotion, pure thresholds) · R5 hash-chained ledger (append-only
++ trigger, nightly verify, /api/ledger/head, tamper tests) · R8
+personalization (behavior events, honest behavior-gap report, bounded
+monotonic guardrail strictness).
+
+**R0 (user action):** the 107GB Polymarket corpus bulk load runs on your
+machine/VPS — runbook in scripts/poly-corpus/README.md.
+
+**New migrations:** 20260703e (quarantine/source_scores), f (pit_facts),
+g (corpus aggregates), h (sleeve_floors), i (cost_overrides/provider_options),
+j (regime_state), k (ledger_entries), l (user_behavior_events) — plus re-run
+20260703c for the new kb_parameters.
+
 ## 2026-07-03 — Advisory Module + Sweep Engine + UI upgrade (first pass)
 
 ### Advisory Module (`9f79fbd`)

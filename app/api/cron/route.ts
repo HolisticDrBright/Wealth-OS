@@ -196,6 +196,34 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
     }
 
+    if (task === 'behavior-gap') {
+      // R8: quarterly behavior-gap report per user — honest both ways.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { computeBehaviorGap } = await import('@/lib/personalization/behavior')
+      const { data: rows } = await supabase
+        .from('user_behavior_events').select('user_id, event, outcome_usd_delta, ts')
+      const byUser = new Map<string, Array<{ event: never; outcomeUsdDelta: number | null; ts: string }>>()
+      for (const r of rows ?? []) {
+        if (!byUser.has(r.user_id as string)) byUser.set(r.user_id as string, [])
+        byUser.get(r.user_id as string)!.push({
+          event: r.event as never, outcomeUsdDelta: r.outcome_usd_delta as number | null, ts: r.ts as string,
+        })
+      }
+      let reports = 0
+      for (const [uid, events] of byUser) {
+        const report = computeBehaviorGap(events)
+        if (report.graded === 0) continue
+        reports++
+        await supabase.from('alerts').insert({
+          user_id: uid, type: 'behavior_gap', severity: 'info',
+          title: 'Your annual behavior report', message: report.headline,
+          created_at: new Date().toISOString(),
+        }).then(({ error }) => { if (error) console.warn('[behavior-gap] alert failed:', error.message) })
+      }
+      return NextResponse.json({ task: 'behavior-gap', users: byUser.size, reports })
+    }
+
     if (task === 'ledger') {
       // R5: nightly ledger sync + full-chain verification. Pull-based hooks
       // over decision_log / order_intents / outcome_log — batch hashing, zero

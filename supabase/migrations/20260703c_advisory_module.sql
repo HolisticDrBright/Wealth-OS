@@ -109,7 +109,9 @@ INSERT INTO public.kb_parameters (key, value, description, source) VALUES
   ('hdhp_consideration_confidence', 0.5,  'Confidence multiplier for the consider-an-HDHP card', 'Advisory brief R4'),
   ('contribution_escalator_step_pct', 1,  'Save More Tomorrow: +1%/yr contribution escalation', 'Thaler-Benartzi'),
   ('contribution_escalator_cap_pct', 15,  'Escalator cap (% of pay)', 'Planner consensus'),
-  ('behavior_gap_rate',            0.012, 'Behavior gap cost estimate (fraction/yr)', 'Morningstar Mind the Gap 2025')
+  ('behavior_gap_rate',            0.012, 'Behavior gap cost estimate (fraction/yr)', 'Morningstar Mind the Gap 2025'),
+  ('guardrail_max_multiplier',     3,     'Cap on personalized friction scaling (R8)', 'Remaining brief R8'),
+  ('guardrail_loss_at_max_usd',    5000,  'Measured override losses at which friction caps (R8)', 'Remaining brief R8')
 ON CONFLICT (key) DO NOTHING;
 
 -- ── financial_profile ─────────────────────────────────────────────────────────
