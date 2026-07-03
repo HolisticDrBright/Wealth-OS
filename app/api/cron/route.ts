@@ -196,6 +196,90 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
     }
 
+    if (task === 'lifecycle') {
+      // R6: weekly auto-retirement review. Pure thresholds — demotion is
+      // paper_enabled=false + shadow tracking + a filed report; never LLM.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { evaluateLifecycle, quarterOf, isCompleteQuarter, MIN_TRADES_PER_QUARTER } =
+        await import('@/lib/strategies/lifecycle')
+      const { sendOpsAlert } = await import('@/lib/ops/alert')
+
+      const { data: closed } = await supabase
+        .from('paper_positions')
+        .select('user_id, strategy_key, asset_class, closed_at, realized_pnl_pct')
+        .eq('status', 'closed')
+        .limit(20_000)
+
+      // Benchmark quarterly returns: SPY via Yahoo (others skipped honestly
+      // until their benchmark feeds land — a strategy is never demoted
+      // against a benchmark we didn't measure).
+      const bench = new Map<string, number>()
+      try {
+        const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=3mo&range=2y',
+          { signal: AbortSignal.timeout(8_000) })
+        if (res.ok) {
+          const d = await res.json() as { chart?: { result?: Array<{ timestamp?: number[]; indicators?: { quote?: Array<{ close?: Array<number | null> }> } }> } }
+          const r = d.chart?.result?.[0]
+          const ts = r?.timestamp ?? []
+          const closes = (r?.indicators?.quote?.[0]?.close ?? [])
+          for (let i = 1; i < ts.length; i++) {
+            const a = closes[i - 1]; const b = closes[i]
+            if (a && b) bench.set(quarterOf(new Date(ts[i] * 1000).toISOString()), (b / a - 1) * 100)
+          }
+        }
+      } catch { /* no benchmark → no demotions this run */ }
+
+      const groups = new Map<string, Map<string, { sum: number; n: number; assetClass: string }>>()
+      for (const row of closed ?? []) {
+        if (!row.closed_at || row.realized_pnl_pct == null) continue
+        const q = quarterOf(row.closed_at as string)
+        if (!isCompleteQuarter(q)) continue
+        const key = `${row.user_id}|${row.strategy_key}`
+        if (!groups.has(key)) groups.set(key, new Map())
+        const g = groups.get(key)!
+        const cur = g.get(q) ?? { sum: 0, n: 0, assetClass: row.asset_class as string }
+        cur.sum += (row.realized_pnl_pct as number) * 100
+        cur.n += 1
+        g.set(q, cur)
+      }
+
+      const demotions: string[] = []
+      for (const [key, byQuarter] of groups) {
+        const [uid, strategyKey] = key.split('|')
+        const isSpxBenchmarked = [...byQuarter.values()][0]?.assetClass === 'stocks'
+        if (!isSpxBenchmarked || bench.size === 0) continue
+        const quarters = [...byQuarter.entries()]
+          .filter(([q]) => bench.has(q))
+          .map(([q, v]) => ({
+            quarter: q, strategyReturnPct: v.sum, benchmarkReturnPct: bench.get(q)!,
+            trades: v.n,
+          }))
+        const verdict = evaluateLifecycle(strategyKey, quarters)
+        if (verdict.demote) {
+          demotions.push(`${uid}:${strategyKey}`)
+          await supabase.from('user_enabled_strategies')
+            .update({ paper_enabled: false })
+            .eq('user_id', uid).eq('strategy_key', strategyKey)
+          await supabase.from('strategy_retirement_log').insert({
+            user_id: uid, strategy_key: strategyKey, reason: verdict.report,
+            created_at: new Date().toISOString(),
+          }).then(({ error }) => { if (error) console.warn('[lifecycle] retirement log failed:', error.message) })
+          await sendOpsAlert(supabase, {
+            severity: 'warning', userId: uid,
+            title: `Strategy demoted: ${strategyKey}`,
+            message: verdict.report,
+          })
+        }
+      }
+      return NextResponse.json({
+        task: 'lifecycle',
+        strategiesReviewed: groups.size,
+        demotions,
+        minTradesPerQuarter: MIN_TRADES_PER_QUARTER,
+      })
+    }
+
     if (task === 'regime-allocator') {
       // R4: daily allocator-regime classification from observable inputs,
       // persisted to regime_state for regime-conditional capital weights.
