@@ -92,7 +92,14 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-0.5 w-4 rounded border-t border-dashed border-indigo-400" /> Shadow (rejected trades)
             </span>
-            <span className="ml-auto tabular-nums">{data.closedTrades} closed trades</span>
+            <span className="ml-auto flex items-center gap-2 tabular-nums">
+              <a href="/api/ledger/head" target="_blank" rel="noreferrer"
+                title="Every decision, order, and outcome is hash-chained — fetch the head and recompute independently"
+                className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/20">
+                ✓ Verified ledger
+              </a>
+              {data.closedTrades} closed trades
+            </span>
           </div>
         </div>
       )}

@@ -196,6 +196,58 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
     }
 
+    if (task === 'ledger') {
+      // R5: nightly ledger sync + full-chain verification. Pull-based hooks
+      // over decision_log / order_intents / outcome_log — batch hashing, zero
+      // per-trade latency. Any mutated historical row breaks verification.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { chainBatch, verifyChain, GENESIS_HASH } = await import('@/lib/ledger/chain')
+      const { sendOpsAlert } = await import('@/lib/ops/alert')
+
+      const { data: existing } = await supabase
+        .from('ledger_entries').select('kind, source_id')
+      const seen = new Set((existing ?? []).map(r => `${r.kind}:${r.source_id}`))
+      const { data: headRow } = await supabase
+        .from('ledger_entries').select('chain_hash').order('seq', { ascending: false }).limit(1)
+      const head = (headRow ?? [])[0]?.chain_hash ?? GENESIS_HASH
+
+      const sources: Array<['decision' | 'order_intent' | 'outcome', string, string[]]> = [
+        ['decision', 'decision_log', ['id', 'strategy', 'symbol', 'confidence', 'predicted_direction', 'created_at']],
+        ['order_intent', 'order_intents', ['id', 'client_order_id', 'leg', 'status', 'broker_order_id', 'created_at']],
+        ['outcome', 'outcome_log', ['id', 'decision_id', 'actual_direction', 'brier_score', 'created_at']],
+      ]
+      const inputs: Array<{ kind: 'decision' | 'order_intent' | 'outcome'; sourceId: string; payload: unknown }> = []
+      for (const [kind, table, cols] of sources) {
+        const { data } = await supabase.from(table).select(cols.join(', ')).order('created_at', { ascending: true }).limit(2000)
+        for (const row of (data ?? []) as unknown as Array<Record<string, unknown>>) {
+          const id = String(row.id)
+          if (seen.has(`${kind}:${id}`)) continue
+          inputs.push({ kind, sourceId: id, payload: row })
+        }
+      }
+
+      let appended = 0
+      if (inputs.length) {
+        const { entries } = chainBatch(head, inputs)
+        const { error } = await supabase.from('ledger_entries').insert(entries)
+        if (error) console.warn('[ledger] append failed:', error.message)
+        else appended = entries.length
+      }
+
+      const { data: all } = await supabase
+        .from('ledger_entries').select('seq, payload_hash, prev_hash, chain_hash').order('seq', { ascending: true })
+      const verification = verifyChain((all ?? []) as never)
+      if (!verification.valid) {
+        await sendOpsAlert(supabase, {
+          severity: 'critical',
+          title: 'LEDGER VERIFICATION FAILED',
+          message: `Chain broken at seq ${verification.brokenAtSeq} — history has been tampered with or corrupted`,
+        })
+      }
+      return NextResponse.json({ task: 'ledger', appended, verification })
+    }
+
     if (task === 'lifecycle') {
       // R6: weekly auto-retirement review. Pure thresholds — demotion is
       // paper_enabled=false + shadow tracking + a filed report; never LLM.
