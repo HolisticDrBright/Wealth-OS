@@ -485,7 +485,10 @@ export class FundingRateArbStrategy extends BaseStrategy {
   async generateSignal(symbol: string, _bars: PriceBar[], meta?: Record<string, unknown>): Promise<StrategySignal | null> {
     const fundingRate = meta?.funding_rate as number | undefined
     if (fundingRate === undefined || Math.abs(fundingRate) < 0.001) return null
-    return sig(symbol, fundingRate > 0 ? 'sell' : 'buy', Math.min(1, Math.abs(fundingRate) / 0.01), -fundingRate, this.id, this.defaultAssetClass)
+    // Positive funding: short perp COLLECTS funding; negative: long perp collects.
+    // Either way the correct side EARNS |funding| — expectedReturn is +|rate|.
+    // (The old `-fundingRate` made every positive-funding signal look like a loss.)
+    return sig(symbol, fundingRate > 0 ? 'sell' : 'buy', Math.min(1, Math.abs(fundingRate) / 0.01), Math.abs(fundingRate), this.id, this.defaultAssetClass)
   }
 }
 

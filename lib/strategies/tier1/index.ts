@@ -345,7 +345,10 @@ export class FundingBasisArbStrategy extends BaseStrategy {
       symbol,
       side: perpSide,
       strength: Math.min(1, Math.abs(fundingRate) / 0.002),
-      expectedReturn: annualisedYield / 12,  // monthly expected return
+      // Carry COLLECTED is |yield| regardless of sign — direction rides in
+      // side/arb_side. The signed value made long_perp (negative funding)
+      // signals look like losses and mis-size to zero.
+      expectedReturn: Math.abs(annualisedYield) / 12,  // monthly expected return
       assetClass: this.defaultAssetClass,
       metadata: {
         funding_rate_8h: fundingRate,

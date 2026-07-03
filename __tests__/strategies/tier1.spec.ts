@@ -52,6 +52,8 @@ vi.mock('@/lib/market-data/funding-rates', () => ({
     symbol: 'BTC', rate: 0.0001, annualised: 0.0365,
     timestamp: new Date().toISOString(), source: 'binance',
   }),
+  // Real perp mark (premium consistent with positive funding by default)
+  getPerpMarkPrice: vi.fn().mockResolvedValue(100_200),
 }))
 
 // Mock global fetch for all external HTTP calls

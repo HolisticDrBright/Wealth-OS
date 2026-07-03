@@ -28,7 +28,7 @@ import type {
 } from '../../pipeline-types'
 import { getRiskControl } from '../../risk-controls'
 import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
-import { getFundingRate } from '@/lib/market-data/funding-rates'
+import { getFundingRate, getPerpMarkPrice } from '@/lib/market-data/funding-rates'
 import type { BrokerCache } from '@/lib/brokers/BrokerFactory'
 import { selectBroker } from '@/lib/brokers/asset-broker-routing'
 import { getBroker } from '@/lib/brokers/BrokerFactory'
@@ -126,20 +126,30 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
       ])
 
       if (fundingData.source === 'unavailable') continue
-      if (fundingData.rate < HIGH_FUNDING_THRESHOLD) continue
+      // BOTH funding signs are tradeable carry:
+      //   positive → short perp collects; negative → long perp collects.
+      if (Math.abs(fundingData.rate) < HIGH_FUNDING_THRESHOLD) continue
       if (!spotPrice) continue
 
-      // Estimated perp price from funding premium
-      const perpPrice = spotPrice * (1 + fundingData.rate * 3)
-      const basisBps  = ((perpPrice - spotPrice) / spotPrice) * 10_000
-      if (basisBps < MIN_SPREAD_BPS) continue
+      // REAL perp mark price — never fabricated from the funding rate
+      // (spot*(1+rate*3) made the basis check circular: it always passed
+      // exactly when the funding check passed).
+      const perpPrice = await getPerpMarkPrice(symbol)
+      if (!perpPrice) continue
+
+      const basisBps = ((perpPrice - spotPrice) / spotPrice) * 10_000
+      // Basis must CONFIRM the funding sign: premium for short-perp carry,
+      // discount for long-perp carry.
+      const carrySide: 'short_perp' | 'long_perp' = fundingData.rate > 0 ? 'short_perp' : 'long_perp'
+      const signedBasisBps = carrySide === 'short_perp' ? basisBps : -basisBps
+      if (signedBasisBps < MIN_SPREAD_BPS) continue
 
       // Book-depth cap: 25% of depth or MAX_NOTIONAL_USD
       const capNotional = bookDepth
         ? Math.min(bookDepth * BOOK_CAP_PCT, MAX_NOTIONAL_USD)
         : MAX_NOTIONAL_USD
 
-      const annualisedCarry = fundingData.annualised
+      const annualisedCarry = Math.abs(fundingData.annualised)
       const strength = Math.min(1, annualisedCarry / 0.30)
       const expectedReturn = annualisedCarry / 365
 
@@ -155,6 +165,7 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
           symbol,
           fundingRate: fundingData.rate,
           annualisedCarry,
+          carrySide,
           fundingSource: fundingData.source,
           basisBps,
           spotPrice,
@@ -162,7 +173,7 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
           bookDepth,
           capNotional,
           minsToNextSettlement: minsToSettle,
-          reasoning: `${symbol} funding ${(fundingData.rate * 100).toFixed(4)}%/8h (${(annualisedCarry * 100).toFixed(1)}% ann). Basis ${basisBps.toFixed(1)}bps. Book cap $${(capNotional / 1000).toFixed(0)}k.`,
+          reasoning: `${symbol} funding ${(fundingData.rate * 100).toFixed(4)}%/8h (${(annualisedCarry * 100).toFixed(1)}% ann, ${carrySide}). Basis ${basisBps.toFixed(1)}bps. Book cap $${(capNotional / 1000).toFixed(0)}k.`,
         },
         detectedAt: new Date().toISOString(),
       })
@@ -237,13 +248,18 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
     if (blocked) return blocked
 
     const symbol = (opp.metadata.symbol as string | undefined) ?? 'BTC'
+    // Legs flip with the funding sign: short_perp = long spot + short perp;
+    // long_perp (negative funding) = short spot + long perp.
+    const carrySide = (opp.metadata.carrySide as 'short_perp' | 'long_perp' | undefined) ?? 'short_perp'
+    const spotSide: 'buy' | 'sell' = carrySide === 'short_perp' ? 'buy' : 'sell'
+    const perpSide: 'buy' | 'sell' = carrySide === 'short_perp' ? 'sell' : 'buy'
 
     const { broker: spotBroker } = selectBroker({ assetClass: 'crypto_spot', userJurisdiction: 'us' })
     const spotAdapter = await getBroker(spotBroker, userId, supabase, cache)
     const spotResult = await spotAdapter.execute({
       symbol,
       asset_class: 'crypto',
-      side: 'buy',
+      side: spotSide,
       notional_usd: size.notionalUsd,
     })
 
@@ -252,7 +268,7 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
     const perpResult = await perpAdapter.execute({
       symbol: opp.symbol,
       asset_class: 'crypto',
-      side: 'sell',
+      side: perpSide,
       notional_usd: size.notionalUsd,
     })
 
@@ -287,23 +303,27 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
 
     if (currentFunding.source === 'unavailable') return { type: 'hold' }
 
-    // Funding flipped negative: reverse of carry -- exit both legs
-    if (currentFunding.rate < 0) {
-      return { type: 'close', reason: `funding flipped negative (${(currentFunding.rate * 100).toFixed(4)}%/8h)` }
+    // Funding flipped AGAINST the entry side: carry reversed — exit both legs.
+    // (Entry may be short_perp on positive funding OR long_perp on negative.)
+    const entrySide = (position.metadata.carrySide as 'short_perp' | 'long_perp' | undefined) ?? 'short_perp'
+    const flipped = entrySide === 'short_perp' ? currentFunding.rate < 0 : currentFunding.rate > 0
+    if (flipped) {
+      return { type: 'close', reason: `funding flipped against ${entrySide} (${(currentFunding.rate * 100).toFixed(4)}%/8h)` }
     }
 
-    // Basis compressed below 5% APR: no longer economic net of fees
+    // Carry compressed below 5% APR (magnitude): no longer economic net of fees
     const BASIS_FLOOR_APR = 0.05
-    if (currentFunding.annualised < BASIS_FLOOR_APR) {
+    const currentCarry = Math.abs(currentFunding.annualised)
+    if (currentCarry < BASIS_FLOOR_APR) {
       return {
         type: 'close',
-        reason: `basis compressed to ${(currentFunding.annualised * 100).toFixed(1)}% APR < 5% floor`,
+        reason: `basis compressed to ${(currentCarry * 100).toFixed(1)}% APR < 5% floor`,
       }
     }
 
     // Alert-only: carry degraded >70% from entry (no close -- still positive, just weaker)
-    if (openAnnualised > 0 && currentFunding.annualised < openAnnualised * 0.30) {
-      console.log(`[funding_basis_arb] ${symbol} carry degraded ${(currentFunding.annualised * 100).toFixed(1)}% vs entry ${(openAnnualised * 100).toFixed(1)}% -- monitoring`)
+    if (openAnnualised > 0 && currentCarry < openAnnualised * 0.30) {
+      console.log(`[funding_basis_arb] ${symbol} carry degraded ${(currentCarry * 100).toFixed(1)}% vs entry ${(openAnnualised * 100).toFixed(1)}% -- monitoring`)
     }
 
     // Hard timeout: 14 days (2x 8h settlement cycle buffer)

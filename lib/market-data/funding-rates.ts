@@ -95,6 +95,11 @@ export async function getFundingRates(symbols: string[]): Promise<Map<string, Fu
  * Positive funding = longs pay shorts → short perp + long spot is profitable.
  * Negative funding = shorts pay longs → long perp + short spot is profitable.
  *
+ * annualisedYield is SIGNED (sign of the funding rate). The carry COLLECTED
+ * by the correct side is |annualisedYield| — callers must size on the
+ * magnitude and take direction from `side`, never feed the signed value
+ * into expected-return math (a long_perp signal would look like a loss).
+ *
  * @param rate        8h funding rate (fraction)
  * @param threshold   Minimum 8h rate to trigger signal (default 0.05% = 0.0005)
  */
@@ -106,4 +111,38 @@ export function assessBasisArb(
   if (rate >= threshold) return { viable: true, side: 'short_perp', annualisedYield }
   if (rate <= -threshold) return { viable: true, side: 'long_perp', annualisedYield }
   return { viable: false, side: 'neutral', annualisedYield }
+}
+
+/**
+ * REAL perpetual mark price — Deribit ticker first, Binance premium index
+ * as fallback. Returns null when unavailable; callers must skip the signal
+ * rather than fabricate a perp price from the funding rate (that makes any
+ * basis check circular).
+ */
+export async function getPerpMarkPrice(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://www.deribit.com/api/v2/public/ticker?instrument_name=${symbol}-PERPETUAL`,
+      { signal: AbortSignal.timeout(6_000) }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      const mark = data.result?.mark_price
+      if (typeof mark === 'number' && isFinite(mark) && mark > 0) return mark
+    }
+  } catch { /* fall through to Binance */ }
+
+  try {
+    const res = await fetch(
+      `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}USDT`,
+      { signal: AbortSignal.timeout(6_000) }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      const mark = parseFloat(data.markPrice)
+      if (isFinite(mark) && mark > 0) return mark
+    }
+  } catch { /* unavailable */ }
+
+  return null
 }
