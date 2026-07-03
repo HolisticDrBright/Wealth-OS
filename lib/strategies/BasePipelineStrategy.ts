@@ -27,6 +27,7 @@ import {
   type StrategyAIConfig,
 } from './strategy-registry'
 import { resolveAndFetchImbalance, type ImbalanceVerdict } from '@/lib/confluence/order-book-imbalance'
+import { preTradeRiskCheck } from '@/lib/risk/kill-switch'
 import type {
   Opportunity,
   OpportunityContext,
@@ -333,6 +334,46 @@ export abstract class BasePipelineStrategy {
 
   // ── Stage 8: Execute ─────────────────────────────────────────────────────────
 
+  /**
+   * Runtime kill switch — MUST be called by every execute() implementation
+   * (including subclass overrides) before touching a broker adapter.
+   * Returns an ExecutionResult when the trade is blocked (already audited),
+   * or null when the trade may proceed.
+   */
+  protected async checkKillSwitch(
+    opp: Opportunity,
+    userId: string,
+    supabase: SupabaseClient
+  ): Promise<ExecutionResult | null> {
+    const verdict = await preTradeRiskCheck({
+      supabase,
+      userId,
+      strategyKey: this.key,
+    })
+    if (verdict.allowed) return null
+
+    // Blocked trades are logged to the audit trail, never silently dropped.
+    const reason = `kill_switch: ${verdict.reason}`
+    try {
+      await supabase.from('audit_logs').insert({
+        user_id: userId,
+        strategy_key: this.key,
+        symbol: opp.symbol,
+        edge_type: this.config.edgeType,
+        mirofish_used: false,
+        kronos_used: false,
+        decision: 'block',
+        size_fraction: 0,
+        decided_at: new Date().toISOString(),
+        metadata: { blocked_by: 'kill_switch', reason: verdict.reason, direction: opp.direction },
+      })
+    } catch (err) {
+      console.warn('[kill-switch] audit insert failed:', err)
+    }
+    console.warn(`[kill-switch] BLOCKED ${this.key} ${opp.symbol}: ${verdict.reason}`)
+    return { status: 'skipped', broker: 'none', error: reason }
+  }
+
   async execute(
     opp: Opportunity,
     size: PositionSize,
@@ -344,6 +385,9 @@ export abstract class BasePipelineStrategy {
     if (!supabase) {
       return { status: 'skipped', broker: 'none', error: 'no supabase client' }
     }
+
+    const blocked = await this.checkKillSwitch(opp, userId, supabase)
+    if (blocked) return blocked
 
     const brokerAC = toBrokerAssetClass(opp.assetClass)
     const { broker } = selectBroker({ assetClass: brokerAC, userJurisdiction: jurisdiction })

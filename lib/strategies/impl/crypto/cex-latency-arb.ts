@@ -269,6 +269,9 @@ export class CexLatencyArbStrategy extends BasePipelineStrategy {
   ): Promise<ExecutionResult> {
     if (!supabase) return { status: 'skipped', broker: 'coinbase', error: 'no supabase client' }
 
+    const blocked = await this.checkKillSwitch(opp, userId, supabase)
+    if (blocked) return blocked
+
     const longVenue  = opp.metadata.longVenue  as string
     const shortVenue = opp.metadata.shortVenue as string
     const symbol     = opp.metadata.symbol     as string

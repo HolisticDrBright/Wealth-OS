@@ -230,6 +230,9 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
   ): Promise<ExecutionResult> {
     if (!supabase) return { status: 'skipped', broker: 'none', error: 'no supabase' }
 
+    const blocked = await this.checkKillSwitch(opp, userId, supabase)
+    if (blocked) return blocked
+
     const symbol = (opp.metadata.symbol as string | undefined) ?? 'BTC'
 
     const { broker: spotBroker } = selectBroker({ assetClass: 'crypto_spot', userJurisdiction: 'us' })

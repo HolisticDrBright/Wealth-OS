@@ -148,6 +148,18 @@ export class StrategyOrchestrator {
 
     // ── Stage 7: Execute ─────────────────────────────────────────────────────
     if (decision === 'execute' && !dryRun) {
+      // Runtime kill switch — last gate before any order reaches a broker.
+      const { preTradeRiskCheck } = await import('@/lib/risk/kill-switch')
+      const killSwitch = await preTradeRiskCheck({
+        supabase,
+        userId,
+        strategyKey: isStrategyKey(strategy.id) ? strategy.id : undefined,
+      })
+      if (!killSwitch.allowed) {
+        trail.push(`[kill-switch] BLOCKED: ${killSwitch.reason}`)
+        return buildResult(signal, 'block', 0, score, trail, miroFishReport, miroFishScore, undefined, `kill_switch: ${killSwitch.reason}`)
+      }
+
       const broker = selectBroker({
         symbol,
         asset_class: signal.assetClass,

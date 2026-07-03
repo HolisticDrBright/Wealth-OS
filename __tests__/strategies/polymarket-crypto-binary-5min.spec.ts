@@ -72,14 +72,17 @@ function mockFetch(coinbaseUsd: number | null, binanceUsd: number | null) {
   }))
 }
 
-function makeSupabase(): SupabaseClient {
-  return {
-    from: vi.fn().mockReturnValue({
-      insert: vi.fn().mockReturnValue(
-        Promise.resolve({ error: null })
-      ),
-    }),
-  } as unknown as SupabaseClient
+// Supports both the audit insert and the kill-switch read chains
+// (select().eq()… resolves empty state = trading allowed).
+function makeSupabase(insertMock?: ReturnType<typeof vi.fn>): SupabaseClient {
+  const builder: Record<string, unknown> = {
+    then: (resolve: (v: unknown) => unknown) => resolve({ data: [], error: null }),
+  }
+  builder.select = () => builder
+  builder.eq = () => builder
+  builder.single = () => Promise.resolve({ data: null, error: null })
+  builder.insert = insertMock ?? vi.fn().mockReturnValue(Promise.resolve({ error: null }))
+  return { from: vi.fn().mockReturnValue(builder) } as unknown as SupabaseClient
 }
 
 const NOW = Date.now()
@@ -409,9 +412,7 @@ describe('PolymarketCryptoBinary5MinStrategy', () => {
   // ── Test 8 ──────────────────────────────────────────────────────────────────
   it('audit_logs records correct edge_type and broker_used', async () => {
     const insertMock = vi.fn().mockReturnValue(Promise.resolve({ error: null }))
-    const supabase = {
-      from: vi.fn().mockReturnValue({ insert: insertMock }),
-    } as unknown as SupabaseClient
+    const supabase = makeSupabase(insertMock)
 
     const endTime = NOW + 60_000
     const opp: Opportunity = {
