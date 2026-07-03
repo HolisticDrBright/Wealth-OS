@@ -25,6 +25,7 @@ import { getKronosConfluence } from '@/lib/predictors/kronos-confluence'
 import { isStrategyKey } from '@/lib/strategies/strategy-registry'
 import { miroFishClient, simulateWithClaude } from '@/lib/agents/mirofish-client'
 import { selectBroker, submitOrder } from '@/lib/broker-adapters/router'
+import { edgeClearsCosts } from '@/lib/costs/transaction-costs'
 import type { TradeContext } from '@/lib/agents/types'
 import type { SimulationReport } from '@/lib/agents/types'
 
@@ -130,7 +131,16 @@ export class StrategyOrchestrator {
       }
     }
 
-    // ── Stage 5: Red Team (lightweight score adjustment) ─────────────────────
+    // ── Stage 5: Red Team (cost gate + lightweight score adjustment) ─────────
+    // Cost floor: expected edge must clear 2× the venue round-trip cost.
+    const venue = signal.assetClass === 'stock' ? 'stocks' : signal.assetClass
+    const cost = edgeClearsCosts(Math.abs(signal.expectedReturn), venue)
+    if (!cost.clears) {
+      const reason = `edge_below_cost_floor: gross=${cost.grossBps}bps < 2× round-trip ${cost.costBps}bps (net=${cost.netBps}bps, venue=${venue})`
+      trail.push(`[redteam] ${reason}`)
+      return buildResult(signal, 'block', 0, 0, trail, miroFishReport, miroFishScore, undefined, reason)
+    }
+
     const score = computeBaseScore(signal, miroFishScore)
     trail.push(`[redteam] base_score=${score.toFixed(0)}`)
 

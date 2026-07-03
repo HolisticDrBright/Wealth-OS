@@ -305,6 +305,25 @@ Write a CIO synthesis as JSON:
       return decision
     }
 
+    // ── Gate 0 — cost floor. Enforced HERE so runRedTeam() overrides cannot
+    // bypass it: an edge below 2× the venue round trip is blocked outright
+    // (never reduce_size — a smaller negative-net trade is still negative).
+    const { edgeClearsCosts } = await import('@/lib/costs/transaction-costs')
+    const cost = edgeClearsCosts(Math.abs(opp.expectedReturn), opp.assetClass)
+    if (!cost.clears) {
+      const decision = {
+        action: 'block' as const,
+        reason: `edge_below_cost_floor: gross=${cost.grossBps}bps < 2× round-trip ${cost.costBps}bps (net=${cost.netBps}bps, venue=${opp.assetClass})`,
+      }
+      await strat.logAudit(opp, decision, {
+        mirofish: null,
+        kronos: null,
+        redTeam: { passed: false, score: 0, reason: decision.reason },
+        risk: { veto: true, kellyFraction: 0, reason: decision.reason },
+      }, supabase, userId)
+      return decision
+    }
+
     const edge     = await strat.classifyEdge(opp)
     const mirofish = await strat.runMiroFishConfluence(opp, userId, supabase)
     const kronos   = await strat.runKronosConfluence(opp, userId, supabase)
@@ -357,6 +376,13 @@ Write a CIO synthesis as JSON:
 
     // Gate 4 — red team
     if (!redTeam.passed) {
+      // A cost-floor failure from an overridden runRedTeam is a hard block —
+      // reducing the size of a negative-net-edge trade doesn't make it positive.
+      if (redTeam.reason?.includes('edge_below_cost_floor')) {
+        const decision = { action: 'block' as const, reason: redTeam.reason }
+        await strat.logAudit(opp, decision, verdicts, supabase, userId)
+        return decision
+      }
       const size = await strat.sizePosition(opp, verdicts, userId)
       const decision = { action: 'reduce_size' as const, reason: redTeam.reason ?? 'red team score low', size }
       await strat.logAudit(opp, decision, verdicts, supabase, userId)

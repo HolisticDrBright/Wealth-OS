@@ -28,6 +28,7 @@ import {
 } from './strategy-registry'
 import { resolveAndFetchImbalance, type ImbalanceVerdict } from '@/lib/confluence/order-book-imbalance'
 import { preTradeRiskCheck } from '@/lib/risk/kill-switch'
+import { edgeClearsCosts } from '@/lib/costs/transaction-costs'
 import type {
   Opportunity,
   OpportunityContext,
@@ -284,6 +285,18 @@ export abstract class BasePipelineStrategy {
   // ── Stage 5: Red Team ────────────────────────────────────────────────────────
 
   async runRedTeam(opp: Opportunity): Promise<RedTeamVerdict> {
+    // Cost floor first: the expected edge must clear 2× the venue round trip,
+    // otherwise no score can save it. CIODecisionEngine.decide() hard-blocks on
+    // this reason (never reduce_size — a smaller negative-net trade is still negative).
+    const cost = edgeClearsCosts(Math.abs(opp.expectedReturn), opp.assetClass)
+    if (!cost.clears) {
+      return {
+        passed: false,
+        score: 0,
+        reason: `edge_below_cost_floor: gross=${cost.grossBps}bps < 2× round-trip ${cost.costBps}bps (net=${cost.netBps}bps, venue=${opp.assetClass})`,
+      }
+    }
+
     const signalScore = opp.strength * 60
     const edgeScore = Math.min(20, Math.abs(opp.expectedReturn) * 500)
     const score = Math.min(100, signalScore + edgeScore)
