@@ -1,5 +1,42 @@
 # Wealth OS Changelog
 
+## 2026-07-03 — Advisory Module + Sweep Engine + UI upgrade (first pass)
+
+### Advisory Module (`9f79fbd`)
+`tax_constants` (year-keyed, source-URL'd — no limit ever hardcoded; 2026
+seed verified against IRS Notice 25-67/Pub 15), `kb_parameters` (KB §9),
+`financial_profile`, `advisory_log`. Seven rules (S-corp with honest corrected
+math, Roth/backdoor gated on pro-rata, emergency fund with live yields, HSA,
+deductions checklist, Solo 401(k) with S-corp interaction, banking hygiene).
+ESLint forbids numeric literals in rule files. Staleness job wired into cron
+(`task=advisory-staleness`). 29 table-driven tests.
+
+### Sweep Engine (`ee4f055`)
+KB §5–6 as pure functions: Merton share, Thorp drawdown-constrained Kelly,
+TIPP ratcheting floor, vol brake, Daryanani bands, deferral hurdle; all nine
+sweep triggers in order with sleeve claiming; tax-aware funding order (STCG
+only when forced); waterfall destination routing; sleeve refill gate. 25 tests.
+
+### UI upgrade — priority widgets (`aa973dc`)
+Risk Strip on every page (PAPER badge, kill-switch state, DD/daily-loss vs
+limits, exposure chips) + global Flatten & Halt with impact-summary confirm
+(integration-tested against the kill switch) + advisory cards on /advisor
+(ranked, show-the-math, status lifecycle, disclaimer+CPA CTA, live yields) +
+underwater drawdown shading on the equity hero + Trade Tape with per-fill
+reasoning provenance.
+
+### Follow-ups queued (UI brief remainder + Gap Analysis)
+Advisor/Terminal density mode toggle (user-prefs persisted) · full 13-agent
+debate transcript panel · strategy leaderboard metric columns
+(CAGR/Sortino/Calmar/SQN) · calibration reliability diagram · Polymarket
+model-vs-market fair-value chart · Gap Analysis top picks (point-in-time DB +
+Polymarket corpus, adversarial-input defense, household Monte Carlo).
+
+### New migration (apply in Supabase SQL Editor)
+- `20260703c_advisory_module.sql` — tax_constants + kb_parameters (seeded),
+  financial_profile, advisory_log
+
+
 ## 2026-07-03 — Phase 0 + Backtester (safety wiring)
 
 Implements the full *Phase 0 + Backtester Implementation Brief* (7 items, one
