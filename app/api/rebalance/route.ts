@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, getBearerToken } from '@/lib/api'
 import { computeRebalanceTrades, DEFAULT_TARGETS } from '@/lib/rebalance-engine'
 import { submitOrder } from '@/lib/broker-router'
+import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
 import { checkWashSaleBlocklist } from '@/lib/tax/wash-sale-guard'
 import { estimateRebalanceTaxDrag } from '@/lib/tax/tax-aware-rebalance'
 import type { Asset, PortfolioTarget } from '@/lib/types'
@@ -104,13 +105,25 @@ export async function POST(req: NextRequest) {
         errors.push(`${trade.asset_class}: skipped — ${meta.blocked_reason}`)
         continue
       }
+      // Pre-execution guard per order: kill switch + sleeve halts.
+      const guard = await preExecutionGuard({ supabase, userId })
+      if (!guard.ok) {
+        errors.push(`${trade.asset_class}: blocked — ${guard.reason}`)
+        await supabase.from('audit_logs').insert({
+          user_id: userId, strategy_key: 'rebalance', symbol: trade.asset_class,
+          decision: 'block', size_fraction: 0, mirofish_used: false, kronos_used: false,
+          decided_at: new Date().toISOString(),
+          metadata: { blocked_by: 'pre_execution_guard', reason: guard.reason, route: '/api/rebalance' },
+        }).then(() => {}, () => {})
+        continue
+      }
       const result = await submitOrder({
         symbol: trade.asset_class === 'stock' ? 'SPY' : trade.asset_class === 'crypto' ? 'BTC' : trade.asset_class,
         asset_class: trade.asset_class,
         side: trade.action,
         order_type: 'market',
         notional_usd: trade.suggested_notional,
-      })
+      }, guard.token)
 
       if (result.status === 'open' || result.status === 'submitted') {
         executed++

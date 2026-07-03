@@ -278,6 +278,9 @@ export class CexLatencyArbStrategy extends BasePipelineStrategy {
     const blocked = await this.checkKillSwitch(opp, userId, supabase)
     if (blocked) return blocked
 
+    const liveBlocked = await this.checkLiveGate(opp, userId, supabase)
+    if (liveBlocked) return liveBlocked
+
     const longVenue  = opp.metadata.longVenue  as string
     const shortVenue = opp.metadata.shortVenue as string
     const symbol     = opp.metadata.symbol     as string

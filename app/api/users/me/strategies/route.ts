@@ -23,12 +23,13 @@ export async function GET(req: NextRequest) {
 
   const { data: userRows } = await supabase
     .from('user_enabled_strategies')
-    .select('strategy_key, is_enabled, paper_enabled')
+    .select('strategy_key, is_enabled, paper_enabled, live_enabled')
     .eq('user_id', userId)
 
   const enabledMap = new Map(
     (userRows ?? []).map(r => [r.strategy_key as StrategyKey, {
       is_enabled: r.is_enabled,
+      live_enabled: r.live_enabled ?? false,
       allocation_pct: null,
       paper_enabled: r.paper_enabled,
     }])
@@ -46,9 +47,9 @@ export async function GET(req: NextRequest) {
       isEnabled: enabledMap.get(key)?.is_enabled ?? false,
       allocationPct: enabledMap.get(key)?.allocation_pct ?? null,
       paperEnabled: enabledMap.get(key)?.paper_enabled ?? false,
-      // `live_enabled` is not in the select above (column may not exist in all
-      // environments); default to false to avoid breaking the response shape.
-      liveEnabled: false,
+      // Truthful exposure — migration 20260703m guarantees the column exists
+      // and defaults to false. NEVER treated as authorization by itself.
+      liveEnabled: enabledMap.get(key)?.live_enabled ?? false,
       maturityStatus: cfg.maturityStatus,
       enabledInProfiles: cfg.enabledInProfiles,
       missingRequired: (cfg.requiredEnv ?? []).filter(v => !process.env[v]),

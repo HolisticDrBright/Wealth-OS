@@ -68,11 +68,19 @@ export interface BrokerConfig {
   assetClasses: AssetClass[]
 }
 
-export interface SelectBrokerResult {
-  broker: Broker
-  reason: 'user_override' | 'default' | 'fallback_legal'
-  config: BrokerConfig
-}
+export type SelectBrokerResult =
+  | {
+      broker: Broker
+      reason: 'user_override' | 'default' | 'fallback_legal'
+      config: BrokerConfig
+    }
+  | {
+      /** No legally available broker for this asset class in this jurisdiction. */
+      broker: null
+      reason: 'no_legal_broker'
+      config: null
+      detail: string
+    }
 
 // ─── Broker registry ──────────────────────────────────────────────────────────
 
@@ -312,8 +320,18 @@ export function selectBroker(args: {
     return { broker: defaults.primary, reason: 'default', config: BROKER_CONFIGS[defaults.primary] }
   }
 
-  // 3. Fallback
-  return { broker: defaults.fallback, reason: 'fallback_legal', config: BROKER_CONFIGS[defaults.fallback] }
+  // 3. Fallback — MUST also be legal in the jurisdiction. A US user whose
+  // primary AND fallback are both us_unavailable (e.g. Polymarket) gets NO
+  // broker and execution blocks with a clear reason — never an illegal venue.
+  if (isBrokerAllowed(defaults.fallback, userJurisdiction)) {
+    return { broker: defaults.fallback, reason: 'fallback_legal', config: BROKER_CONFIGS[defaults.fallback] }
+  }
+  return {
+    broker: null,
+    reason: 'no_legal_broker',
+    config: null,
+    detail: `no legally available broker for ${assetClass} in jurisdiction ${userJurisdiction} (primary=${defaults.primary}, fallback=${defaults.fallback})`,
+  }
 }
 
 // ─── Utility ─────────────────────────────────────────────────────────────────

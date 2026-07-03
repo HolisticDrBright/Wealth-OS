@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiSuccess, apiError } from '@/lib/api'
 import { submitOrder } from '@/lib/broker-router'
+import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
 import { sendDrawdownAlert } from '@/lib/notifications'
 import { logAudit, extractRequestMeta } from '@/lib/audit-log'
 
@@ -48,13 +49,24 @@ export async function POST(req: NextRequest) {
     }
 
     if (request.symbol && request.action && request.notional_usd) {
+      // Pre-execution guard: kill switch + sleeve halts. Blocked → 423 + audit.
+      const guard = await preExecutionGuard({ supabase, userId: user.id, sleeveId: request.sleeve_id as string | undefined })
+      if (!guard.ok) {
+        await supabase.from('audit_logs').insert({
+          user_id: user.id, strategy_key: 'sleeve_approval', symbol: request.symbol,
+          decision: 'block', size_fraction: 0, mirofish_used: false, kronos_used: false,
+          decided_at: new Date().toISOString(),
+          metadata: { blocked_by: 'pre_execution_guard', reason: guard.reason, route: '/api/sleeves/approve' },
+        }).then(() => {}, () => {})
+        return apiError(`blocked: ${guard.reason}`, 423)
+      }
       brokerResult = await submitOrder({
         symbol: request.symbol,
         asset_class: sleeve?.approved_asset_classes?.[0] ?? 'stock',
         side: request.action === 'buy' ? 'buy' : 'sell',
         order_type: (request.order_type ?? 'market') as 'market' | 'limit',
         notional_usd: request.notional_usd,
-      })
+      }, guard.token)
 
       // Write order record
       await supabase.from('orders').insert({

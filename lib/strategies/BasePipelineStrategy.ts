@@ -32,6 +32,7 @@ import { edgeClearsCosts } from '@/lib/costs/transaction-costs'
 import { computeEmpiricalSize, zeroSize } from '@/lib/risk/empirical-sizing'
 import { getPortfolioUsd } from '@/lib/strategies/risk-controls'
 import { executeIdempotent, placeBracketIdempotent } from '@/lib/broker-adapters/order-intents'
+import { liveTradingEnabled, PAPER_PHASE_REASON, checkLiveApproval } from '@/lib/broker-adapters/execution-guard'
 import type {
   Opportunity,
   OpportunityContext,
@@ -424,6 +425,36 @@ export abstract class BasePipelineStrategy {
     return { status: 'skipped', broker: 'none', error: reason }
   }
 
+  /**
+   * Hard live gate — execute() paths talk to REAL broker adapters. Paper
+   * trading never comes through here (PaperBroker only). Requires the
+   * LIVE_TRADING_ENABLED master switch AND explicit live approval
+   * (maturity live_candidate + user live_enabled=true; is_enabled is never
+   * a live signal). MUST be called by every execute() override.
+   */
+  protected async checkLiveGate(
+    opp: Opportunity,
+    userId: string,
+    supabase: SupabaseClient
+  ): Promise<ExecutionResult | null> {
+    if (!liveTradingEnabled()) {
+      return { status: 'skipped', broker: 'none', error: PAPER_PHASE_REASON }
+    }
+    const approval = await checkLiveApproval(supabase, userId, this.key)
+    if (!approval.approved) {
+      try {
+        await supabase.from('audit_logs').insert({
+          user_id: userId, strategy_key: this.key, symbol: opp.symbol,
+          decision: 'block', size_fraction: 0, mirofish_used: false, kronos_used: false,
+          decided_at: new Date().toISOString(),
+          metadata: { blocked_by: 'live_approval_gate', reason: approval.reason },
+        })
+      } catch { /* audit best-effort; the block below is the guarantee */ }
+      return { status: 'skipped', broker: 'none', error: `live_approval_gate: ${approval.reason}` }
+    }
+    return null
+  }
+
   async execute(
     opp: Opportunity,
     size: PositionSize,
@@ -439,8 +470,15 @@ export abstract class BasePipelineStrategy {
     const blocked = await this.checkKillSwitch(opp, userId, supabase)
     if (blocked) return blocked
 
+    const liveBlocked = await this.checkLiveGate(opp, userId, supabase)
+    if (liveBlocked) return liveBlocked
+
     const brokerAC = toBrokerAssetClass(opp.assetClass)
-    const { broker } = selectBroker({ assetClass: brokerAC, userJurisdiction: jurisdiction })
+    const selection = selectBroker({ assetClass: brokerAC, userJurisdiction: jurisdiction })
+    if (selection.broker === null) {
+      return { status: 'skipped', broker: 'none', error: `no_legal_broker: ${selection.detail}` }
+    }
+    const broker = selection.broker
     const adapter = await getBroker(broker, userId, supabase, cache)
 
     // Place bracket order if the opportunity specifies one

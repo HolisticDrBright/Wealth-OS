@@ -170,16 +170,17 @@ export class StrategyOrchestrator {
 
     // ── Stage 7: Execute ─────────────────────────────────────────────────────
     if (decision === 'execute' && !dryRun) {
-      // Runtime kill switch — last gate before any order reaches a broker.
-      const { preTradeRiskCheck } = await import('@/lib/risk/kill-switch')
-      const killSwitch = await preTradeRiskCheck({
+      // Pre-execution guard (kill switch et al.) — mints the token the broker
+      // router requires; ungated submissions are refused at the router.
+      const { preExecutionGuard } = await import('@/lib/broker-adapters/execution-guard')
+      const guard = await preExecutionGuard({
         supabase,
         userId,
         strategyKey: isStrategyKey(strategy.id) ? strategy.id : undefined,
       })
-      if (!killSwitch.allowed) {
-        trail.push(`[kill-switch] BLOCKED: ${killSwitch.reason}`)
-        return buildResult(signal, 'block', 0, score, trail, miroFishReport, miroFishScore, undefined, `kill_switch: ${killSwitch.reason}`)
+      if (!guard.ok) {
+        trail.push(`[kill-switch] BLOCKED: ${guard.reason}`)
+        return buildResult(signal, 'block', 0, score, trail, miroFishReport, miroFishScore, undefined, guard.reason)
       }
 
       // Notional from the empirical sizing result — real equity, no defaults.
@@ -200,7 +201,7 @@ export class StrategyOrchestrator {
             side: signal.side,
             notional_usd: notionalUsd,
             jurisdiction,
-          })
+          }, guard.token)
           trail.push(`[execute] broker=${result.broker} status=${result.status} order=${result.broker_order_id ?? 'n/a'}`)
         } catch (err) {
           trail.push(`[execute] Error: ${err}`)

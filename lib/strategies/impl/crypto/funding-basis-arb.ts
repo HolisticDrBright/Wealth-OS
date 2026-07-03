@@ -247,6 +247,9 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
     const blocked = await this.checkKillSwitch(opp, userId, supabase)
     if (blocked) return blocked
 
+    const liveBlocked = await this.checkLiveGate(opp, userId, supabase)
+    if (liveBlocked) return liveBlocked
+
     const symbol = (opp.metadata.symbol as string | undefined) ?? 'BTC'
     // Legs flip with the funding sign: short_perp = long spot + short perp;
     // long_perp (negative funding) = short spot + long perp.
@@ -254,7 +257,13 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
     const spotSide: 'buy' | 'sell' = carrySide === 'short_perp' ? 'buy' : 'sell'
     const perpSide: 'buy' | 'sell' = carrySide === 'short_perp' ? 'sell' : 'buy'
 
-    const { broker: spotBroker } = selectBroker({ assetClass: 'crypto_spot', userJurisdiction: 'us' })
+    const spotSel = selectBroker({ assetClass: 'crypto_spot', userJurisdiction: 'us' })
+    const perpSel = selectBroker({ assetClass: 'crypto_perp', userJurisdiction: 'us' })
+    if (spotSel.broker === null || perpSel.broker === null) {
+      return { status: 'skipped', broker: 'none', error: 'no_legal_broker for one or both legs' }
+    }
+    const spotBroker = spotSel.broker
+    const perpBroker = perpSel.broker
     const spotAdapter = await getBroker(spotBroker, userId, supabase, cache)
     const spotResult = await spotAdapter.execute({
       symbol,
@@ -263,7 +272,6 @@ export class FundingBasisArbStrategy extends BasePipelineStrategy {
       notional_usd: size.notionalUsd,
     })
 
-    const { broker: perpBroker } = selectBroker({ assetClass: 'crypto_perp', userJurisdiction: 'us' })
     const perpAdapter = await getBroker(perpBroker, userId, supabase, cache)
     const perpResult = await perpAdapter.execute({
       symbol: opp.symbol,

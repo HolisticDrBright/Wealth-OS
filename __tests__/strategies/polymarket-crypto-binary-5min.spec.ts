@@ -140,6 +140,9 @@ describe('PolymarketCryptoBinary5MinStrategy', () => {
 
   beforeEach(() => {
     strategy = new PolymarketCryptoBinary5MinStrategy()
+    // Execute-mechanics tests only — the live gate itself is covered in
+    // __tests__/safety/live-trading-gates.spec.ts.
+    ;(strategy as unknown as { checkLiveGate: () => Promise<null> }).checkLiveGate = async () => null
     vi.useFakeTimers()
     vi.setSystemTime(new Date(NOW))
   })

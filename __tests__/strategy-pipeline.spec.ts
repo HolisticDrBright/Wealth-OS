@@ -238,8 +238,15 @@ describe('Broker routing — execute()', () => {
     } as never
   }
 
+  // Routing mechanics only — the live gate is tested separately in
+  // __tests__/safety/live-trading-gates.spec.ts, so bypass it here.
+  function bypassLiveGate(strat: object) {
+    ;(strat as { checkLiveGate: () => Promise<null> }).checkLiveGate = async () => null
+  }
+
   it('5. FxTrendfollowingStrategy.execute routes to OANDA (forex default)', async () => {
     const strat = new FxTrendfollowingStrategy()
+    bypassLiveGate(strat)
     const opp = makeOpp({
       strategyKey: 'fx_trendfollowing',
       assetClass: 'forex',
@@ -256,8 +263,9 @@ describe('Broker routing — execute()', () => {
     executeSpy.mockRestore()
   })
 
-  it('6. PolymarketResolutionRules.execute routes to PolymarketAdapter', async () => {
+  it('6. PolymarketResolutionRules.execute routes to PolymarketAdapter for non-US users', async () => {
     const strat = new PolymarketResolutionRulesStrategy()
+    bypassLiveGate(strat)
     const opp = makeOpp({
       strategyKey: 'polymarket_resolution_rules',
       assetClass: 'polymarket',
@@ -268,9 +276,31 @@ describe('Broker routing — execute()', () => {
 
     const executeSpy = vi.spyOn(PolymarketAdapter.prototype, 'execute').mockResolvedValue(mockBrokerResult)
 
-    const result = await strat.execute(opp, size, 'user-1', supabase)
+    // Polymarket is us_unavailable — routing only resolves outside the US.
+    const result = await strat.execute(opp, size, 'user-1', supabase, undefined, 'eu')
     expect(result.broker).toBe('polymarket')
     expect(result.status).toBe('submitted')
+    executeSpy.mockRestore()
+  })
+
+  it('6b. Polymarket never routes for a US user — no legal broker', async () => {
+    const strat = new PolymarketResolutionRulesStrategy()
+    bypassLiveGate(strat)
+    const opp = makeOpp({
+      strategyKey: 'polymarket_resolution_rules',
+      assetClass: 'polymarket',
+      symbol: 'POLY:0xabc',
+    })
+    const size = { fraction: 0.02, notionalUsd: 200, rationale: 'test' }
+    const supabase = makeSupabaseWithLinkedAccount()
+
+    const executeSpy = vi.spyOn(PolymarketAdapter.prototype, 'execute').mockResolvedValue(mockBrokerResult)
+
+    const result = await strat.execute(opp, size, 'user-1', supabase, undefined, 'us')
+    expect(result.status).toBe('skipped')
+    expect(result.broker).toBe('none')
+    expect(result.error).toContain('no_legal_broker')
+    expect(executeSpy).not.toHaveBeenCalled()
     executeSpy.mockRestore()
   })
 })

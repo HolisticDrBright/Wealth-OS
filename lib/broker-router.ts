@@ -1,4 +1,5 @@
 import { createHash, createHmac } from 'crypto'
+import { isGuardTokenValid, liveTradingEnabled, PAPER_PHASE_REASON, type GuardToken } from './broker-adapters/execution-guard'
 
 export interface OrderParams {
   symbol: string
@@ -172,7 +173,21 @@ export async function executeViaPolymarket(params: OrderParams): Promise<BrokerR
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────
-export async function submitOrder(params: OrderParams): Promise<BrokerResult> {
+export async function submitOrder(
+  params: OrderParams,
+  guard?: GuardToken
+): Promise<BrokerResult> {
+  // Refuse ungated submissions (kill switch / cost gate enforced upstream via
+  // preExecutionGuard) and everything while the live master switch is off.
+  if (!isGuardTokenValid(guard)) {
+    return {
+      status: 'failed',
+      reason: 'ungated submission refused — run preExecutionGuard() and pass its token',
+    }
+  }
+  if (!liveTradingEnabled()) {
+    return { status: 'skipped', reason: PAPER_PHASE_REASON }
+  }
   const broker = params.broker_override ?? params.asset_class
   switch (broker) {
     case 'stock':

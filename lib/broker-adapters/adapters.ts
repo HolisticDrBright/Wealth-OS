@@ -911,6 +911,8 @@ export class PolymarketAdapter extends BrokerAdapter {
     id: 'polymarket',
     displayName: 'Polymarket',
     assetClasses: ['prediction_market', 'polymarket'],
+    // Polymarket is not available to US persons (CFTC settlement).
+    blockedJurisdictions: ['US'],
     requiredEnvVars: ['POLYMARKET_PRIVATE_KEY'],
   }
 

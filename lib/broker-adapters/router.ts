@@ -10,6 +10,7 @@
 
 import type { OrderParams, BrokerResult } from './types'
 import { BrokerAdapter } from './types'
+import { isGuardTokenValid, liveTradingEnabled, PAPER_PHASE_REASON, type GuardToken } from './execution-guard'
 import {
   AlpacaAdapter,
   KrakenAdapter,
@@ -108,7 +109,23 @@ export function selectBroker(params: OrderParams): BrokerAdapter | null {
 
 // ─── submitOrder() — drop-in replacement for the old broker-router ─────────────
 
-export async function submitOrder(params: OrderParams): Promise<BrokerResult> {
+export async function submitOrder(
+  params: OrderParams,
+  guard?: GuardToken
+): Promise<BrokerResult> {
+  // The router REFUSES ungated submissions — no future caller can skip the
+  // kill switch / cost gate by calling submitOrder directly.
+  if (!isGuardTokenValid(guard)) {
+    return {
+      status: 'failed',
+      reason: 'ungated submission refused — run preExecutionGuard() and pass its token',
+    }
+  }
+  // Master switch: real broker execution is OFF during the paper phase.
+  if (!liveTradingEnabled()) {
+    return { status: 'skipped', reason: PAPER_PHASE_REASON }
+  }
+
   const adapter = selectBroker(params)
   if (!adapter) {
     return {

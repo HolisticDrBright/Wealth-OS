@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, getBearerToken } from '@/lib/api'
 import { submitOrder } from '@/lib/broker-router'
+import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
 import type { Order } from '@/lib/types'
 
 async function getUserId(req: NextRequest): Promise<string | null> {
@@ -84,13 +85,25 @@ export async function POST(req: NextRequest) {
 
   if (insertErr || !order) return apiError(insertErr?.message ?? 'Insert failed', 500)
 
-  // Submit to broker
+  // Pre-execution guard: kill switch + sleeve halts. Blocked → 423 + audit.
+  const guard = await preExecutionGuard({ supabase, userId })
+  if (!guard.ok) {
+    await supabase.from('audit_logs').insert({
+      user_id: userId, strategy_key: 'manual_order', symbol,
+      decision: 'block', size_fraction: 0, mirofish_used: false, kronos_used: false,
+      decided_at: new Date().toISOString(),
+      metadata: { blocked_by: 'pre_execution_guard', reason: guard.reason, route: '/api/orders' },
+    }).then(() => {}, () => {})
+    return apiError(`blocked: ${guard.reason}`, 423)
+  }
+
+  // Submit to broker (router refuses submissions without a valid guard token)
   const result = await submitOrder({
     symbol, asset_class, side, order_type,
     notional_usd, quantity, limit_price, stop_price,
     trail_amount, trail_percent, time_in_force,
     broker_override,
-  })
+  }, guard.token)
 
   // Update order with broker result
   const newStatus: Order['status'] = result.status === 'open' ? 'open'

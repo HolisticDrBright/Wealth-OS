@@ -401,6 +401,9 @@ export class PolymarketCryptoBinary5MinStrategy extends BasePipelineStrategy {
     const blocked = await this.checkKillSwitch(opp, userId, supabase)
     if (blocked) return blocked
 
+    const liveBlocked = await this.checkLiveGate(opp, userId, supabase)
+    if (liveBlocked) return liveBlocked
+
     const marketId   = opp.metadata.marketId    as string
     const endTime    = opp.metadata.endTime      as number
     const onChain    = opp.metadata.onChainPrice as number

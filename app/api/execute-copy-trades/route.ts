@@ -277,6 +277,10 @@ export async function POST(req: NextRequest) {
         userJurisdiction: jurisdiction,
       })
 
+      if (selectedBroker.broker === null) {
+        errors.push(`${trade.symbol}: no_legal_broker — ${selectedBroker.detail}`)
+        continue
+      }
       const adapter = await getBroker(selectedBroker.broker, userId, supabase, _brokerCache!)
       const result = await adapter.execute({
         symbol: trade.symbol,

@@ -11,7 +11,7 @@
  *     traded the positive-funding side.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ─── Mock market data BEFORE importing strategies ─────────────────────────────
 
@@ -98,6 +98,15 @@ describe('Pipeline funding-basis-arb impl — bug 3', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.unstubAllGlobals()
+    // Pin the clock mid-window (04:00 UTC = 240 min to the 08:00 settlement)
+    // so the 30-min settlement buffer never skips entries — deterministic
+    // regardless of the wall-clock time the suite runs at.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-07-03T04:00:00Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   async function detect(rate: number, spot: number, perpMark: number | null) {
@@ -110,9 +119,6 @@ describe('Pipeline funding-basis-arb impl — bug 3', () => {
 
     const { FundingBasisArbStrategy } = await import('@/lib/strategies/impl/crypto/funding-basis-arb')
     const impl = new FundingBasisArbStrategy()
-    const cadence = await import('@/lib/strategies/impl/crypto/funding-basis-arb')
-    // Force the settlement window open
-    vi.spyOn(cadence, 'minutesToNextFundingSettlement')
     return impl.detectOpportunities({ metadata: { symbols: ['BTC'] } } as never)
   }
 
