@@ -196,6 +196,56 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'advisory-staleness', staleCount: stale.length, stale })
     }
 
+    if (task === 'tipp-floors') {
+      // Daily TIPP ratchet (R2): F_t = max(F_prev × e^(r·dt), k × V_t) per
+      // user per sleeve. The floor only ever rises here.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { updateFloorState } = await import('@/lib/advisory/tipp-state')
+      const { loadKbParameters } = await import('@/lib/advisory/constants')
+      const { fetchCurrentYields } = await import('@/lib/advisory/yields')
+      const params = await loadKbParameters(supabase)
+      const yields = await fetchCurrentYields()
+      const rAnnual = (yields.tbill3moPct ?? 0) / 100
+
+      const { data: open } = await supabase
+        .from('paper_positions').select('user_id, asset_class, notional_usd, unrealized_pnl_usd').eq('status', 'open')
+      const byUserSleeve = new Map<string, number>()
+      for (const r of open ?? []) {
+        const key = `${r.user_id}|${r.asset_class}`
+        byUserSleeve.set(key, (byUserSleeve.get(key) ?? 0) + ((r.notional_usd as number) ?? 0) + ((r.unrealized_pnl_usd as number) ?? 0))
+      }
+
+      let updated = 0
+      for (const [key, valueUsd] of byUserSleeve) {
+        const [uid, sleeveKey] = key.split('|')
+        const m = sleeveKey === 'crypto' || sleeveKey === 'polymarket'
+          ? params.tipp_multiplier_crypto : params.tipp_multiplier_equity
+        const { data: row } = await supabase
+          .from('sleeve_floors').select('floor_usd, hwm_usd, peak_cushion_usd, updated_at')
+          .eq('user_id', uid).eq('sleeve_key', sleeveKey).maybeSingle()
+        const dtDays = row?.updated_at
+          ? Math.max(0, (Date.now() - new Date(row.updated_at as string).getTime()) / 86_400_000)
+          : 1
+        const next = updateFloorState(
+          {
+            floorUsd: Number(row?.floor_usd ?? 0),
+            hwmUsd: Number(row?.hwm_usd ?? 0),
+            peakCushionUsd: Number(row?.peak_cushion_usd ?? 0),
+          },
+          valueUsd, params.tipp_floor_k, rAnnual, dtDays
+        )
+        const { error } = await supabase.from('sleeve_floors').upsert({
+          user_id: uid, sleeve_key: sleeveKey,
+          floor_usd: next.floorUsd, hwm_usd: next.hwmUsd, peak_cushion_usd: next.peakCushionUsd,
+          k: params.tipp_floor_k, multiplier: m, updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,sleeve_key' })
+        if (error) console.warn('[tipp-floors] upsert failed:', error.message)
+        else updated++
+      }
+      return NextResponse.json({ task: 'tipp-floors', sleeves: updated, rAnnual })
+    }
+
     if (task === 'sweep') {
       // Monthly sweep evaluation (KB §6): derive sleeve state per user from
       // paper positions + assets, run the trigger cascade, surface actions as
@@ -212,12 +262,14 @@ export async function GET(req: NextRequest) {
       let actionsTotal = 0
 
       for (const uid of userIds) {
-        const [{ data: open }, { data: assets }, { data: flags }, { data: profile }] = await Promise.all([
+        const [{ data: open }, { data: assets }, { data: flags }, { data: profile }, { data: floors }] = await Promise.all([
           supabase.from('paper_positions').select('asset_class, notional_usd').eq('user_id', uid).eq('status', 'open'),
           supabase.from('assets').select('current_value').eq('user_id', uid),
           supabase.from('system_flags').select('user_id, enabled').eq('key', 'trading_halted'),
           supabase.from('financial_profile').select('monthly_essential_expenses_usd, liquid_cash_usd, income_stability').eq('user_id', uid).maybeSingle(),
+          supabase.from('sleeve_floors').select('sleeve_key, floor_usd, hwm_usd, peak_cushion_usd').eq('user_id', uid),
         ])
+        const floorBySleeve = new Map((floors ?? []).map(f => [f.sleeve_key as string, f]))
         const investable = (assets ?? []).reduce((s, r) => s + ((r.current_value as number) ?? 0), 0)
         if (investable <= 0) continue
 
@@ -236,8 +288,11 @@ export async function GET(req: NextRequest) {
           investableAssetsUsd: investable,
           sleeves: [...byClass.entries()].map(([key, valueUsd]) => ({
             key, valueUsd,
-            floorUsd: 0, peakCushionUsd: 0,               // TIPP state not yet persisted per sleeve
-            initialBankrollUsd: 0, ratchetHwmUsd: 0,
+            // Persisted TIPP ratchet state (R2) — daily tipp-floors job maintains it.
+            floorUsd: Number(floorBySleeve.get(key)?.floor_usd ?? 0),
+            peakCushionUsd: Number(floorBySleeve.get(key)?.peak_cushion_usd ?? 0),
+            initialBankrollUsd: 0,
+            ratchetHwmUsd: Number(floorBySleeve.get(key)?.hwm_usd ?? 0),
             sigmaRealized: null, sigmaTarget: null,
             weightFraction: investable > 0 ? valueUsd / investable : 0,
             tierCapFraction: investable < 100_000 ? params.sleeve_cap_mass_market : params.sleeve_cap_mass_affluent,
