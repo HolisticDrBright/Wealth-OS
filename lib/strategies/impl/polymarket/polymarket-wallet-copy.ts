@@ -240,6 +240,7 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
           marketTitle: mkt.question ?? '',
           endDate: mkt.end_date_iso,
           walletWinRate: stats.winRate,
+          corpusBacked: !stats.isEstimated,
           walletMaxDD: stats.maxDD,
           autoExitDD: AUTO_EXIT_DD,
           entryPrice: price,
@@ -281,6 +282,23 @@ export class PolymarketWalletCopyStrategy extends BasePipelineStrategy {
         ? `Red team: wrong-rate-adjusted score ${adjustedScore.toFixed(0)} below threshold. Wallet win rate ${(walletWinRate * 100).toFixed(0)}%.`
         : undefined,
     }
+  }
+
+  // ── Risk: SHADOW-ONLY until the wallet has corpus-backed stats (R1) ────────
+
+  async runRiskCheck(
+    opp: Opportunity,
+    userId: string,
+    supabase?: SupabaseClient
+  ) {
+    if (opp.metadata.corpusBacked === false) {
+      return {
+        veto: true,
+        kellyFraction: 0,
+        reason: 'corpus_not_loaded: wallet has no admitted wallet_stats — shadow-only until the corpus aggregates exist',
+      }
+    }
+    return super.runRiskCheck(opp, userId, supabase)
   }
 
   // ── Sizing: 2% per trade, quarter-Kelly cap, confluence haircuts ───────────

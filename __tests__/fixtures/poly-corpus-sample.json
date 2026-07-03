@@ -1,0 +1,12 @@
+{
+  "month": "2026-06",
+  "wallet_stats": [
+    { "wallet": "0xabc", "sharpe_60d": 1.8, "win_rate_30d": 0.62, "n_trades": 84, "recertified_at": "RECENT" },
+    { "wallet": "0xdef", "sharpe_60d": 0.4, "win_rate_30d": 0.51, "n_trades": 210, "recertified_at": "STALE" }
+  ],
+  "category_bias": [
+    { "category": "politics", "price_bucket": 0.05, "realized_freq": 0.031, "n": 4210 },
+    { "category": "politics", "price_bucket": 0.95, "realized_freq": 0.968, "n": 3877 },
+    { "category": "sports",   "price_bucket": 0.05, "realized_freq": 0.048, "n": 9120 }
+  ]
+}
