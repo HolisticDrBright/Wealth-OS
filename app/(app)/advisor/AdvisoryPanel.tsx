@@ -11,9 +11,9 @@
  */
 
 import { useState, useTransition } from 'react'
-import { ChevronDown, ChevronUp, Calculator, CalendarClock, ShieldAlert } from 'lucide-react'
+import { ChevronDown, ChevronUp, Calculator, CalendarClock, ShieldAlert, MessageCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { updateAdvisoryStatus, upsertFinancialProfile, type AdvisoryView } from '@/lib/actions/advisory'
+import { updateAdvisoryStatus, upsertFinancialProfile, type AdvisoryView, type ProviderOption } from '@/lib/actions/advisory'
 import type { Recommendation, RuleVerdict, FinancialProfile } from '@/lib/advisory/types'
 
 function usd(n: number): string {
@@ -25,13 +25,72 @@ const STATUS_LABEL: Record<string, string> = {
   new: 'New', reviewing: 'Reviewing', in_progress: 'In progress', done: 'Done', dismissed: 'Dismissed',
 }
 
+const RULE_PROVIDER_CATEGORIES: Record<string, string[]> = {
+  r3_emergency_fund: ['hysa', 'tbill'],
+  r7_business_banking: ['business_checking', 'business_card', 'bookkeeping'],
+}
+
+/** R3b: read-only rule context injected into the existing portfolio chat. */
+function DiscussWithAI({ rec }: { rec: Recommendation }) {
+  const [open, setOpen] = useState(false)
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const ask = async () => {
+    if (!question.trim() || busy) return
+    setBusy(true); setAnswer('')
+    const context =
+      `READ-ONLY CONTEXT (computed by the advisory rules engine — do not alter these numbers):\n` +
+      `Recommendation: ${rec.title}\nRationale: ${rec.rationale}\n` +
+      rec.math.map(m => `${m.label} = ${m.formula} → $${Math.round(m.valueUsd)}`).join('\n') +
+      `\nCounter-indications: ${rec.counterIndications.join('; ')}\n\nUser question: ${question}`
+    try {
+      const res = await fetch('/api/portfolio-chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: context }),
+      })
+      const text = await res.text()
+      setAnswer(text || 'No response.')
+    } catch {
+      setAnswer('Chat unavailable.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1 rounded border border-white/10 px-2 py-0.5 text-[11px] text-indigo-300 hover:bg-white/5">
+        <MessageCircle className="h-3 w-3" /> Discuss with the AI
+      </button>
+      {open && (
+        <div className="mt-2 w-full rounded-lg bg-black/30 p-2.5">
+          <div className="flex gap-1.5">
+            <input value={question} onChange={e => setQuestion(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && ask()}
+              placeholder="Ask about this recommendation…"
+              className="flex-1 rounded border border-white/10 bg-transparent px-2 py-1 text-[11px] text-gray-200" />
+            <button onClick={ask} disabled={busy}
+              className="rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50">
+              {busy ? '…' : 'Ask'}
+            </button>
+          </div>
+          {answer && <p className="mt-2 whitespace-pre-wrap text-[11px] leading-relaxed text-gray-300">{answer}</p>}
+          <p className="mt-1 text-[10px] text-gray-600">The AI explains the rule’s computed numbers — it never recomputes them.</p>
+        </div>
+      )}
+    </>
+  )
+}
+
 function RecommendationCard({
-  rec, status, logId, yields, onStatus,
+  rec, status, logId, yields, providers, onStatus,
 }: {
   rec: Recommendation
   status: string
   logId: string | null
   yields: AdvisoryView['yields']
+  providers: ProviderOption[]
   onStatus: (logId: string, status: string, reason?: string) => void
 }) {
   const [showMath, setShowMath] = useState(false)
@@ -120,7 +179,25 @@ function RecommendationCard({
         </div>
       )}
 
+      {providers.length > 0 && (
+        <div className="mt-3 rounded-lg bg-white/[0.03] p-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-600">
+            Current options (refreshed {new Date(providers[0].refreshedAt).toLocaleDateString()} — not endorsements)
+          </p>
+          <ul className="mt-1 space-y-0.5 text-[11px] text-gray-300">
+            {providers.map(o => (
+              <li key={`${o.category}-${o.name}`}>
+                • {o.url ? <a href={o.url} target="_blank" rel="noreferrer" className="text-indigo-300 hover:underline">{o.name}</a> : o.name}
+                {o.note && <span className="text-gray-500"> — {o.note}</span>}
+                <span className="ml-1 text-gray-600">[{o.category}]</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <DiscussWithAI rec={rec} />
         <span className={cn(
           'rounded px-2 py-0.5 text-[10px] font-semibold uppercase',
           status === 'done' ? 'bg-emerald-500/20 text-emerald-400'
@@ -316,6 +393,8 @@ export function AdvisoryPanel({ view }: { view: AdvisoryView }) {
           status={view.statuses[rec.ruleId]?.status ?? 'new'}
           logId={view.statuses[rec.ruleId]?.logId ?? null}
           yields={view.yields}
+          providers={view.providerOptions.filter(o =>
+            (RULE_PROVIDER_CATEGORIES[rec.ruleId] ?? []).includes(o.category))}
           onStatus={onStatus}
         />
       ))}

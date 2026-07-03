@@ -64,14 +64,19 @@ export function netReturn(grossReturn: number, assetClass: AssetClass | string):
  * The standard bar: gross edge must be at least 2× the round trip, otherwise
  * estimation error eats the rest.
  */
-export function edgeClearsCosts(expectedReturn: number, assetClass: AssetClass | string): {
+export function edgeClearsCosts(
+  expectedReturn: number,
+  assetClass: AssetClass | string,
+  /** TCA-measured one-way cost override (bps); static model when omitted. */
+  oneWayBpsOverride?: number
+): {
   clears: boolean
   grossBps: number
   costBps: number
   netBps: number
 } {
   const grossBps = expectedReturn * 10_000
-  const costBps = roundTripCostBps(assetClass)
+  const costBps = oneWayBpsOverride != null ? 2 * oneWayBpsOverride : roundTripCostBps(assetClass)
   return {
     clears: grossBps >= 2 * costBps,
     grossBps: Math.round(grossBps),

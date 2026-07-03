@@ -309,7 +309,12 @@ Write a CIO synthesis as JSON:
     // bypass it: an edge below 2× the venue round trip is blocked outright
     // (never reduce_size — a smaller negative-net trade is still negative).
     const { edgeClearsCosts } = await import('@/lib/costs/transaction-costs')
-    const cost = edgeClearsCosts(Math.abs(opp.expectedReturn), opp.assetClass)
+    const { loadCostOverrides, effectiveOneWayCostBps } = await import('@/lib/costs/cost-overrides')
+    const overrides = await loadCostOverrides(supabase)
+    const measured = overrides[opp.assetClass] != null
+      ? effectiveOneWayCostBps(opp.assetClass, overrides)
+      : undefined
+    const cost = edgeClearsCosts(Math.abs(opp.expectedReturn), opp.assetClass, measured)
     if (!cost.clears) {
       const decision = {
         action: 'block' as const,

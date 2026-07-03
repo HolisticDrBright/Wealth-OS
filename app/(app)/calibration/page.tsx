@@ -15,6 +15,8 @@ import { detectRegime, CrossAssetRegime } from '@/lib/regime/cross-asset-regime'
 import { getRollingBrier } from '@/lib/learning/rolling-brier'
 import { getCalibrationReliability } from '@/lib/actions/calibration-reliability'
 import { ReliabilityPanel } from './ReliabilityPanel'
+import { getTcaReport } from '@/lib/actions/tca-report'
+import { TcaPanel } from './TcaPanel'
 
 // Hoisted clock read. Server components render once per request, so reading the
 // clock is safe; the helper keeps the call out of the render-purity analysis.
@@ -197,6 +199,7 @@ export default async function CalibrationPage() {
     detectRegime().catch(() => ({ regime: CrossAssetRegime.NEUTRAL, vix: null, hyOas: null, resolvedAt: nowMs() })),
     getCalibrationReliability().catch(() => null),
   ])
+  const tcaReport = await getTcaReport().catch(() => null)
 
   const assetGroups = ['stocks', 'options', 'crypto', 'forex', 'polymarket', 'multi-asset']
   const rb = regimeBadge(regimeReading.regime)
@@ -229,6 +232,9 @@ export default async function CalibrationPage() {
 
         {/* Reliability diagram + live sizer inputs (widget 7) */}
         <ReliabilityPanel data={reliability} />
+
+        {/* TCA: realized vs modeled costs (R3a) */}
+        <TcaPanel report={tcaReport} />
 
         {/* Legend */}
         <div className="flex gap-6 text-xs text-gray-400">

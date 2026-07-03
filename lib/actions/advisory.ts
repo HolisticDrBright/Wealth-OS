@@ -41,6 +41,8 @@ export interface AdvisoryLogRow {
   created_at: string
 }
 
+export interface ProviderOption { category: string; name: string; url: string | null; note: string | null; refreshedAt: string }
+
 export interface AdvisoryView {
   profile: FinancialProfile
   profileComplete: boolean
@@ -49,6 +51,7 @@ export interface AdvisoryView {
   totalEstimatedAnnualBenefitUsd: number
   statuses: Record<string, { logId: string; status: string }>
   yields: YieldSnapshot | null
+  providerOptions: ProviderOption[]
   disclaimer: string
   error?: string
 }
@@ -99,6 +102,7 @@ export async function getAdvisoryView(): Promise<AdvisoryView | null> {
     totalEstimatedAnnualBenefitUsd: 0,
     statuses: {},
     yields: null,
+    providerOptions: [],
     disclaimer: ADVISORY_DISCLAIMER,
   }
 
@@ -160,6 +164,34 @@ export async function getAdvisoryView(): Promise<AdvisoryView | null> {
     ? await fetchCurrentYields().catch(() => null)
     : null
 
+  // (R3d) Provider OPTIONS (never a hardcoded "best") for cards that list them.
+  const { data: provRows } = await supabase
+    .from('provider_options')
+    .select('category, name, url, note, refreshed_at')
+  const providerOptions: ProviderOption[] = ((provRows ?? []) as Array<Record<string, unknown>>).map(r => ({
+    category: r.category as string, name: r.name as string,
+    url: (r.url as string | null) ?? null, note: (r.note as string | null) ?? null,
+    refreshedAt: r.refreshed_at as string,
+  }))
+
+  // (R3c) Deadline → reminder wiring: deadlines within 60 days become alerts
+  // the existing scheduler/alerts surface picks up (deduped per rule+deadline).
+  const REMINDER_WINDOW_DAYS = 60
+  for (const rec of recommendations) {
+    if (!rec.deadline) continue
+    const daysLeft = (new Date(rec.deadline).getTime() - Date.now()) / 86_400_000
+    if (daysLeft < 0 || daysLeft > REMINDER_WINDOW_DAYS) continue
+    const title = `Deadline ${rec.deadline}: ${rec.title}`
+    const { data: existingAlert } = await supabase
+      .from('alerts').select('id').eq('user_id', user.id).eq('title', title).limit(1)
+    if ((existingAlert ?? []).length === 0) {
+      await supabase.from('alerts').insert({
+        user_id: user.id, type: 'advisory_deadline', severity: daysLeft < 14 ? 'critical' : 'warning',
+        title, message: rec.rationale.slice(0, 300), created_at: new Date().toISOString(),
+      }).then(({ error }) => { if (error) console.warn('[advisory] reminder insert failed:', error.message) })
+    }
+  }
+
   return {
     ...base,
     verdicts,
@@ -167,6 +199,7 @@ export async function getAdvisoryView(): Promise<AdvisoryView | null> {
     totalEstimatedAnnualBenefitUsd,
     statuses,
     yields,
+    providerOptions,
   }
 }
 
