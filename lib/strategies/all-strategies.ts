@@ -71,7 +71,9 @@ export class BreakoutStrategy extends BaseStrategy {
   readonly defaultAssetClass = 'stock'
 
   async generateSignal(symbol: string, bars: PriceBar[]): Promise<StrategySignal | null> {
-    if (bars.length < 52) return null
+    // 52-WEEK high needs ~252 DAILY bars; the old 52-bar gate let a 52-day
+    // high masquerade as a 52-week breakout.
+    if (bars.length < 252) return null
     const high52 = Math.max(...bars.slice(-252).map(b => b.high))
     const last = bars[bars.length - 1].close
     if (last < high52 * 0.99) return null
@@ -148,6 +150,7 @@ export class MeanReversionStrategy extends BaseStrategy {
     if (bars.length < 20) return null
     const mean = sma(bars, 20)
     const sd = stddev(bars, 20)
+    if (sd < 1e-9) return null  // flat series: z would be NaN/Infinity
     const last = bars[bars.length - 1].close
     const z = (last - mean) / sd
     if (Math.abs(z) < 1.5) return null
@@ -166,7 +169,9 @@ export class StatArbStrategy extends BaseStrategy {
 
   async generateSignal(symbol: string, bars: PriceBar[]): Promise<StrategySignal | null> {
     if (bars.length < 30) return null
-    const z = (bars[bars.length - 1].close - sma(bars, 30)) / stddev(bars, 30)
+    const sd = stddev(bars, 30)
+    if (sd < 1e-9) return null  // flat series: z would be NaN/Infinity
+    const z = (bars[bars.length - 1].close - sma(bars, 30)) / sd
     if (Math.abs(z) < 2) return null
     return sig(symbol, z < 0 ? 'buy' : 'sell', 0.7, -z * 0.01, this.id, this.defaultAssetClass)
   }
@@ -432,7 +437,9 @@ export class CryptoMeanReversionStrategy extends BaseStrategy {
 
   async generateSignal(symbol: string, bars: PriceBar[]): Promise<StrategySignal | null> {
     if (bars.length < 20) return null
-    const z = (bars[bars.length - 1].close - sma(bars, 20)) / stddev(bars, 20)
+    const sd = stddev(bars, 20)
+    if (sd < 1e-9) return null  // flat series: z would be NaN/Infinity
+    const z = (bars[bars.length - 1].close - sma(bars, 20)) / sd
     if (Math.abs(z) < 2) return null
     return sig(symbol, z < 0 ? 'buy' : 'sell', Math.min(1, Math.abs(z) / 4), -z * 0.02, this.id, this.defaultAssetClass)
   }

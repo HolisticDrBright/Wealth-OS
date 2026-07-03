@@ -28,7 +28,7 @@ function std(bars: PriceBar[], period: number): number {
   return Math.sqrt(s.reduce((a, b) => a + (b.close - m) ** 2, 0) / s.length)
 }
 
-function atr(bars: PriceBar[], period = 14): number {
+export function atr(bars: PriceBar[], period = 14): number {
   const slice = bars.slice(-(period + 1))
   let sum = 0
   for (let i = 1; i < slice.length; i++) {
@@ -99,10 +99,13 @@ export class VCPMinerviniStrategy extends BaseStrategy {
     if (last.close < high52 * 0.75) return null        // 4. within 25% of 52w high
     if (high52 / low52 < 1.30) return null             // 5. enough range
 
-    // Volatility contraction: ATR declining across 3 windows
-    const atr1 = atr(bars.slice(-14), 14)
-    const atr2 = atr(bars.slice(-28, -14), 14)
-    const atr3 = atr(bars.slice(-42, -28), 14)
+    // Volatility contraction: ATR declining across 3 windows.
+    // atr() needs period+1 bars (14 true ranges require 15 bars — the first
+    // bar only seeds the previous close). Passing 14 bars computed 13 TRs
+    // divided by 14, silently understating every window.
+    const atr1 = atr(bars.slice(-15), 14)
+    const atr2 = atr(bars.slice(-29, -14), 14)
+    const atr3 = atr(bars.slice(-43, -28), 14)
     const contracting = atr1 < atr2 && atr2 < atr3
 
     // RS proxy: recent momentum outpacing longer-term momentum

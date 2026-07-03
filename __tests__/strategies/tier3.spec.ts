@@ -66,8 +66,10 @@ vi.mock('@/lib/strategies/cadence-helpers', () => ({
   isAfterMarketClose: vi.fn().mockReturnValue(true),
   isMondayEt: vi.fn().mockReturnValue(true),
   isLastBusinessDayOfMonth: vi.fn().mockReturnValue(true),
+  isLastBusinessDayOfMonthTz: vi.fn().mockReturnValue(true),
+  utcHourDecimal: vi.fn().mockReturnValue(14.5),
+  londonHourDecimal: vi.fn().mockReturnValue(14.5),  // pre-fix window (London wall clock)
   isPreOvernightRoll: vi.fn().mockReturnValue(true),
-  utcHourDecimal: vi.fn().mockReturnValue(14.5),  // pre-fix window
   isHighImpactNewsDay: vi.fn().mockReturnValue(false),
   isNfpWeek: vi.fn().mockReturnValue(false),
   hourEt: vi.fn().mockReturnValue(16),
@@ -377,8 +379,8 @@ describe('London4pmFixEndmonth', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it('21. returns [] when not last business day of month', async () => {
-    vi.mocked(cadenceHelpers.isLastBusinessDayOfMonth).mockReturnValue(false)
+  it('21. returns [] when not last business day of month (Europe/London)', async () => {
+    vi.mocked(cadenceHelpers.isLastBusinessDayOfMonthTz).mockReturnValue(false)
     const result = await new London4pmFixEndmonthStrategy().detectOpportunities(makeCtx())
     expect(result).toEqual([])
   })
@@ -390,7 +392,7 @@ describe('London4pmFixEndmonth', () => {
   })
 
   it('23. returns [] when outside London fix window', async () => {
-    vi.mocked(cadenceHelpers.utcHourDecimal).mockReturnValue(13.0)  // 13:00 UTC — before window
+    vi.mocked(cadenceHelpers.londonHourDecimal).mockReturnValue(13.0)  // 13:00 London — before window
     const result = await new London4pmFixEndmonthStrategy().detectOpportunities(makeCtx())
     expect(result).toEqual([])
   })

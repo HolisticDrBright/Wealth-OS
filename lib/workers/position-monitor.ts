@@ -92,8 +92,15 @@ export class PositionMonitor {
 
   constructor() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ''
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
-    if (!url || !key) throw new Error('Supabase env vars not set for PositionMonitor')
+    // Service-role ONLY. The old silent fallback to the anon key meant the
+    // worker ran with RLS-restricted reads and quietly managed nothing.
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+    if (!url) throw new Error('Supabase URL not set for PositionMonitor')
+    if (!key) {
+      throw new Error(
+        'PositionMonitor requires SUPABASE_SERVICE_ROLE_KEY — refusing to fall back to the anon key'
+      )
+    }
     this.supabase = createClient(url, key)
   }
 

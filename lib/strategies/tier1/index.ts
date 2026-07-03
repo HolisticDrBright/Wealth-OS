@@ -32,6 +32,21 @@ import { getDCASignal } from '@/lib/market-data/halving'
  *
  * Symbol format: "POLY:{conditionId}"
  */
+/**
+ * Rolling win-rate estimate from a wallet's OWN recent trades (price-based
+ * proxy until Dune history is wired): entries below 0.5 that the wallet took
+ * count as contrarian wins-in-expectation. Unknown/empty history → 0.5, i.e.
+ * NO assumed edge — never a flat optimistic constant.
+ */
+export function estimateWalletWinRate(
+  walletTrades: Array<{ side?: string; price?: number }>
+): number {
+  const buys = walletTrades.filter(t => t.side === 'YES' || t.side === 'buy')
+  if (buys.length === 0) return 0.5
+  const wins = buys.filter(t => (t.price ?? 1) < 0.5).length
+  return Math.max(0.4, Math.min(0.9, wins / buys.length))
+}
+
 export class PolymarketWalletCopyStrategy extends BaseStrategy {
   readonly id = 'polymarket_wallet_copy'
   readonly displayName = 'Polymarket Wallet Copy'
@@ -54,8 +69,13 @@ export class PolymarketWalletCopyStrategy extends BaseStrategy {
 
     if (trades.length === 0) return null
 
-    // Take the most recent trade
-    const trade = trades[0]
+    // Respect the symbol argument: "POLY:{conditionId}" selects THAT market's
+    // trade. (The old code always copied trades[0] regardless of symbol.)
+    const requestedConditionId = symbol.startsWith('POLY:') ? symbol.slice(5) : null
+    const trade = requestedConditionId
+      ? trades.find(t => t.conditionId === requestedConditionId)
+      : trades[0]
+    if (!trade) return null
     const conditionId = trade.conditionId
     if (!conditionId) return null
 
@@ -73,8 +93,12 @@ export class PolymarketWalletCopyStrategy extends BaseStrategy {
     // Skip low-liquidity markets
     if (details.liquidity < 10_000) return null
 
-    // Edge = expected value assuming tracked wallet has 60% win rate
-    const walletWinRate = (meta?.wallet_win_rate as number | undefined) ?? 0.60
+    // Edge = EV from the wallet's ACTUAL rolling win rate (caller-supplied
+    // from wallet history, or derived from this wallet's own trades in the
+    // batch). No flat 60% assumption — an unknown wallet gets 0.5 (no edge),
+    // per the Smart Money Basket recertification standard.
+    const walletWinRate = (meta?.wallet_win_rate as number | undefined)
+      ?? estimateWalletWinRate(trades.filter(t => t.wallet === trade.wallet))
     const ev = walletWinRate * (1 - price) - (1 - walletWinRate) * price
     if (ev <= 0) return null
 
@@ -184,9 +208,29 @@ export class PolymarketInfoLagStrategy extends BaseStrategy {
  *   Nancy Pelosi, Dan Crenshaw, Tommy Tuberville, David Perdue (retired)
  */
 
+// FULL names — matched on first+last tokens after normalization. The old
+// bare-substring list ('taylor', …) matched ANY representative with that
+// string anywhere in their name.
 const HIGH_ALPHA_REPS = [
-  'pelosi', 'tuberville', 'crenshaw', 'taylor', 'mccaul', 'gottheimer',
+  'nancy pelosi', 'tommy tuberville', 'dan crenshaw',
+  'michael mccaul', 'josh gottheimer', 'david perdue',
 ]
+
+/**
+ * Normalized full-name match: BOTH the first and last name tokens must be
+ * present as whole words (handles "Pelosi, Nancy" and middle names; rejects
+ * substring collisions like any unrelated "Taylor").
+ */
+export function isHighAlphaRep(name: string | undefined | null): boolean {
+  if (!name) return false
+  const tokens = new Set(
+    name.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean)
+  )
+  return HIGH_ALPHA_REPS.some(full => {
+    const [first, last] = full.split(' ')
+    return tokens.has(first) && tokens.has(last)
+  })
+}
 
 export class AutopilotCongressionalStrategy extends BaseStrategy {
   readonly id = 'autopilot_congressional'
@@ -215,14 +259,16 @@ export class AutopilotCongressionalStrategy extends BaseStrategy {
       t.Ticker.toUpperCase() === symbol.toUpperCase() &&
       t.Transaction === 'Purchase' &&
       new Date(t.ReportDate) >= sevenDaysAgo &&
-      HIGH_ALPHA_REPS.some(r => t.Representative.toLowerCase().includes(r))
+      isHighAlphaRep(t.Representative)
     )
 
-    // UW purchases for this ticker
+    // UW purchases for this ticker — the SAME high-alpha filter applies
+    // (UW-sourced trades previously skipped it entirely).
     const uwSignals = uwTrades.filter(t =>
       t.ticker?.toUpperCase() === symbol.toUpperCase() &&
       t.transaction_type === 'buy' &&
-      new Date(t.disclosure_date) >= sevenDaysAgo
+      new Date(t.disclosure_date) >= sevenDaysAgo &&
+      isHighAlphaRep(t.politician)
     )
 
     const totalSignals = quiverSignals.length + uwSignals.length

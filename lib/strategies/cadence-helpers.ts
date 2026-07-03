@@ -117,6 +117,62 @@ export function inUtcHourWindow(startH: number, endH: number): boolean {
   return h >= startH && h < endH
 }
 
+// ─── Timezone-aware helpers (Intl-based — DST-correct, never server-local) ────
+
+const DOW_NAMES: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+
+interface TzParts { year: number; month: number; day: number; hour: number; minute: number; dow: number }
+
+function tzParts(timeZone: string, date: Date = new Date()): TzParts {
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', weekday: 'short', hour12: false,
+  })
+  const parts: Record<string, string> = {}
+  for (const p of fmt.formatToParts(date)) parts[p.type] = p.value
+  return {
+    year: parseInt(parts.year, 10),
+    month: parseInt(parts.month, 10),
+    day: parseInt(parts.day, 10),
+    hour: parseInt(parts.hour, 10) % 24,  // '24' at midnight in en-GB
+    minute: parseInt(parts.minute, 10),
+    dow: DOW_NAMES[parts.weekday] ?? 0,
+  }
+}
+
+/**
+ * Wall-clock decimal hour in Europe/London. The WMR 4pm fix is 16:00 LONDON
+ * time — a fixed UTC window is wrong for the ~7 months of British Summer Time.
+ */
+export function londonHourDecimal(date: Date = new Date()): number {
+  const p = tzParts('Europe/London', date)
+  return p.hour + p.minute / 60
+}
+
+/** True within a Europe/London wall-clock hour window [startH, endH). */
+export function inLondonHourWindow(startH: number, endH: number, date: Date = new Date()): boolean {
+  const h = londonHourDecimal(date)
+  return h >= startH && h < endH
+}
+
+/**
+ * Last business day of the month in a SPECIFIC timezone — never the server's
+ * local clock (a UTC-evening scan on the 31st can already be next month in
+ * the market's timezone, or vice versa).
+ */
+export function isLastBusinessDayOfMonthTz(timeZone: string, date: Date = new Date()): boolean {
+  const today = tzParts(timeZone, date)
+  if (today.dow === 0 || today.dow === 6) return false
+  // Step forward in absolute time until the next business day in that tz.
+  let probe = new Date(date.getTime() + 86_400_000)
+  for (let i = 0; i < 5; i++) {
+    const p = tzParts(timeZone, probe)
+    if (p.dow !== 0 && p.dow !== 6) return p.month !== today.month
+    probe = new Date(probe.getTime() + 86_400_000)
+  }
+  return false
+}
+
 /**
  * Check whether today is likely an NFP week (first Friday of month within 7 days).
  */
@@ -284,7 +340,7 @@ export const STRATEGY_CADENCE: Record<string, StrategyCadenceMeta> = {
   etf_basis_arb:                        { cadence: 'Continuous',      windowDescription: 'Every run — fires on ETF/perp gap', nextWindowHint: 'Next paper pass' },
   lst_basis_arb:                        { cadence: 'Continuous',      windowDescription: 'Every run — fires on LST discount', nextWindowHint: 'Next paper pass' },
   rwa_yield_stack:                      { cadence: 'Weekly Monday',   windowDescription: 'Monday — RWA yield vs T-bill',      nextWindowHint: 'Next Monday' },
-  london_4pm_fix_endmonth:              { cadence: 'Monthly (London)', windowDescription: 'Last business day of month, London 14:00–16:30 UTC', nextWindowHint: 'Last business day of this month' },
+  london_4pm_fix_endmonth:              { cadence: 'Monthly (London)', windowDescription: 'Last business day of month, 14:00–16:30 Europe/London (WMR fix is 16:00 London, not UTC)', nextWindowHint: 'Last business day of this month' },
   swap_point_arbitrage:                 { cadence: 'Daily pre-roll',  windowDescription: '16:30–17:00 ET (pre-overnight roll)', nextWindowHint: 'Today 4:30pm ET' },
   prediction_market_sportsbook_arb:     { cadence: 'Continuous',      windowDescription: 'Every run — fires on PM/SB margin', nextWindowHint: 'Next paper pass' },
 }
@@ -327,7 +383,7 @@ function isCurrentlyInWindow(key: string): boolean {
     case 'activist_13d_insider_cluster':
     case 'buyback_announcement_momentum':  return isAfterMarketClose()
     case 'rwa_yield_stack':                return isMondayEt()
-    case 'london_4pm_fix_endmonth':        return isLastBusinessDayOfMonth() && inUtcHourWindow(14, 16.5)
+    case 'london_4pm_fix_endmonth':        return isLastBusinessDayOfMonthTz('Europe/London') && inLondonHourWindow(14, 16.5)
     case 'swap_point_arbitrage':           return isPreOvernightRoll()
     // continuous strategies
     default:                         return true

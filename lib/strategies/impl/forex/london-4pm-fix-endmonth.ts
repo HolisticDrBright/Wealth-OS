@@ -30,20 +30,22 @@ import type {
 import { getPortfolioUsd, getRiskControl } from '../../risk-controls'
 import { applyEmpiricalHaircuts, zeroSize } from '@/lib/risk/empirical-sizing'
 import {
-  isLastBusinessDayOfMonth,
-  utcHourDecimal,
+  isLastBusinessDayOfMonthTz,
+  londonHourDecimal,
   isHighImpactNewsDay,
   isNfpWeek,
 } from '../../cadence-helpers'
 import { randomUUID } from 'crypto'
 
 // ─── Thresholds ────────────────────────────────────────────────────────────────
+// The WMR fix is 16:00 EUROPE/LONDON — all windows below are London wall-clock
+// hours (the old fixed-UTC windows were an hour late for ~7 months under BST).
 
 const MIN_MTD_SPREAD   = 0.01   // 1% SPX vs ACWX spread required
-const PRE_FIX_START    = 14.0   // UTC 14:00
-const PRE_FIX_END      = 15.92  // UTC 15:55
-const POST_FIX_START   = 16.08  // UTC 16:05
-const POST_FIX_END     = 16.5   // UTC 16:30
+const PRE_FIX_START    = 14.0   // 14:00 Europe/London
+const PRE_FIX_END      = 15.92  // 15:55 Europe/London
+const POST_FIX_START   = 16.08  // 16:05 Europe/London
+const POST_FIX_END     = 16.5   // 16:30 Europe/London
 const MIN_ATR_MULTIPLE = 1.5    // post-fix move must be > 1.5× ATR to fade
 
 // ─── OANDA price helper ───────────────────────────────────────────────────────
@@ -103,12 +105,12 @@ export class London4pmFixEndmonthStrategy extends BasePipelineStrategy {
   readonly assetClass = 'forex' as const
 
   async detectOpportunities(_ctx: OpportunityContext): Promise<Opportunity[]> {
-    if (!isLastBusinessDayOfMonth()) return []
+    if (!isLastBusinessDayOfMonthTz('Europe/London')) return []
     if (isHighImpactNewsDay() || isNfpWeek()) return []
 
-    const utcH = utcHourDecimal()
-    const inPreFix  = utcH >= PRE_FIX_START  && utcH < PRE_FIX_END
-    const inPostFix = utcH >= POST_FIX_START && utcH < POST_FIX_END
+    const londonH = londonHourDecimal()
+    const inPreFix  = londonH >= PRE_FIX_START  && londonH < PRE_FIX_END
+    const inPostFix = londonH >= POST_FIX_START && londonH < POST_FIX_END
     if (!inPreFix && !inPostFix) return []
 
     const [spxMtd, acwxMtd] = await Promise.all([getMtdReturn('SPY'), getMtdReturn('ACWX')])
@@ -125,7 +127,7 @@ export class London4pmFixEndmonthStrategy extends BasePipelineStrategy {
     if (inPreFix) {
       // USD strength when SPX underperforms ACWX (global > US rebalancing)
       const direction = spread > 0 ? 'short' : 'long'   // spread>0: USD flows out = EUR/USD long
-      const forceExitMs = Date.now() + (PRE_FIX_END - utcH) * 3_600_000  // at 16:02 UTC
+      const forceExitMs = Date.now() + (PRE_FIX_END - londonH) * 3_600_000  // just before the 16:00 London fix
 
       opportunities.push({
         id: randomUUID(),

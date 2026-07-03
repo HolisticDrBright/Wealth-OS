@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // Vercel Cron hits this endpoint via GET
-// Protect with CRON_SECRET to prevent unauthorized triggers
+// Protect with CRON_SECRET to prevent unauthorized triggers.
+// FAILS CLOSED: no secret configured = nobody can trigger tasks
+// (the old check skipped auth entirely when CRON_SECRET was unset).
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
