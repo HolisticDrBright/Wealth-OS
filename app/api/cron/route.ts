@@ -175,6 +175,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ task: 'learning', users: userIds.length, summary })
     }
 
+    if (task === 'agent-calibration') {
+      // W4: weekly committee-weight calibration — graded agent votes →
+      // softmax over accuracy with asymmetric clamp → agent_weights table.
+      // The engine falls back to hardcoded weights if this never runs.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const { runAgentCalibration } = await import('@/lib/agents/agent-calibration')
+      const result = await runAgentCalibration(supabase)
+      return NextResponse.json({
+        task: 'agent-calibration',
+        updated: result.updated,
+        gradedAgents: Object.keys(result.graded).length,
+        weights: result.weights,
+      })
+    }
+
     if (task === 'advisory-staleness') {
       // Flags tax_constants / kb_parameters unverified for >90 days — stale
       // limits must surface as alerts, never silently produce outdated advice.

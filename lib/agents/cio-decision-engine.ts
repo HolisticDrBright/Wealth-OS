@@ -117,30 +117,14 @@ export class CIODecisionEngine {
     }
 
     // ── Compute final score ───────────────────────────────────────────────
-    const weights: Record<string, number> = {
-      OrchestratorAgent: 0.05,
-      ClientProfileAgent: 0.08,
-      PortfolioDiagnosticAgent: 0.10,
-      FundamentalEquityAgent: 0.10,
-      TechnicalMarketAgent: 0.07,
-      QuantScreeningAgent: 0.07,
-      MacroRegimeAgent: 0.08,
-      CryptoIntelligenceAgent: 0.05,
-      ForexStrategyAgent: 0.05,
-      RiskManagementAgent: 0.12,
-      TaxOptimizationAgent: 0.05,
-      RetirementExecutionAgent: 0.05,
-      MiroFishSimulationAgent: 0.13,
-    }
-
-    let weightedScore = 0
-    let totalWeight = 0
-    for (const output of allOutputs) {
-      const w = weights[output.agent] ?? 0.05
-      weightedScore += output.score * w
-      totalWeight += w
-    }
-    const finalScore = totalWeight > 0 ? weightedScore / totalWeight : 50
+    // Calibrated weights from agent_weights (weekly cron); hardcoded fallback.
+    // Defers are abstentions and are excluded from the mean.
+    const { loadAgentWeights, computeCommitteeScore } = await import('./agent-calibration')
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    let weightsClient
+    try { weightsClient = createAdminClient() } catch { weightsClient = undefined }
+    const weights = await loadAgentWeights(weightsClient)
+    const finalScore = computeCommitteeScore(allOutputs, weights)
 
     // ── Map score to decision ─────────────────────────────────────────────
     const decision = finalScore >= 68 ? 'execute'

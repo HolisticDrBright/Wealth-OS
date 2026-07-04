@@ -83,12 +83,19 @@ export abstract class BaseAgent {
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       const parsed = JSON.parse(jsonMatch?.[0] ?? '{}') as Partial<AgentOutput>
 
+      // FAIL CLOSED: a vote we cannot parse is an ABSTENTION ('defer'), never
+      // an approval. The engine excludes defers from the weighted mean.
+      const VALID_RECOMMENDATIONS: AgentRecommendation[] = ['approve', 'reduce', 'reject', 'defer']
+      const recommendation = VALID_RECOMMENDATIONS.includes(parsed.recommendation as AgentRecommendation)
+        ? (parsed.recommendation as AgentRecommendation)
+        : 'defer'
+
       const output: AgentOutput = {
         agent: this.name,
-        recommendation: (parsed.recommendation as AgentRecommendation) ?? 'approve',
-        confidence: (parsed.confidence as ConfidenceLevel) ?? 'medium',
+        recommendation,
+        confidence: (parsed.confidence as ConfidenceLevel) ?? 'low',
         score: typeof parsed.score === 'number' ? Math.max(0, Math.min(100, parsed.score)) : 50,
-        reasoning: parsed.reasoning ?? '',
+        reasoning: parsed.reasoning ?? (recommendation === 'defer' ? 'unparseable agent response — abstaining' : ''),
         keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
         metadata: parsed.metadata,
       }
