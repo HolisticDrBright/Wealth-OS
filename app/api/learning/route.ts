@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiSuccess, apiError } from '@/lib/api'
 import { runLearningPass } from '@/lib/learning/loop'
-import { loadWeightsForUser } from '@/lib/learning/weights'
+import { loadRegimeAdjustedWeights } from '@/lib/learning/weights'
 import { scoreStrategies } from '@/lib/learning/scorer'
 
 export async function GET(_req: NextRequest) {
@@ -14,8 +14,8 @@ export async function GET(_req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return apiError('Unauthorized', 401)
 
-  const [weights, { data: outcomes }] = await Promise.all([
-    loadWeightsForUser(user.id),
+  const [{ weights, globalWeights, regime }, { data: outcomes }] = await Promise.all([
+    loadRegimeAdjustedWeights(user.id),
     supabase
       .from('outcome_log')
       .select('actual_direction, actual_return, alpha_vs_benchmark, brier_score, decision:decision_log(strategy, confidence)')
@@ -56,7 +56,9 @@ export async function GET(_req: NextRequest) {
     .eq('user_id', user.id)
 
   return apiSuccess({
-    weights,
+    weights,               // regime-adjusted — the capital-facing numbers
+    global_weights: globalWeights,
+    regime,
     stats,
     total_decisions: totalDecisions ?? 0,
     total_outcomes: outcomes?.length ?? 0,

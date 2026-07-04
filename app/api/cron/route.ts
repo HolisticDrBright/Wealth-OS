@@ -417,12 +417,61 @@ export async function GET(req: NextRequest) {
         })
       }
 
+      // W3: CRISIS regime fires the pre-committed playbook — never an LLM
+      // improvisation. Executed per user, chained into the tamper-evident
+      // ledger so the response itself is auditable.
+      let playbook: { fired: boolean; regime: string | null; executions: number } = { fired: false, regime: null, executions: 0 }
+      try {
+        const { data: rs } = await supabase
+          .from('regime_state').select('as_of, regime')
+          .order('as_of', { ascending: false }).limit(1)
+        const regime = (rs ?? [])[0]?.regime ?? null
+        playbook.regime = regime
+        if (regime === 'crisis') {
+          const { CRISIS_PLAYBOOKS, executePlaybook } = await import('@/lib/regime/playbooks')
+          const { chainBatch, GENESIS_HASH } = await import('@/lib/ledger/chain')
+          const crisisPb = CRISIS_PLAYBOOKS.find(p => p.id === 'liquidity_crash_2020')!
+
+          const { data: users } = await supabase
+            .from('user_enabled_strategies').select('user_id')
+          const userIds = [...new Set(((users ?? []) as Array<{ user_id: string }>).map(u => u.user_id))]
+
+          const results = []
+          for (const uid of userIds) {
+            const exec = await executePlaybook(crisisPb, { supabase, userId: uid, dryRun: false })
+            results.push({ userId: uid, ...exec })
+          }
+
+          // Chain the execution into the ledger (append-only, hash-chained).
+          const { data: headRow } = await supabase
+            .from('ledger_entries').select('chain_hash').order('seq', { ascending: false }).limit(1)
+          const head = (headRow ?? [])[0]?.chain_hash ?? GENESIS_HASH
+          const today = new Date().toISOString().slice(0, 10)
+          const { entries } = chainBatch(head, [{
+            kind: 'playbook',
+            sourceId: `${crisisPb.id}:${today}`,
+            payload: { playbookId: crisisPb.id, regime, date: today, executions: results },
+          }])
+          await supabase.from('ledger_entries').insert(entries)
+
+          await sendOpsAlert(supabase, {
+            severity: 'critical',
+            title: 'CRISIS regime — playbook executed',
+            message: `${crisisPb.id} executed for ${results.length} user(s); halts + floor tightening + resting-order cancels applied`,
+          })
+          playbook = { fired: true, regime, executions: results.length }
+        }
+      } catch (err) {
+        console.warn('[ops-watchdog] crisis playbook check failed:', err instanceof Error ? err.message : err)
+      }
+
       // Reconciliation: with no live broker linked, paper book is truth-by-
       // construction; report skipped honestly instead of fabricating a diff.
       const brokerLinked = !!(process.env.ALPACA_API_KEY || process.env.COINBASE_API_KEY || process.env.OANDA_API_KEY)
       return NextResponse.json({
         task: 'ops-watchdog',
         deadWorkers: dead,
+        playbook,
         reconciliation: brokerLinked ? 'broker adapters present — wire per-broker snapshots' : 'skipped (paper mode, no broker linked)',
       })
     }

@@ -21,7 +21,7 @@ export function chainHash(prevHash: string, payloadHashHex: string): string {
 }
 
 export interface LedgerEntryInput {
-  kind: 'decision' | 'order_intent' | 'outcome'
+  kind: 'decision' | 'order_intent' | 'outcome' | 'playbook'
   sourceId: string
   payload: unknown
 }
