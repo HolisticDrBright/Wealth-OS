@@ -83,6 +83,28 @@ export function deferralHurdle(gainFraction: number, stcgRate: number, ltcgRate:
 
 // ─── §6.1 Sweep triggers ──────────────────────────────────────────────────────
 
+/**
+ * KB §1 wealth-tier ladder for the speculative sleeve cap (W7):
+ * <$100k mass market → $100k–$1M mass affluent → $1M–$5M HNW →
+ * $5M–$25M VHNW → >$25M UHNW. Missing parameters fall back to the
+ * nearest LOWER tier — never a looser cap than what was verified.
+ */
+export function tierCapForInvestable(
+  investableUsd: number,
+  params: Record<string, number | undefined>
+): number {
+  const massMarket = params.sleeve_cap_mass_market ?? 0.05
+  const massAffluent = params.sleeve_cap_mass_affluent ?? massMarket
+  const hnw = params.sleeve_cap_hnw ?? massAffluent
+  const vhnw = params.sleeve_cap_vhnw ?? hnw
+  const uhnw = params.sleeve_cap_uhnw ?? vhnw
+  if (investableUsd < 100_000) return massMarket
+  if (investableUsd < 1_000_000) return massAffluent
+  if (investableUsd < 5_000_000) return hnw
+  if (investableUsd < 25_000_000) return vhnw
+  return uhnw
+}
+
 export interface SleeveState {
   key: string
   valueUsd: number

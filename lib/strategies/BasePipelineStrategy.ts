@@ -323,11 +323,28 @@ export abstract class BasePipelineStrategy {
     userId: string,
     supabase?: SupabaseClient
   ): Promise<RiskVerdict> {
+    // W7: polymarket entries use the MEASURED per-category resolution prior
+    // (category_bias corpus) as modelWinProb when the strategy has no rolling
+    // calibration yet. No corpus row → no assumed edge (prior stays unset).
+    let modelWinProb: number | undefined
+    if (this.assetClass === 'polymarket' && supabase) {
+      const category = (opp.metadata?.category ?? opp.metadata?.pmCategory) as string | undefined
+      const price = (opp.metadata?.entryPrice ?? opp.metadata?.onChainPrice ?? opp.metadata?.price) as number | undefined
+      if (category && typeof price === 'number' && price > 0 && price < 1) {
+        try {
+          const { loadCategoryPrior } = await import('@/lib/risk/polymarket-priors')
+          const prior = await loadCategoryPrior(supabase, category, price)
+          if (prior != null) modelWinProb = prior
+        } catch { /* prior unavailable → sizing proceeds without an assumed edge */ }
+      }
+    }
+
     const sized = await computeEmpiricalSize({
       supabase,
       userId,
       strategyKey: this.key,
       opp,
+      ...(modelWinProb != null ? { modelWinProb } : {}),
     })
     const veto = sized.blocked || sized.fraction <= 0
     return {

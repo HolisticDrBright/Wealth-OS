@@ -310,24 +310,49 @@ export async function GET(req: NextRequest) {
         .eq('status', 'closed')
         .limit(20_000)
 
-      // Benchmark quarterly returns: SPY via Yahoo (others skipped honestly
-      // until their benchmark feeds land — a strategy is never demoted
-      // against a benchmark we didn't measure).
-      const bench = new Map<string, number>()
-      try {
-        const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=3mo&range=2y',
-          { signal: AbortSignal.timeout(8_000) })
-        if (res.ok) {
-          const d = await res.json() as { chart?: { result?: Array<{ timestamp?: number[]; indicators?: { quote?: Array<{ close?: Array<number | null> }> } }> } }
-          const r = d.chart?.result?.[0]
-          const ts = r?.timestamp ?? []
-          const closes = (r?.indicators?.quote?.[0]?.close ?? [])
-          for (let i = 1; i < ts.length; i++) {
-            const a = closes[i - 1]; const b = closes[i]
-            if (a && b) bench.set(quarterOf(new Date(ts[i] * 1000).toISOString()), (b / a - 1) * 100)
+      // Benchmark quarterly returns per asset class (W7): SPY (stocks/options),
+      // BTC-USD (crypto), UUP dollar-carry (forex) via Yahoo; polymarket uses
+      // the hold-NO baseline — a fair-priced binary market has ZERO expected
+      // return, so a strategy must beat 0% net of costs. A strategy is never
+      // demoted against a benchmark we didn't measure.
+      const quarterlyReturns = async (symbol: string): Promise<Map<string, number>> => {
+        const out = new Map<string, number>()
+        try {
+          const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=3mo&range=2y`,
+            { signal: AbortSignal.timeout(8_000) })
+          if (res.ok) {
+            const d = await res.json() as { chart?: { result?: Array<{ timestamp?: number[]; indicators?: { quote?: Array<{ close?: Array<number | null> }> } }> } }
+            const r = d.chart?.result?.[0]
+            const ts = r?.timestamp ?? []
+            const closes = (r?.indicators?.quote?.[0]?.close ?? [])
+            for (let i = 1; i < ts.length; i++) {
+              const a = closes[i - 1]; const b = closes[i]
+              if (a && b) out.set(quarterOf(new Date(ts[i] * 1000).toISOString()), (b / a - 1) * 100)
+            }
           }
+        } catch { /* missing feed → that asset class sees no demotions this run */ }
+        return out
+      }
+
+      const [spyBench, btcBench, fxBench] = await Promise.all([
+        quarterlyReturns('SPY'),
+        quarterlyReturns('BTC-USD'),
+        quarterlyReturns('UUP'),
+      ])
+      const benchFor = (assetClass: string): Map<string, number> | 'hold_no' | null => {
+        switch (assetClass) {
+          case 'stocks': case 'stock': case 'options': case 'etf':
+            return spyBench.size ? spyBench : null
+          case 'crypto':
+            return btcBench.size ? btcBench : null
+          case 'forex': case 'fx':
+            return fxBench.size ? fxBench : null
+          case 'polymarket': case 'prediction_market':
+            return 'hold_no'
+          default:
+            return null
         }
-      } catch { /* no benchmark → no demotions this run */ }
+      }
 
       const groups = new Map<string, Map<string, { sum: number; n: number; assetClass: string }>>()
       for (const row of closed ?? []) {
@@ -346,12 +371,15 @@ export async function GET(req: NextRequest) {
       const demotions: string[] = []
       for (const [key, byQuarter] of groups) {
         const [uid, strategyKey] = key.split('|')
-        const isSpxBenchmarked = [...byQuarter.values()][0]?.assetClass === 'stocks'
-        if (!isSpxBenchmarked || bench.size === 0) continue
+        const assetClass = [...byQuarter.values()][0]?.assetClass ?? ''
+        const bench = benchFor(assetClass)
+        if (bench === null) continue   // unmeasured benchmark → never demote
         const quarters = [...byQuarter.entries()]
-          .filter(([q]) => bench.has(q))
+          .filter(([q]) => bench === 'hold_no' || bench.has(q))
           .map(([q, v]) => ({
-            quarter: q, strategyReturnPct: v.sum, benchmarkReturnPct: bench.get(q)!,
+            quarter: q,
+            strategyReturnPct: v.sum,
+            benchmarkReturnPct: bench === 'hold_no' ? 0 : bench.get(q)!,
             trades: v.n,
           }))
         const verdict = evaluateLifecycle(strategyKey, quarters)
@@ -551,7 +579,7 @@ export async function GET(req: NextRequest) {
       // alerts. Recommendations only — the engine never moves money.
       const { createAdminClient } = await import('@/lib/supabase/admin')
       const supabase = createAdminClient()
-      const { evaluateSweepTriggers } = await import('@/lib/advisory/sweep-engine')
+      const { evaluateSweepTriggers, tierCapForInvestable } = await import('@/lib/advisory/sweep-engine')
       const { loadKbParameters } = await import('@/lib/advisory/constants')
       const params = await loadKbParameters(supabase)
 
@@ -594,7 +622,9 @@ export async function GET(req: NextRequest) {
             ratchetHwmUsd: Number(floorBySleeve.get(key)?.hwm_usd ?? 0),
             sigmaRealized: null, sigmaTarget: null,
             weightFraction: investable > 0 ? valueUsd / investable : 0,
-            tierCapFraction: investable < 100_000 ? params.sleeve_cap_mass_market : params.sleeve_cap_mass_affluent,
+            // Full KB §1 tier ladder (W7): mass market → mass affluent →
+            // HNW → VHNW → UHNW, falling back to the nearest LOWER tier.
+            tierCapFraction: tierCapForInvestable(investable, params),
             kellyCapFraction: params.kelly_fraction_max,
             suspended: false,
           })),
