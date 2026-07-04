@@ -125,6 +125,72 @@ CREATE POLICY "service writes broker certifications" ON public.broker_certificat
   USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
 -- ── 6. Household goals: widen the goal_type enum (additive) ──────────────────
+-- Remote databases created before schema.sql grew the household tables may
+-- not have them at all — create them (from schema.sql, unchanged shapes)
+-- before altering. All IF NOT EXISTS; nothing is dropped.
+
+CREATE TABLE IF NOT EXISTS public.households (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  owner_user_id uuid REFERENCES auth.users ON DELETE CASCADE NOT NULL,
+  household_type text DEFAULT 'family' CHECK (household_type IN ('family','couple','individual','trust','foundation','advisory')),
+  total_net_worth_usd numeric(15,2) DEFAULT 0,
+  advisor_user_id uuid REFERENCES auth.users ON DELETE SET NULL,
+  estate_plan_notes text,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.households ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Household owner manages" ON public.households;
+CREATE POLICY "Household owner manages" ON public.households FOR ALL USING (owner_user_id = auth.uid());
+DROP POLICY IF EXISTS "Household advisor can view" ON public.households;
+CREATE POLICY "Household advisor can view" ON public.households FOR SELECT USING (advisor_user_id = auth.uid());
+
+CREATE TABLE IF NOT EXISTS public.household_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id uuid REFERENCES public.households(id) ON DELETE CASCADE NOT NULL,
+  user_id uuid REFERENCES auth.users ON DELETE CASCADE,
+  name text NOT NULL,
+  role text DEFAULT 'member' CHECK (role IN ('owner','spouse','dependent','trustee','beneficiary','advisor')),
+  email text,
+  birth_year int,
+  net_worth_usd numeric(15,2) DEFAULT 0,
+  income_usd numeric(15,2) DEFAULT 0,
+  is_invited boolean DEFAULT false,
+  invited_at timestamptz,
+  joined_at timestamptz,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.household_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Household owner manages members" ON public.household_members;
+CREATE POLICY "Household owner manages members" ON public.household_members FOR ALL USING (
+  household_id IN (SELECT id FROM public.households WHERE owner_user_id = auth.uid())
+);
+
+-- assigned_sleeve_id stays a plain uuid here (no FK) so this migration works
+-- even on databases where portfolio_sleeves has not been created yet.
+CREATE TABLE IF NOT EXISTS public.household_goals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id uuid REFERENCES public.households(id) ON DELETE CASCADE NOT NULL,
+  name text NOT NULL,
+  goal_type text DEFAULT 'general',
+  target_amount_usd numeric(15,2) NOT NULL,
+  current_amount_usd numeric(15,2) DEFAULT 0,
+  target_date date,
+  assigned_sleeve_id uuid,
+  status text DEFAULT 'active' CHECK (status IN ('active','achieved','paused','cancelled')),
+  notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.household_goals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Household owner manages goals" ON public.household_goals;
+CREATE POLICY "Household owner manages goals" ON public.household_goals FOR ALL USING (
+  household_id IN (SELECT id FROM public.households WHERE owner_user_id = auth.uid())
+);
+
 ALTER TABLE public.household_goals DROP CONSTRAINT IF EXISTS household_goals_goal_type_check;
 ALTER TABLE public.household_goals ADD CONSTRAINT household_goals_goal_type_check
   CHECK (goal_type IN ('retirement','education','home','estate','trust','charitable',
