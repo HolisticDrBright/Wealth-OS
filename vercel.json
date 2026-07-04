@@ -1,3 +1,6 @@
 {
-  "crons": []
+  "crons": [
+    { "path": "/api/cron?task=daily", "schedule": "0 13 * * *" },
+    { "path": "/api/cron?task=daily-ops", "schedule": "30 4 * * *" }
+  ]
 }

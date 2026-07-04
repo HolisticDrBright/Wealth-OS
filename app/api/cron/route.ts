@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Combined tasks run several jobs sequentially — allow up to a minute.
+export const maxDuration = 60
+
 // Vercel Cron hits this endpoint via GET
 // Protect with CRON_SECRET to prevent unauthorized triggers.
 // FAILS CLOSED: no secret configured = nobody can trigger tasks
@@ -661,6 +664,40 @@ export async function GET(req: NextRequest) {
       // Use a system-level userId (null user_id written to DB for cron-sourced rows)
       const result = await runSyncNewsSentiment(supabase, 'cron', tickers)
       return NextResponse.json({ task: 'news-sentiment', ...result })
+    }
+
+    // ── Daily OPS combined task — the validation-phase jobs in one cron ──────
+    // Covers Vercel Hobby's cron limit: one schedule runs every ops job.
+    // Weekly jobs (lifecycle demotion, agent calibration) only fire on
+    // Mondays so their clamps/cadences behave as designed; the behavior-gap
+    // report fires on the 1st of the month.
+    if (task === 'daily-ops') {
+      const now = new Date()
+      const isMonday = now.getUTCDay() === 1
+      const isFirstOfMonth = now.getUTCDate() === 1
+      const opsTasks = [
+        'tipp-floors', 'sweep', 'ops-watchdog', 'regime-allocator',
+        'ledger', 'advisory-staleness',
+        ...(isMonday ? ['lifecycle', 'agent-calibration'] : []),
+        ...(isFirstOfMonth ? ['behavior-gap'] : []),
+      ]
+      const results: Record<string, string> = {}
+      for (const t of opsTasks) {
+        try {
+          const r = await fetch(`${baseUrl}/api/cron?task=${t}`, {
+            headers: { authorization: `Bearer ${cronSecret}` },
+          })
+          results[t] = r.ok ? 'ok' : `http ${r.status}`
+        } catch (e) {
+          results[t] = e instanceof Error ? e.message : 'error'
+        }
+      }
+      return NextResponse.json({
+        task: 'daily-ops',
+        results,
+        weeklyTasksRan: isMonday,
+        monthlyTasksRan: isFirstOfMonth,
+      })
     }
 
     // ── Daily combined task (runs all tasks sequentially for Hobby plan) ──────
