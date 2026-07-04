@@ -54,6 +54,8 @@ export type PaperFillResult =
   | { status: 'invalid_price'; reason: string }
   | { status: 'insert_error'; reason: string }
   | { status: 'no_size'; reason: string }
+  /** Modeled cost exceeded the rejection threshold — order too large for the book. */
+  | { status: 'rejected_liquidity'; reason: string }
 
 // ── Run breakdown ─────────────────────────────────────────────────────────────
 

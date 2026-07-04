@@ -111,8 +111,12 @@ describe('PaperBroker', () => {
     const result = await broker.fill(makeOpp({ direction: 'long' }), makeSize(), 'user-1', supabase)
 
     expect(result.status).toBe('opened')
-    const expectedFillPrice = midPrice * (1 + 5 / 10_000)
-    expect(capturedFillPrice).toBeCloseTo(expectedFillPrice, 2)
+    // Fill model: crypto half-spread 2 bps + impact 3 × (500/50k) — see
+    // lib/paper-trading/fill-model.ts.
+    const { modelFill } = await import('@/lib/paper-trading/fill-model')
+    const expected = modelFill({ assetClass: 'crypto', price: midPrice, direction: 'long', notionalUsd: 500 })
+    expect(capturedFillPrice).toBeCloseTo(expected.fillPrice, 2)
+    expect(capturedFillPrice!).toBeGreaterThan(midPrice)   // longs always pay up
   })
 
   it('fill() returns opened and charges short slippage (crypto = 5 bps)', async () => {
@@ -147,8 +151,10 @@ describe('PaperBroker', () => {
     const broker = new PaperBroker()
     await broker.fill(makeOpp({ direction: 'short' }), makeSize(), 'user-1', supabase)
 
-    const expectedFillPrice = midPrice * (1 - 5 / 10_000)
-    expect(capturedFillPrice).toBeCloseTo(expectedFillPrice, 2)
+    const { modelFill } = await import('@/lib/paper-trading/fill-model')
+    const expected = modelFill({ assetClass: 'crypto', price: midPrice, direction: 'short', notionalUsd: 500 })
+    expect(capturedFillPrice).toBeCloseTo(expected.fillPrice, 2)
+    expect(capturedFillPrice!).toBeLessThan(midPrice)   // shorts always receive less
   })
 
   it('fill() returns insert_error when Supabase insert fails', async () => {

@@ -1,5 +1,54 @@
 # Wealth OS Changelog
 
+## 2026-07-04 — Final Wiring Fixes (W1–W7) + paper-trading hardening
+
+**Hard live-trading gate (W1 + items 1–4):** new
+`lib/broker-adapters/execution-guard.ts` — `LIVE_TRADING_ENABLED` master
+switch (default OFF), unforgeable WeakSet guard tokens minted only by
+`preExecutionGuard` (kill switch → cost gate) and required by BOTH broker
+routers (ungated submissions refused), and `checkLiveApproval` (maturity
+`live_candidate` AND `live_enabled=true`; `is_enabled` is never a live
+signal). `BasePipelineStrategy.checkLiveGate` blocks every real-adapter
+execute() path. Manual API routes (orders/rebalance/sleeves-approve) gated
+with 423 + audit rows. `selectBroker` returns `no_legal_broker` when neither
+primary nor fallback is legal — a US user can never route to Polymarket.
+Migration 20260703m: `live_enabled` default false + backfill, `live_approvals`
+audit table.
+
+**Honest execution (items 5–8):** placeholder adapters (eToro, Polymarket
+bracket, cex-latency-arb) no longer fake `submitted`; `BrokerCapabilities`
+declared per adapter (market/limit/bracket/cancel/status/sizing + `liveReady`,
+all false in the paper phase) and enforced at the router; unsafe
+notional↔quantity conversions blocked per path (OANDA units guess, IBKR
+notional/100, Kraken missing volume, Coinbase unprotected bracket, Tastytrade/
+Deribit default-1, Kalshi 0.50 price guess); `CIODecisionEngine.decide` now
+AWAITS execution and surfaces broker failures on `Decision.execution`.
+
+**Wiring (W2–W7):** adversarial ingest gate wired into the REAL paths
+(sync-news-sentiment, sync-quiver-quant, CryptoPanic headlines) with
+quarantine; `canIncreaseRisk` gates the sentiment boost (≥2 admitted sources)
+· regime allocator connected — `loadRegimeAdjustedWeights` in the weight read
+path; ops-watchdog fires the pre-committed crisis playbook and chains it into
+the ledger · committee fail-closed — unparseable votes are `defer`, excluded
+from the weighted mean; `agent_weights` table + weekly calibration cron
+(softmax over graded accuracy, asymmetric clamp, hardcoded fallback)
+(migration 20260704a) · relational provenance — `order_intents.decision_id` +
+`outcome_log.order_intent_id` FKs populated at write/grade, tape joins
+relationally, ids hashed into ledger payloads (migration 20260704b) · honest
+halves — full KB §1 wealth-tier ladder (VHNW/UHNW caps, migration 20260704c),
+BTC/UUP/hold-NO lifecycle benchmarks, `loadCategoryPrior` in the live sizing
+path.
+
+**Validation tooling (items 9–12):** per-strategy paper scorecards
+(`lib/actions/paper-scorecard.ts` — expectancy, loss streak, slippage vs
+model, blocked/veto counts, maturity recommendation, promotion readiness) ·
+deterministic fill model (`lib/paper-trading/fill-model.ts` — spread +
+size-dependent impact, partial fills, rejections; assumptions documented) ·
+npm audit 11 → 2 moderate (next 16.2.10, @anthropic-ai/sdk 0.110.0; remaining
+two live inside next's vendored postcss) · **docs/paper-trading-validation-
+runbook.md** — the 2-month protocol, weekly metrics, pass/fail criteria, and
+the explicit pre-live checklist. Live trading remains disabled.
+
 ## 2026-07-03 — Gap Top Three + Remaining Items (R1–R8)
 
 **Gap Top Three brief:** Item B adversarial defense (typed extraction sandbox,

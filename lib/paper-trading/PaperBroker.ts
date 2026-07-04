@@ -3,9 +3,12 @@ import type { Opportunity, PositionSize } from '@/lib/strategies/pipeline-types'
 import type { AssetClass } from '@/lib/strategies/strategy-registry'
 import type { PaperFillResult } from './types'
 import { fetchCurrentPrice } from './price-feed'
+import { modelFill } from './fill-model'
 import { alertPositionClosed } from '@/lib/alerts/auto-alerts'
 
-// Realistic one-way slippage estimates per asset class (bps)
+// Exit-side one-way slippage estimates per asset class (bps). Entry fills use
+// the richer spread+impact model in fill-model.ts; exits keep this flat model
+// (exit sizes equal entry sizes, so impact symmetry is a fair simplification).
 const SLIPPAGE_BPS: Partial<Record<AssetClass, number>> = {
   crypto:       5,
   stocks:      10,
@@ -121,17 +124,26 @@ export class PaperBroker {
       return { status: 'invalid_price', reason: `Price ${price} is not a valid positive number for ${opp.symbol}.` }
     }
 
-    const slippageBps = SLIPPAGE_BPS[opp.assetClass] ?? 10
-    const slip = price * slippageBps / 10_000
-    // Longs pay the ask (+slip); shorts receive the bid (-slip); neutral enters at mid
-    const fillPrice = opp.direction === 'long' ? price + slip
-      : opp.direction === 'short' ? price - slip
-      : price
+    // Modeled fill: spread + size-dependent impact, deterministic partial
+    // fills above the depth cap, rejection when the modeled cost is too wide.
+    // Assumptions documented in lib/paper-trading/fill-model.ts.
+    const modeled = modelFill({
+      assetClass: opp.assetClass,
+      price,
+      direction: opp.direction,
+      notionalUsd: size.notionalUsd,
+    })
+    if (modeled.status === 'rejected') {
+      return { status: 'rejected_liquidity', reason: modeled.reason ?? 'modeled liquidity rejection' }
+    }
+    const fillPrice = modeled.fillPrice
+    const slippageBps = modeled.slippageBps
+    const filledNotionalUsd = modeled.filledNotionalUsd
     if (fillPrice <= 0) {
       return { status: 'invalid_price', reason: `Fill price ${fillPrice} is not positive.` }
     }
 
-    const quantity = size.notionalUsd / fillPrice
+    const quantity = filledNotionalUsd / fillPrice
     const exit = exitFor(opp.strategyKey, opp.exit)
 
     const { data: pos, error } = await supabase
@@ -145,7 +157,7 @@ export class PaperBroker {
         entry_price:     fillPrice,
         current_price:   price,
         quantity,
-        notional_usd:    size.notionalUsd,
+        notional_usd:    filledNotionalUsd,
         stop_loss_pct:   exit.sl,
         take_profit_pct: exit.tp,
         max_hold_hours:  exit.hours,
@@ -154,6 +166,9 @@ export class PaperBroker {
           strength:      opp.strength,
           expectedReturn: opp.expectedReturn,
           rationale:     size.rationale,
+          ...(modeled.status === 'partial'
+            ? { partialFill: true, requestedNotionalUsd: size.notionalUsd, fillNote: modeled.reason }
+            : {}),
           ...opp.metadata,
         },
       })
@@ -175,7 +190,7 @@ export class PaperBroker {
       side:           'open',
       fill_price:     fillPrice,
       quantity,
-      notional_usd:   size.notionalUsd,
+      notional_usd:   filledNotionalUsd,
       slippage_bps:   slippageBps,
       opportunity_id: opp.id,
       metadata:       opp.metadata,
@@ -207,7 +222,8 @@ export class PaperBroker {
 
     console.log(
       `[PaperBroker] ✓ opened ${opp.strategyKey} ${opp.direction.toUpperCase()} ` +
-      `${opp.symbol} @ $${fillPrice.toFixed(4)} notional=$${size.notionalUsd.toFixed(2)}`
+      `${opp.symbol} @ $${fillPrice.toFixed(4)} notional=$${filledNotionalUsd.toFixed(2)}` +
+      (modeled.status === 'partial' ? ' (partial)' : '')
     )
     return { status: 'opened', id: pos.id }
   }
