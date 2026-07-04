@@ -1,5 +1,34 @@
 # Wealth OS Changelog
 
+## 2026-07-04 — Validation platform upgrade (hardening gaps + operator/wealth dashboards)
+
+**Safety:** legacy `lib/broker-router.ts` retired to a delegation shim — its
+own executeVia* implementations are deleted and every manual API route now
+goes through the single adapter router (guard token + master switch +
+capability + jurisdiction + liveReady). `/api/orders` persists skipped broker
+results as `skipped` (migration 20260704d adds the status + corrects
+historical rows) and the response says explicitly when no broker order was
+placed; `/api/rebalance` reports skipped_orders. `/api/internal/scan-all`
+attributes every audit call to its userId so scheduled scans feed the
+per-user scorecards. Key-hygiene test is cross-platform (execFileSync, no
+shell).
+
+**Paper validation:** `/paper-trading` is a real operator console — safety
+gates, runbook checklist with auto-computed items + blockers, expanded
+scorecards (every paper-enabled strategy, incl. zero-trade/blocked-only/
+missing-data; activity counters, validation status, entry/exit slippage,
+material-cost-impact flag), strategy coverage buckets, portfolio synergy
+(exposure, clusters, conflicts, drawdown overlap, concentration warnings,
+regime notes), run health, and the fill-model assumptions table with the
+modeled-not-live disclaimer.
+
+**Wealth management:** Wealth Checkup on /advisor — emergency fund, idle
+cash + live cash yields, Roth/HSA/401k prompts, TLH + wash-sale windows,
+rebalance suggestions, honest missing-data list; best-next-dollar waterfall
+(rules-based, never moves money, paper bankroll always last); every item
+carries a data-quality label (completeness, confidence, rate/tax-constant
+freshness, requires-CPA-review, informational-only).
+
 ## 2026-07-04 — Final Wiring Fixes (W1–W7) + paper-trading hardening
 
 **Hard live-trading gate (W1 + items 1–4):** new

@@ -26,8 +26,9 @@ per-strategy evidence pack (`getPaperScorecards()`), not P&L bragging rights.
 
 ## 2. Weekly review (every Monday)
 
-Pull the scorecards (`getPaperScorecards()` per user, or the strategy
-leaderboard) and record, per strategy, in a dated log:
+Open **/paper-trading** — the operator dashboard renders this runbook as a
+live checklist (auto-computed where the data allows), the full scorecards,
+coverage, synergy, and run health. Record, per strategy, in a dated log:
 
 1. Closed-trade count (cumulative and week-over-week)
 2. Win rate and net expectancy (after modeled spread + impact)
