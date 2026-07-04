@@ -20,6 +20,8 @@ interface IntentContext {
   supabase: SupabaseClient
   userId: string
   opportunityId: string
+  /** decision_log.id that produced this intent — relational provenance (W6). */
+  decisionId?: string | null
   retry?: RetryOptions
 }
 
@@ -59,6 +61,7 @@ async function upsertIntent(
         opportunity_id: ctx.opportunityId,
         client_order_id: cid,
         leg,
+        ...(ctx.decisionId ? { decision_id: ctx.decisionId } : {}),
         updated_at: new Date().toISOString(),
         ...fields,
       },

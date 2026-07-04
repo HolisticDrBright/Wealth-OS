@@ -256,10 +256,13 @@ export async function GET(req: NextRequest) {
         .from('ledger_entries').select('chain_hash').order('seq', { ascending: false }).limit(1)
       const head = (headRow ?? [])[0]?.chain_hash ?? GENESIS_HASH
 
+      // W6: provenance ids (decision_id / order_intent_id) are part of the
+      // hashed payloads, so the decision→intent→outcome chain itself is
+      // tamper-evident.
       const sources: Array<['decision' | 'order_intent' | 'outcome', string, string[]]> = [
-        ['decision', 'decision_log', ['id', 'strategy', 'symbol', 'confidence', 'predicted_direction', 'created_at']],
-        ['order_intent', 'order_intents', ['id', 'client_order_id', 'leg', 'status', 'broker_order_id', 'created_at']],
-        ['outcome', 'outcome_log', ['id', 'decision_id', 'actual_direction', 'brier_score', 'created_at']],
+        ['decision', 'decision_log', ['id', 'strategy', 'symbol', 'confidence', 'predicted_direction', 'paper_position_id', 'created_at']],
+        ['order_intent', 'order_intents', ['id', 'client_order_id', 'leg', 'status', 'broker_order_id', 'decision_id', 'created_at']],
+        ['outcome', 'outcome_log', ['id', 'decision_id', 'order_intent_id', 'actual_direction', 'brier_score', 'created_at']],
       ]
       const inputs: Array<{ kind: 'decision' | 'order_intent' | 'outcome'; sourceId: string; payload: unknown }> = []
       for (const [kind, table, cols] of sources) {

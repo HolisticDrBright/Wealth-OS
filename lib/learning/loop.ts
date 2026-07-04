@@ -63,7 +63,7 @@ async function gradeOutcomes(userId: string): Promise<number> {
     const posIds = linkedPending.map(d => d.paper_position_id as string)
     const { data: closedPos } = await admin
       .from('paper_positions')
-      .select('id, realized_pnl_pct, realized_pnl_usd, status')
+      .select('id, realized_pnl_pct, realized_pnl_usd, status, metadata')
       .in('id', posIds)
       .eq('status', 'closed')
 
@@ -74,10 +74,39 @@ async function gradeOutcomes(userId: string): Promise<number> {
       if (!pos) continue
       const actualDirection: 0 | 1 = (pos.realized_pnl_usd as number) >= 0 ? 1 : 0
       const brierScore = ((dec.confidence as number) - actualDirection) ** 2
+
+      // W6 relational provenance: find the entry order intent for this
+      // decision's opportunity, link the outcome to it, and backfill the
+      // intent's decision_id — decision → intent → outcome joins relationally.
+      let orderIntentId: string | null = null
+      try {
+        const oppId = (pos.metadata as Record<string, unknown> | null)?.opportunityId as string | undefined
+        if (oppId) {
+          const { data: intents } = await admin
+            .from('order_intents')
+            .select('id, decision_id')
+            .eq('user_id', userId)
+            .eq('opportunity_id', oppId)
+            .eq('leg', 'entry')
+            .limit(1)
+          const intent = (intents ?? [])[0] as { id: string; decision_id: string | null } | undefined
+          if (intent) {
+            orderIntentId = intent.id
+            if (!intent.decision_id) {
+              await admin.from('order_intents')
+                .update({ decision_id: dec.id, updated_at: new Date().toISOString() })
+                .eq('id', intent.id)
+            }
+          }
+        }
+      } catch { /* provenance link is best-effort; grading proceeds regardless */ }
+
       const [{ error: outErr }] = await Promise.all([
         admin.from('outcome_log').insert({
           decision_id:        dec.id,
           user_id:            userId,
+          // Included only when linked so grading still works pre-migration.
+          ...(orderIntentId ? { order_intent_id: orderIntentId } : {}),
           actual_direction:   actualDirection,
           actual_return:      pos.realized_pnl_pct as number,
           alpha_vs_benchmark: 0,
