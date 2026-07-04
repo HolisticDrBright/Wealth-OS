@@ -192,6 +192,23 @@ describe('FINAL in-adapter gate — no direct caller can bypass (audit residue 1
     expect(spy).not.toHaveBeenCalled()
   })
 
+  it('cancelBracket/modifyStop/modifyTarget are gated identically (round-3 residual)', async () => {
+    vi.stubEnv('ALPACA_API_KEY', 'fake')
+    vi.stubEnv('ALPACA_SECRET_KEY', 'fake')
+    const spy = fetchTrap()
+    const adapter = new AlpacaAdapter()
+
+    const cancel = await adapter.cancelBracket('ord-1')
+    const stop = await adapter.modifyStop('ord-1', 90)
+    const target = await adapter.modifyTarget('ord-1', 110)
+
+    for (const r of [cancel, stop, target]) {
+      expect(r.status).toBe('skipped')
+      expect(r.reason).toContain('live trading disabled')
+    }
+    expect(spy).not.toHaveBeenCalled()
+  })
+
   it('direct placeBracketOrder() is gated identically', async () => {
     vi.stubEnv('ALPACA_API_KEY', 'fake')
     vi.stubEnv('ALPACA_SECRET_KEY', 'fake')

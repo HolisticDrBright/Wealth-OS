@@ -119,7 +119,7 @@ export class AlpacaAdapter extends BrokerAdapter {
     }
   }
 
-  async cancelBracket(parentOrderId: string): Promise<BrokerResult> {
+  protected async doCancelBracket(parentOrderId: string): Promise<BrokerResult> {
     const key = process.env.ALPACA_API_KEY
     const secret = process.env.ALPACA_SECRET_KEY
     if (!key || !secret) return { status: 'skipped', broker: 'alpaca', reason: 'not configured' }
@@ -138,7 +138,7 @@ export class AlpacaAdapter extends BrokerAdapter {
     }
   }
 
-  async modifyStop(orderId: string, newStop: number): Promise<BrokerResult> {
+  protected async doModifyStop(orderId: string, newStop: number): Promise<BrokerResult> {
     const key = process.env.ALPACA_API_KEY
     const secret = process.env.ALPACA_SECRET_KEY
     if (!key || !secret) return { status: 'skipped', broker: 'alpaca', reason: 'not configured' }
@@ -159,7 +159,7 @@ export class AlpacaAdapter extends BrokerAdapter {
     }
   }
 
-  async modifyTarget(orderId: string, newTarget: number): Promise<BrokerResult> {
+  protected async doModifyTarget(orderId: string, newTarget: number): Promise<BrokerResult> {
     const key = process.env.ALPACA_API_KEY
     const secret = process.env.ALPACA_SECRET_KEY
     if (!key || !secret) return { status: 'skipped', broker: 'alpaca', reason: 'not configured' }
@@ -468,7 +468,7 @@ export class CoinbaseAdapter extends BrokerAdapter {
     }
   }
 
-  async cancelBracket(orderId: string): Promise<BrokerResult> {
+  protected async doCancelBracket(orderId: string): Promise<BrokerResult> {
     const key = process.env.COINBASE_API_KEY
     const secret = process.env.COINBASE_API_SECRET
     if (!key || !secret) return { status: 'skipped', broker: 'coinbase', reason: 'not configured' }
@@ -639,7 +639,7 @@ export class OandaAdapter extends BrokerAdapter {
     }
   }
 
-  async modifyStop(tradeId: string, newStop: number): Promise<BrokerResult> {
+  protected async doModifyStop(tradeId: string, newStop: number): Promise<BrokerResult> {
     const key = process.env.OANDA_API_KEY
     const accountId = process.env.OANDA_ACCOUNT_ID
     if (!key || !accountId) return { status: 'skipped', broker: 'oanda', reason: 'not configured' }
@@ -660,7 +660,7 @@ export class OandaAdapter extends BrokerAdapter {
     }
   }
 
-  async modifyTarget(tradeId: string, newTarget: number): Promise<BrokerResult> {
+  protected async doModifyTarget(tradeId: string, newTarget: number): Promise<BrokerResult> {
     const key = process.env.OANDA_API_KEY
     const accountId = process.env.OANDA_ACCOUNT_ID
     if (!key || !accountId) return { status: 'skipped', broker: 'oanda', reason: 'not configured' }
@@ -793,7 +793,7 @@ export class IBKRAdapter extends BrokerAdapter {
     }
   }
 
-  async cancelBracket(parentOrderId: string): Promise<BrokerResult> {
+  protected async doCancelBracket(parentOrderId: string): Promise<BrokerResult> {
     const accountId = process.env.IBKR_ACCOUNT_ID
     const baseUrl = process.env.IBKR_API_URL
     if (!accountId || !baseUrl) return { status: 'skipped', broker: 'ibkr', reason: 'not configured' }

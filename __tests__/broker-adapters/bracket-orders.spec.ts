@@ -60,6 +60,20 @@ function bracket(adapter: object, params: BracketParams) {
     .doPlaceBracketOrder(params)
 }
 
+
+// cancel/modify are now gated like execute() (paper phase short-circuits) —
+// mechanics tests call the protected implementations; the gate itself is
+// covered in __tests__/safety/broker-capabilities.spec.ts.
+function doCancel(adapter: object, id: string) {
+  return (adapter as unknown as { doCancelBracket(i: string): Promise<{ status: string; broker_order_id?: string; reason?: string }> }).doCancelBracket(id)
+}
+function doStop(adapter: object, id: string, px: number) {
+  return (adapter as unknown as { doModifyStop(i: string, p: number): Promise<{ status: string; broker_order_id?: string }> }).doModifyStop(id, px)
+}
+function doTarget(adapter: object, id: string, px: number) {
+  return (adapter as unknown as { doModifyTarget(i: string, p: number): Promise<{ status: string; broker_order_id?: string }> }).doModifyTarget(id, px)
+}
+
 // ─── Alpaca ───────────────────────────────────────────────────────────────────
 
 describe('AlpacaAdapter.placeBracketOrder', () => {
@@ -125,7 +139,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
   it('cancelBracket sends DELETE to /v2/orders/:id', async () => {
     const fetchMock = mockFetch({}, true, 204)
     global.fetch = fetchMock
-    const result = await adapter.cancelBracket('order-123')
+    const result = await doCancel(adapter, 'order-123')
     expect(result.status).toBe('submitted')
     expect(fetchMock.mock.calls[0][0]).toContain('/v2/orders/order-123')
     expect(fetchMock.mock.calls[0][1].method).toBe('DELETE')
@@ -134,7 +148,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
   it('modifyStop sends PATCH with stop_price', async () => {
     const fetchMock = mockFetch({ id: 'stop-id' }, true)
     global.fetch = fetchMock
-    const result = await adapter.modifyStop('stop-id', 185)
+    const result = await doStop(adapter, 'stop-id', 185)
     expect(result.status).toBe('submitted')
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body.stop_price).toBe('185')
@@ -143,7 +157,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
   it('modifyTarget sends PATCH with limit_price', async () => {
     const fetchMock = mockFetch({ id: 'tp-id' }, true)
     global.fetch = fetchMock
-    const result = await adapter.modifyTarget('tp-id', 225)
+    const result = await doTarget(adapter, 'tp-id', 225)
     expect(result.status).toBe('submitted')
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body.limit_price).toBe('225')
@@ -243,7 +257,7 @@ describe('OandaAdapter.placeBracketOrder', () => {
     const fetchMock = mockFetch({ relatedTransactionIDs: ['tx-1'] })
     global.fetch = fetchMock
 
-    const result = await adapter.modifyStop('trade-123', 1.075)
+    const result = await doStop(adapter, 'trade-123', 1.075)
     expect(result.status).toBe('submitted')
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body.stopLoss.price).toBe('1.07500')
@@ -256,7 +270,7 @@ describe('BrokerAdapter default bracket methods', () => {
   it('KrakenAdapter.cancelBracket returns skipped (no native cancel-bracket)', async () => {
     const { KrakenAdapter } = await import('@/lib/broker-adapters/adapters')
     const adapter = new KrakenAdapter()
-    const result = await adapter.cancelBracket('txid-123')
+    const result = await doCancel(adapter, 'txid-123')
     // Kraken does not override cancelBracket -> falls to base default
     expect(result.status).toBe('skipped')
   })

@@ -248,18 +248,40 @@ export abstract class BrokerAdapter {
     }
   }
 
-  /** Cancel all legs of a bracket order by parent order ID. */
+  /**
+   * Cancel all legs of a bracket order — same FINAL gate as execute().
+   * Not an order-creation path (and no live orders can exist while the gates
+   * hold), but gated anyway so EVERY broker HTTP call shares one pattern.
+   */
   async cancelBracket(parentOrderId: string): Promise<BrokerResult> {
+    const gate = this.preLiveGate()
+    if (gate) return gate
+    return this.doCancelBracket(parentOrderId)
+  }
+
+  protected async doCancelBracket(parentOrderId: string): Promise<BrokerResult> {
     return { status: 'skipped', broker: this.config.id, reason: `cancelBracket not implemented for ${this.config.id}; cancel order ${parentOrderId} manually` }
   }
 
-  /** Move an existing stop-loss order to a new price. */
-  async modifyStop(orderId: string, _newStop: number): Promise<BrokerResult> {
+  /** Move an existing stop-loss order to a new price — gated like execute(). */
+  async modifyStop(orderId: string, newStop: number): Promise<BrokerResult> {
+    const gate = this.preLiveGate()
+    if (gate) return gate
+    return this.doModifyStop(orderId, newStop)
+  }
+
+  protected async doModifyStop(orderId: string, _newStop: number): Promise<BrokerResult> {
     return { status: 'skipped', broker: this.config.id, reason: `modifyStop not implemented for ${this.config.id}; order ${orderId}` }
   }
 
-  /** Move an existing take-profit limit order to a new price. */
-  async modifyTarget(orderId: string, _newTarget: number): Promise<BrokerResult> {
+  /** Move an existing take-profit limit order — gated like execute(). */
+  async modifyTarget(orderId: string, newTarget: number): Promise<BrokerResult> {
+    const gate = this.preLiveGate()
+    if (gate) return gate
+    return this.doModifyTarget(orderId, newTarget)
+  }
+
+  protected async doModifyTarget(orderId: string, _newTarget: number): Promise<BrokerResult> {
     return { status: 'skipped', broker: this.config.id, reason: `modifyTarget not implemented for ${this.config.id}; order ${orderId}` }
   }
 }
