@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { computeScorecardCore, recommendMaturity } from '@/lib/actions/paper-scorecard'
+import { computeScorecardCore, recommendMaturity } from '@/lib/paper-trading/scorecard-core'
 
 const t = (i: number, returnPct: number) => ({
   closedAt: `2026-06-${String(i + 1).padStart(2, '0')}T12:00:00Z`,
