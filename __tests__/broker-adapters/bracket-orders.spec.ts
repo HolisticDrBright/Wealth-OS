@@ -50,6 +50,16 @@ function clearEnv(vars: Record<string, string>) {
   for (const k of Object.keys(vars)) delete process.env[k]
 }
 
+
+// The public placeBracketOrder is now a FINAL live-safety gate (paper phase →
+// skipped before any HTTP). These tests exercise the broker-specific payload
+// mechanics, so they call the protected implementation directly; the gate
+// itself is covered in __tests__/safety/broker-capabilities.spec.ts.
+function bracket(adapter: object, params: BracketParams) {
+  return (adapter as unknown as { doPlaceBracketOrder(p: BracketParams): Promise<import('@/lib/broker-adapters/types').BracketResult> })
+    .doPlaceBracketOrder(params)
+}
+
 // ─── Alpaca ───────────────────────────────────────────────────────────────────
 
 describe('AlpacaAdapter.placeBracketOrder', () => {
@@ -80,7 +90,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
       stop_price: 180,
       take_profit_price: 220,
     }
-    const result = await adapter.placeBracketOrder(params)
+    const result = await bracket(adapter, params)
 
     expect(result.status).toBe('submitted')
     expect(result.broker).toBe('alpaca')
@@ -95,7 +105,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
   it('returns failed when API returns error', async () => {
     global.fetch = mockFetch({ message: 'insufficient funds' }, false, 422)
 
-    const result = await adapter.placeBracketOrder({
+    const result = await bracket(adapter, {
       symbol: 'AAPL', asset_class: 'stock', side: 'buy', quantity: 10,
       stop_price: 180,
     })
@@ -106,7 +116,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
 
   it('returns skipped when env vars missing', async () => {
     clearEnv(ALPACA_ENV)
-    const result = await adapter.placeBracketOrder({
+    const result = await bracket(adapter, {
       symbol: 'AAPL', asset_class: 'stock', side: 'buy', quantity: 1, stop_price: 100,
     })
     expect(result.status).toBe('skipped')
@@ -165,7 +175,7 @@ describe('CoinbaseAdapter.placeBracketOrder', () => {
   afterEach(() => clearEnv(COINBASE_ENV))
 
   it('places 3 separate orders (entry + stop + take-profit)', async () => {
-    const result = await adapter.placeBracketOrder({
+    const result = await bracket(adapter, {
       symbol: 'BTC',
       asset_class: 'crypto',
       side: 'buy',
@@ -186,7 +196,7 @@ describe('CoinbaseAdapter.placeBracketOrder', () => {
       ok: false,
       json: () => Promise.resolve({ error_response: { message: 'bad request' } }),
     })
-    const result = await adapter.placeBracketOrder({
+    const result = await bracket(adapter, {
       symbol: 'BTC', asset_class: 'crypto', side: 'buy', quantity: 0.1, stop_price: 50_000,
     })
     expect(result.status).toBe('failed')
@@ -211,7 +221,7 @@ describe('OandaAdapter.placeBracketOrder', () => {
     })
     global.fetch = fetchMock
 
-    const result = await adapter.placeBracketOrder({
+    const result = await bracket(adapter, {
       symbol: 'EUR_USD',
       asset_class: 'forex',
       side: 'buy',

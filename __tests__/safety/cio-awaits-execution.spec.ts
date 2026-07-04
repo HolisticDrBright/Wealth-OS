@@ -45,13 +45,14 @@ vi.mock('@/lib/costs/cost-overrides', () => ({
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
 import type { Opportunity } from '@/lib/strategies/pipeline-types'
 
-function makeSupabase() {
-  const from = vi.fn(() => {
+function makeSupabase(tableRows: Record<string, unknown[]> = {}) {
+  const from = vi.fn((table: string) => {
+    const rows = tableRows[table] ?? []
     const chain: Record<string, unknown> = {}
     for (const m of ['select', 'eq', 'order', 'limit', 'gte']) chain[m] = vi.fn(() => chain)
-    chain.single = vi.fn(async () => ({ data: null, error: null }))
+    chain.single = vi.fn(async () => ({ data: rows[0] ?? null, error: null }))
     chain.insert = vi.fn(async () => ({ error: null }))
-    chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve)
+    chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(resolve)
     return chain
   })
   return { from } as never
@@ -102,5 +103,25 @@ describe('CIODecisionEngine.decide awaits execution', () => {
     expect(decision.action).toBe('execute')
     expect(executeMock).not.toHaveBeenCalled()
     expect(decision.execution).toBeUndefined()
+  })
+
+  it('consumes the allocator regime: risk_off halves the sized capital (audit residue 3)', async () => {
+    const engine = new CIODecisionEngine()
+    const baseline = await engine.decide(opp, 'user-1', makeSupabase(), undefined, { paperMode: true })
+    const riskOff = await engine.decide(opp, 'user-1', makeSupabase({
+      regime_state: [{ regime: 'risk_off' }],
+    }), undefined, { paperMode: true })
+
+    expect(baseline.size?.notionalUsd).toBeGreaterThan(0)
+    expect(riskOff.size?.notionalUsd).toBeCloseTo((baseline.size?.notionalUsd ?? 0) * 0.5, 5)
+    expect(riskOff.size?.rationale).toContain('regime haircut 50% (risk_off)')
+  })
+
+  it('crisis regime zeroes the sized capital', async () => {
+    const engine = new CIODecisionEngine()
+    const crisis = await engine.decide(opp, 'user-1', makeSupabase({
+      regime_state: [{ regime: 'crisis' }],
+    }), undefined, { paperMode: true })
+    expect(crisis.size?.notionalUsd).toBe(0)
   })
 })

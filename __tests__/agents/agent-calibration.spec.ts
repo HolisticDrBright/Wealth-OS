@@ -30,12 +30,15 @@ import {
   calibrateWeights,
   computeCommitteeScore,
   loadAgentWeights,
+  runAgentCalibration,
+  _clearAgentWeightsCacheForTest,
 } from '@/lib/agents/agent-calibration'
 import { BaseAgent } from '@/lib/agents/base-agent'
 import type { TradeContext } from '@/lib/agents/types'
 
 afterEach(() => {
   vi.clearAllMocks()
+  _clearAgentWeightsCacheForTest()
 })
 
 class TestAgent extends BaseAgent {
@@ -168,5 +171,63 @@ describe('loadAgentWeights — table with hardcoded fallback', () => {
 
   it('no client → hardcoded weights', async () => {
     expect(await loadAgentWeights(undefined)).toEqual(HARDCODED_AGENT_WEIGHTS)
+  })
+})
+
+describe('loadAgentWeights cache (audit residue 5)', () => {
+  it('reads the table once per TTL window', async () => {
+    const select = vi.fn(async () => ({
+      data: [{ agent_name: 'RiskManagementAgent', weight: 0.2 }], error: null,
+    }))
+    const supabase = { from: () => ({ select }) } as never
+
+    const a = await loadAgentWeights(supabase)
+    const b = await loadAgentWeights(supabase)
+    expect(a.RiskManagementAgent).toBe(0.2)
+    expect(b.RiskManagementAgent).toBe(0.2)
+    expect(select).toHaveBeenCalledTimes(1)   // second call served from cache
+  })
+})
+
+describe('runAgentCalibration reads agent_performance_logs (audit residue 5)', () => {
+  it('per-agent committee scores are graded against closed positions', async () => {
+    const now = Date.now()
+    const upserts: unknown[] = []
+    const tables: Record<string, unknown[]> = {
+      agent_weights: [],
+      audit_logs: [],
+      paper_positions: [
+        { symbol: 'AAPL', opened_at: new Date(now + 3_600_000).toISOString(), realized_pnl_usd: 50 },
+      ],
+      agent_performance_logs: [{
+        scenario: {
+          trade: { symbol: 'AAPL' },
+          // ≥60 = approving vote (correct: trade won); ≤40 = rejecting (wrong)
+          agentScores: { TechnicalMarketAgent: 80, MacroRegimeAgent: 30, QuantScreeningAgent: 50 },
+        },
+        decision: 'execute',
+        created_at: new Date(now).toISOString(),
+      }],
+    }
+    const supabase = {
+      from: (table: string) => {
+        const rows = tables[table] ?? []
+        const chain: Record<string, unknown> = {}
+        for (const m of ['select', 'eq', 'gte', 'not', 'limit', 'order']) chain[m] = () => chain
+        chain.upsert = async (rowsIn: unknown) => { upserts.push(rowsIn); return { error: null } }
+        chain.then = (resolve: (v: unknown) => unknown) =>
+          Promise.resolve({ data: rows, error: null }).then(resolve)
+        return chain
+      },
+    } as never
+
+    const result = await runAgentCalibration(supabase)
+
+    expect(result.graded.TechnicalMarketAgent).toEqual({ accuracy: 1, samples: 1 })
+    expect(result.graded.MacroRegimeAgent).toEqual({ accuracy: 0, samples: 1 })
+    // Neutral band (41–59) abstains — never graded.
+    expect(result.graded.QuantScreeningAgent).toBeUndefined()
+    expect(result.updated).toBe(true)
+    expect(upserts.length).toBe(1)
   })
 })

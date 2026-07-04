@@ -15,11 +15,22 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+
+// execute()/placeBracketOrder() are now FINAL live-safety gates (paper phase
+// short-circuits before adapter code). These tests target the placeholder
+// implementations themselves, so they call the protected methods directly.
+function doExecute(adapter: object, params: Record<string, unknown>) {
+  return (adapter as unknown as { doExecute(p: unknown): Promise<{ status: string; reason?: string }> }).doExecute(params)
+}
+function doBracket(adapter: object, params: Record<string, unknown>) {
+  return (adapter as unknown as { doPlaceBracketOrder(p: unknown): Promise<{ status: string; reason?: string }> }).doPlaceBracketOrder(params)
+}
+
 describe('placeholder adapters never report submitted', () => {
   it('EToroAdapter (partner API pending) returns skipped even when configured', async () => {
     vi.stubEnv('ETORO_API_KEY', 'fake')
     vi.stubEnv('ETORO_ACCOUNT_ID', 'fake')
-    const result = await new EToroAdapter().execute({
+    const result = await doExecute(new EToroAdapter(), {
       symbol: 'AAPL', asset_class: 'stock', side: 'buy', notional_usd: 100,
     })
     expect(result.status).toBe('skipped')
@@ -28,7 +39,7 @@ describe('placeholder adapters never report submitted', () => {
 
   it('PolymarketAdapter.placeBracketOrder (CLOB pending) returns skipped even when configured', async () => {
     vi.stubEnv('POLYMARKET_PRIVATE_KEY', 'fake')
-    const result = await new PolymarketAdapter().placeBracketOrder({
+    const result = await doBracket(new PolymarketAdapter(), {
       symbol: 'POLY:0xabc', asset_class: 'polymarket', side: 'buy',
       notional_usd: 100, take_profit_price: 0.75,
     })

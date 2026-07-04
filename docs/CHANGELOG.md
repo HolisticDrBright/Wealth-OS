@@ -1,5 +1,31 @@
 # Wealth OS Changelog
 
+## 2026-07-04 — Round-2 audit residues closed
+
+1. **FINAL in-adapter gate**: `BrokerAdapter.execute()` / `placeBracketOrder()`
+   are now non-overridable wrappers (master switch → liveReady → capability)
+   around protected `doExecute()` / `doPlaceBracketOrder()` — no direct caller
+   can reach broker HTTP, ever. `/api/execute-copy-trades` (the last ungated
+   path) runs `preExecutionGuard` per trade and records skipped results as
+   `pending` with the reason, never faked `open`.
+2. **Cost gate always fires on manual paths**: orders / rebalance / sleeves /
+   copy-trades pass a conservative 50 bps default edge (`DEFAULT_MANUAL_EDGE`,
+   overridable via `expected_return`) so venues whose 2× round-trip cost eats
+   the edge are refused (423 + audit).
+3. **Regime → capital allocation**: `CIODecisionEngine.decide` consumes the
+   allocator's `regime_state` (crisis 0×, risk_off 0.5×, transition 0.75×)
+   when the detector supplied no haircut — regime-conditional weighting now
+   shapes live sizing, not just the display API.
+4. **Provenance at submission**: live executions write their `decision_log`
+   row at SUBMISSION and thread `decision_id` into the order intent (grading
+   backfill remains as the safety net).
+5. **agent_performance_logs is read**: weekly calibration grades per-agent
+   committee scores (≥60 approve / ≤40 reject, neutral abstains) against
+   closed positions as a second evidence source; `loadAgentWeights` is cached
+   (60s TTL) instead of one DB read per decision.
+6. (Residue 6 — the scorecard/promotion surface — was already shipped as the
+   /paper-trading operator console earlier today.)
+
 ## 2026-07-04 — Validation platform upgrade (hardening gaps + operator/wealth dashboards)
 
 **Safety:** legacy `lib/broker-router.ts` retired to a delegation shim — its

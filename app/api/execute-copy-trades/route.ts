@@ -14,6 +14,7 @@ import {
   type Jurisdiction,
 } from '@/lib/brokers/asset-broker-routing'
 import { getBroker, type BrokerCache } from '@/lib/brokers/BrokerFactory'
+import { preExecutionGuard, DEFAULT_MANUAL_EDGE } from '@/lib/broker-adapters/execution-guard'
 
 /** Map asset class → default strategy key used for simulation dispatch. */
 function inferStrategyKey(assetClass: string): StrategyKey {
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
 
   let executed = 0
   const errors: string[] = []
+  const skippedOrders: string[] = []
 
   for (const follow of autoCopyUsers) {
     const traderId = follow.trader_id
@@ -281,6 +283,24 @@ export async function POST(req: NextRequest) {
         errors.push(`${trade.symbol}: no_legal_broker — ${selectedBroker.detail}`)
         continue
       }
+
+      // Pre-execution guard: kill switch + sleeve halts + cost gate. Copy
+      // trades were the last ungated path — never again. (The adapter itself
+      // also enforces the master switch / liveReady gate internally.)
+      const guard = await preExecutionGuard({
+        supabase,
+        userId,
+        expectedReturn: DEFAULT_MANUAL_EDGE,
+        assetClass: normaliseAssetClass(trade.asset_class),
+      })
+      if (!guard.ok) {
+        errors.push(`${trade.symbol}: blocked — ${guard.reason}`)
+        await supabase.from('user_copied_positions')
+          .update({ status: 'failed', error_message: `blocked: ${guard.reason}` })
+          .eq('id', pos.id)
+        continue
+      }
+
       const adapter = await getBroker(selectedBroker.broker, userId, supabase, _brokerCache!)
       const result = await adapter.execute({
         symbol: trade.symbol,
@@ -288,10 +308,13 @@ export async function POST(req: NextRequest) {
         side: trade.action === 'buy' || trade.action === 'cover' ? 'buy' : 'sell',
         order_type: 'market',
         notional_usd: approvedNotional,
+        jurisdiction,
       })
 
+      // A skipped result means NO broker order exists — the position stays
+      // 'pending' with the reason, never faked as 'open'.
       const finalStatus = result.status === 'open' || result.status === 'submitted' ? 'open'
-        : result.status === 'skipped' ? 'open'
+        : result.status === 'skipped' ? 'pending'
         : 'failed'
 
       // Update position (include broker_used + override reason)
@@ -321,7 +344,8 @@ export async function POST(req: NextRequest) {
           .eq('id', orderRow.id)
       }
 
-      executed++
+      if (finalStatus === 'open') executed++
+      else if (result.status === 'skipped') skippedOrders.push(`${trade.symbol}: no order placed — ${result.reason ?? 'skipped'}`)
 
       // ── Dispatch auto-simulate (fire-and-forget, never blocks order flow) ──
       const rawStrategyKey = (trade as Record<string, unknown>).strategy_key as string | undefined
@@ -342,5 +366,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true, executed, errors: errors.length ? errors : undefined })
+  return NextResponse.json({
+    success: true,
+    executed,
+    skipped_orders: skippedOrders.length ? skippedOrders : undefined,
+    errors: errors.length ? errors : undefined,
+  })
 }

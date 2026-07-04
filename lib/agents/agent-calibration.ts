@@ -72,12 +72,24 @@ export function calibrateWeights(
   return out
 }
 
+// In-process cache — the engine reads weights on EVERY decision; one DB
+// round-trip per minute is plenty (weights change weekly).
+let _weightsCache: { weights: Record<string, number>; at: number } | null = null
+const WEIGHTS_CACHE_MS = 60_000
+
+/** Test hook. */
+export function _clearAgentWeightsCacheForTest(): void { _weightsCache = null }
+
 /**
- * Read the calibrated weights; fall back to the hardcoded map on any failure
- * or empty table. Unknown agents always get their hardcoded weight.
+ * Read the calibrated weights (cached 60s); fall back to the hardcoded map
+ * on any failure or empty table. Unknown agents always get their hardcoded
+ * weight.
  */
 export async function loadAgentWeights(supabase?: SupabaseClient): Promise<Record<string, number>> {
   if (!supabase) return { ...HARDCODED_AGENT_WEIGHTS }
+  if (_weightsCache && Date.now() - _weightsCache.at < WEIGHTS_CACHE_MS) {
+    return { ..._weightsCache.weights }
+  }
   try {
     const { data, error } = await supabase
       .from('agent_weights')
@@ -89,7 +101,8 @@ export async function loadAgentWeights(supabase?: SupabaseClient): Promise<Recor
         out[row.agent_name] = row.weight
       }
     }
-    return out
+    _weightsCache = { weights: out, at: Date.now() }
+    return { ...out }
   } catch {
     return { ...HARDCODED_AGENT_WEIGHTS }
   }
@@ -132,7 +145,7 @@ export async function runAgentCalibration(supabase: SupabaseClient): Promise<{
   const current = await loadAgentWeights(supabase)
 
   const since = new Date(Date.now() - 90 * 86_400_000).toISOString()
-  const [{ data: votes }, { data: positions }] = await Promise.all([
+  const [{ data: votes }, { data: positions }, perfLogs] = await Promise.all([
     supabase
       .from('audit_logs')
       .select('agent_name, trade_context, output, created_at')
@@ -145,6 +158,16 @@ export async function runAgentCalibration(supabase: SupabaseClient): Promise<{
       .eq('status', 'closed')
       .gte('opened_at', since)
       .limit(5000),
+    // agent_performance_logs is written by the CIO engine per committee run
+    // (per-agent scores + the trade). It used to be write-only — it is now a
+    // second graded-vote source. Best-effort: table absence never breaks
+    // calibration.
+    supabase
+      .from('agent_performance_logs')
+      .select('scenario, decision, created_at')
+      .gte('created_at', since)
+      .limit(5000)
+      .then(r => r.data ?? [], () => []),
   ])
 
   const posBySymbol = new Map<string, Array<{ openedAt: number; pnl: number }>>()
@@ -155,7 +178,18 @@ export async function runAgentCalibration(supabase: SupabaseClient): Promise<{
     posBySymbol.set(p.symbol, list)
   }
 
+  const matchPosition = (symbol: string, votedAt: number) =>
+    (posBySymbol.get(symbol) ?? []).find(
+      p => p.openedAt >= votedAt && p.openedAt <= votedAt + 48 * 3_600_000
+    )
+
   const tally: Record<string, { hits: number; n: number }> = {}
+  const grade = (agent: string, approving: boolean, won: boolean) => {
+    const bucket = (tally[agent] ??= { hits: 0, n: 0 })
+    bucket.n += 1
+    if (approving === won) bucket.hits += 1
+  }
+
   for (const v of (votes ?? []) as Array<{
     agent_name: string
     trade_context: { symbol?: string } | null
@@ -166,17 +200,27 @@ export async function runAgentCalibration(supabase: SupabaseClient): Promise<{
     if (!rec || rec === 'defer') continue   // abstentions are never graded
     const symbol = v.trade_context?.symbol
     if (!symbol) continue
-    const votedAt = new Date(v.created_at).getTime()
-    const match = (posBySymbol.get(symbol) ?? []).find(
-      p => p.openedAt >= votedAt && p.openedAt <= votedAt + 48 * 3_600_000
-    )
+    const match = matchPosition(symbol, new Date(v.created_at).getTime())
     if (!match) continue
+    grade(v.agent_name, rec === 'approve' || rec === 'reduce', match.pnl > 0)
+  }
 
-    const won = match.pnl > 0
-    const correct = (rec === 'approve' || rec === 'reduce') ? won : !won
-    const bucket = (tally[v.agent_name] ??= { hits: 0, n: 0 })
-    bucket.n += 1
-    if (correct) bucket.hits += 1
+  // Second source: committee-run logs — per-agent scores graded against the
+  // same closed positions. Score ≥60 counts as an approving vote, ≤40 as a
+  // rejecting vote; the neutral band abstains.
+  for (const row of perfLogs as Array<{
+    scenario: { trade?: { symbol?: string }; agentScores?: Record<string, number> } | null
+    created_at: string | null
+  }>) {
+    const symbol = row.scenario?.trade?.symbol
+    const scores = row.scenario?.agentScores
+    if (!symbol || !scores || !row.created_at) continue
+    const match = matchPosition(symbol, new Date(row.created_at).getTime())
+    if (!match) continue
+    for (const [agent, score] of Object.entries(scores)) {
+      if (!Number.isFinite(score) || (score > 40 && score < 60)) continue
+      grade(agent, score >= 60, match.pnl > 0)
+    }
   }
 
   const graded: Record<string, AgentAccuracy> = {}

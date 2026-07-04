@@ -58,11 +58,21 @@ export interface RegimeOutcome {
 
 export const MIN_REGIME_OUTCOMES = 15
 
-const REGIME_HAIRCUT: Record<AllocatorRegime, number> = {
+export const REGIME_HAIRCUT: Record<AllocatorRegime, number> = {
   risk_on: 1.0,
   transition: 0.75,
   risk_off: 0.5,
   crisis: 0.0,   // the pipeline's CRISIS gate closes everything but hedges
+}
+
+/**
+ * Regime capital multiplier for the LIVE sizing path (W-audit residue 3):
+ * unknown/unclassified regimes fail OPEN to 1.0 — the haircut only applies
+ * to a regime we actually measured.
+ */
+export function regimeCapitalMultiplier(regime: string | null | undefined): number {
+  if (regime == null) return 1.0
+  return REGIME_HAIRCUT[regime as AllocatorRegime] ?? 1.0
 }
 
 /**

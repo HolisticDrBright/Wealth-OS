@@ -132,6 +132,31 @@ describe('POST /api/orders — cannot reach broker adapters', () => {
     expect(body.meta.broker_order_placed).toBe(false)
   })
 
+  it('cost gate always fires (audit residue 2): high-cost venue refuses the default manual edge', async () => {
+    const executeSpy = vi.spyOn(AlpacaAdapter.prototype, 'execute')
+
+    // Polymarket round trip (~300bps) dwarfs the 50bps default manual edge.
+    const res = await postOrder(orderRequest({
+      symbol: 'POLY:0xabc', asset_class: 'polymarket', side: 'buy', notional_usd: 100,
+    }))
+    const body = await res.json()
+
+    expect(res.status).toBe(423)
+    expect(body.error).toContain('edge_below_cost_floor')
+    expect(executeSpy).not.toHaveBeenCalled()
+  })
+
+  it('an explicit expected_return can clear the cost gate (still paper-skipped downstream)', async () => {
+    const res = await postOrder(orderRequest({
+      symbol: 'POLY:0xabc', asset_class: 'polymarket', side: 'buy', notional_usd: 100,
+      expected_return: 0.10,   // 1000 bps — clears 2× round trip
+    }))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.data.status).toBe('skipped')   // master switch still off
+  })
+
   it('kill switch active: 423 with an audit row, adapter never called', async () => {
     dbState.tables.system_flags = [{ user_id: null, enabled: true, reason: 'ops halt' }]
     const executeSpy = vi.spyOn(AlpacaAdapter.prototype, 'execute')

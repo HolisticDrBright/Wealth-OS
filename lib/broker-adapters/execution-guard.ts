@@ -34,6 +34,25 @@ export function liveTradingEnabled(): boolean {
 export const PAPER_PHASE_REASON =
   'live trading disabled — paper validation phase (set LIVE_TRADING_ENABLED=true only after the runbook criteria pass)'
 
+/**
+ * Conservative default edge (50 bps) for MANUAL and copy orders, so the
+ * 2×-round-trip cost gate ALWAYS runs instead of being skipped when the
+ * caller has no edge model. Venues whose modeled round trip exceeds 25 bps
+ * (e.g. polymarket at ~150 bps half-spread) refuse manual market orders
+ * unless the caller supplies a larger explicit expected_return.
+ */
+export const DEFAULT_MANUAL_EDGE = 0.005
+
+/** Map order asset_class values to the cost-model venue keys. */
+export function costVenueOf(assetClass: string): string {
+  switch (assetClass) {
+    case 'stock': case 'etf': case 'equity': case 'options': return 'stocks'
+    case 'fx': return 'forex'
+    case 'prediction_market': return 'polymarket'
+    default: return assetClass
+  }
+}
+
 // ─── 2. Guard tokens ──────────────────────────────────────────────────────────
 
 export interface GuardToken {

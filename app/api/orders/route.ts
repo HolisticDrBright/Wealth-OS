@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, getBearerToken } from '@/lib/api'
 import { submitOrder } from '@/lib/broker-adapters/router'
-import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
+import { preExecutionGuard, DEFAULT_MANUAL_EDGE, costVenueOf } from '@/lib/broker-adapters/execution-guard'
 import type { Order } from '@/lib/types'
 
 async function getUserId(req: NextRequest): Promise<string | null> {
@@ -85,8 +85,16 @@ export async function POST(req: NextRequest) {
 
   if (insertErr || !order) return apiError(insertErr?.message ?? 'Insert failed', 500)
 
-  // Pre-execution guard: kill switch + sleeve halts. Blocked → 423 + audit.
-  const guard = await preExecutionGuard({ supabase, userId })
+  // Pre-execution guard: kill switch + sleeve halts + cost gate. Manual
+  // orders carry a conservative default edge (50 bps, overridable via
+  // expected_return) so the 2×-round-trip check always fires — venues whose
+  // modeled costs eat the edge are refused. Blocked → 423 + audit.
+  const guard = await preExecutionGuard({
+    supabase,
+    userId,
+    expectedReturn: typeof body.expected_return === 'number' ? body.expected_return : DEFAULT_MANUAL_EDGE,
+    assetClass: costVenueOf(asset_class),
+  })
   if (!guard.ok) {
     await supabase.from('audit_logs').insert({
       user_id: userId, strategy_key: 'manual_order', symbol,

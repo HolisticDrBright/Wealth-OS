@@ -498,6 +498,29 @@ export abstract class BasePipelineStrategy {
     const broker = selection.broker
     const adapter = await getBroker(broker, userId, supabase, cache)
 
+    // W6/audit residue 4: LIVE submissions write their decision_log row at
+    // SUBMISSION time and thread the id into the order intent — provenance
+    // is relational from the first write, not backfilled at grading. Only
+    // reached in live mode (checkLiveGate already passed). Best-effort:
+    // a failed decision insert never blocks the order.
+    let decisionId: string | null = null
+    try {
+      const { data: dec } = await supabase
+        .from('decision_log')
+        .insert({
+          user_id: userId,
+          strategy: this.key,
+          symbol: opp.symbol,
+          confidence: Math.min(1, Math.max(0, opp.strength)),
+          predicted_direction: opp.direction === 'long' ? 1 : 0,
+          asset_class: opp.assetClass,
+          outcome_graded: false,
+        })
+        .select('id')
+        .single()
+      decisionId = (dec?.id as string | undefined) ?? null
+    } catch { /* provenance is best-effort at submission; grading backfills */ }
+
     // Place bracket order if the opportunity specifies one
     if (opp.bracket) {
       const entryPrice = (opp.metadata.entryPrice as number | undefined) ?? 0
@@ -518,7 +541,7 @@ export abstract class BasePipelineStrategy {
         jurisdiction,
       }
       const result = await placeBracketIdempotent(adapter, bracketParams, {
-        supabase, userId, opportunityId: opp.id,
+        supabase, userId, opportunityId: opp.id, decisionId,
       })
       return {
         status: result.status === 'submitted' ? 'submitted' : result.status === 'skipped' ? 'skipped' : 'failed',
@@ -533,7 +556,7 @@ export abstract class BasePipelineStrategy {
       asset_class: opp.assetClass,
       side: opp.direction === 'short' ? 'sell' : 'buy',
       notional_usd: size.notionalUsd,
-    }, { supabase, userId, opportunityId: opp.id })
+    }, { supabase, userId, opportunityId: opp.id, decisionId })
 
     const status: ExecutionResult['status'] =
       result.status === 'open' || result.status === 'submitted' ? 'submitted'

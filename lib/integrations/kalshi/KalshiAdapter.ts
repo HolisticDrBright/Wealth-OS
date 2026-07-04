@@ -27,7 +27,7 @@ export class KalshiAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.KALSHI_API_KEY
     const secret = process.env.KALSHI_API_SECRET
     if (!key || !secret) {

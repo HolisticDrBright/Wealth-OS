@@ -96,6 +96,50 @@ describe('order_intents.decision_id populated at write', () => {
   })
 })
 
+describe('live path writes decision_log AT SUBMISSION (audit residue 4)', () => {
+  it('BasePipelineStrategy.execute inserts the decision and threads its id into the intent', async () => {
+    vi.stubEnv('LIVE_TRADING_ENABLED', 'true')
+    try {
+      // decision_log single() returns the inserted row's id.
+      dbState.tables.decision_log = [{ id: 'dec-live-1' }]
+
+      const { FxTrendfollowingStrategy } = await import('@/lib/strategies/impl/forex/stubs')
+      const strat = new FxTrendfollowingStrategy()
+      const bypass = strat as unknown as {
+        checkKillSwitch: () => Promise<null>
+        checkLiveGate: () => Promise<null>
+      }
+      bypass.checkKillSwitch = async () => null
+      bypass.checkLiveGate = async () => null
+
+      const opp = {
+        id: 'opp-live-1', strategyKey: 'fx_trendfollowing', symbol: 'EUR/USD',
+        assetClass: 'forex', direction: 'long', expectedReturn: 0.02, strength: 0.8,
+        metadata: {}, detectedAt: new Date().toISOString(),
+      } as never
+      const size = { fraction: 0.05, notionalUsd: 500, rationale: 'test' }
+
+      // The adapter's FINAL gate stops at liveReady:false — but the intent
+      // row is written BEFORE submission, carrying the decision id.
+      const result = await strat.execute(opp, size, 'u1', mockClient as never)
+
+      const decisionInsert = dbState.writes.find(w => w.table === 'decision_log' && w.op === 'insert')
+      expect(decisionInsert).toBeDefined()
+      expect((decisionInsert!.row as { strategy?: string }).strategy).toBe('fx_trendfollowing')
+
+      const intentWrites = dbState.writes.filter(w => w.table === 'order_intents' && w.op === 'upsert')
+      expect(intentWrites.length).toBeGreaterThan(0)
+      for (const w of intentWrites) {
+        expect((w.row as { decision_id?: string }).decision_id).toBe('dec-live-1')
+      }
+      // And no fake success: the adapter refused (not liveReady).
+      expect(result.status).toBe('skipped')
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+})
+
 describe('grading pass links outcome → intent and backfills intent → decision', () => {
   it('outcome_log rows carry order_intent_id; the intent gets decision_id', async () => {
     const today = new Date().toISOString()

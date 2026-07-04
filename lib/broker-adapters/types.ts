@@ -1,3 +1,5 @@
+import { liveTradingEnabled, PAPER_PHASE_REASON } from './execution-guard'
+
 export interface OrderParams {
   symbol: string
   asset_class: string
@@ -150,16 +152,68 @@ export abstract class BrokerAdapter {
     return null
   }
 
-  abstract execute(params: OrderParams): Promise<BrokerResult>
+  /**
+   * THE order-creating entry point — a FINAL gate no caller can bypass.
+   * Master switch → liveReady → capability check, then the adapter's real
+   * implementation (doExecute). Even code that gets hold of an adapter
+   * instance directly (BrokerFactory, one-off routes) cannot reach broker
+   * HTTP while live trading is disabled or the adapter is unverified.
+   * Subclasses implement doExecute(), never override execute().
+   */
+  async execute(params: OrderParams): Promise<BrokerResult> {
+    const gate = this.preLiveGate(params)
+    if (gate) return gate
+    return this.doExecute(params)
+  }
+
+  /** The adapter's real submission logic — only reachable through execute(). */
+  protected abstract doExecute(params: OrderParams): Promise<BrokerResult>
+
+  /** Shared live-safety gate for every order-creating call. */
+  protected preLiveGate(params?: OrderParams): BrokerResult | null {
+    if (!liveTradingEnabled()) {
+      return { status: 'skipped', broker: this.config.id, reason: PAPER_PHASE_REASON }
+    }
+    if (!this.config.capabilities.liveReady) {
+      return {
+        status: 'skipped',
+        broker: this.config.id,
+        reason: `broker_not_live_ready: ${this.config.id} has not been verified against the broker sandbox — live routing refused`,
+      }
+    }
+    if (params) {
+      const unsupported = this.checkOrderSupport(params)
+      if (unsupported) {
+        return { status: 'skipped', broker: this.config.id, reason: `capability_blocked: ${unsupported}` }
+      }
+    }
+    return null
+  }
 
   /**
    * Place a bracket (entry + stop + take-profit) as a single atomic operation
-   * where the broker supports it. Falls back to separate orders otherwise.
-   * Default: returns skipped — override in adapters that support brackets.
+   * where the broker supports it. Same FINAL gate as execute(); subclasses
+   * implement doPlaceBracketOrder(), never override this.
    */
   async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+    const gate = this.preLiveGate()
+    if (gate) return { status: 'skipped', broker: this.config.id, reason: gate.reason }
+    if (params.quantity == null && params.notional_usd == null) {
+      return { status: 'skipped', broker: this.config.id, reason: 'capability_blocked: order must specify quantity or notional_usd' }
+    }
+    if (!this.config.capabilities.supportsBracket) {
+      return { status: 'skipped', broker: this.config.id, reason: `capability_blocked: ${this.config.id} does not support bracket orders` }
+    }
+    return this.doPlaceBracketOrder(params)
+  }
+
+  /**
+   * Bracket implementation — only reachable through placeBracketOrder().
+   * Default: entry + stop as separate orders; no atomic OCO guarantee.
+   */
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     // Fallback: place entry + stop as separate orders; no atomic OCO guarantee.
-    const entry = await this.execute({
+    const entry = await this.doExecute({
       symbol: params.symbol,
       asset_class: params.asset_class,
       side: params.side,
@@ -174,7 +228,7 @@ export abstract class BrokerAdapter {
     }
     let stopOrderId: string | undefined
     if (params.stop_price || params.stop_pct) {
-      const stop = await this.execute({
+      const stop = await this.doExecute({
         symbol: params.symbol,
         asset_class: params.asset_class,
         side: params.side === 'buy' ? 'sell' : 'buy',

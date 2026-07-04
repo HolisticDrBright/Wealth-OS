@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, getBearerToken } from '@/lib/api'
 import { computeRebalanceTrades, DEFAULT_TARGETS } from '@/lib/rebalance-engine'
 import { submitOrder } from '@/lib/broker-adapters/router'
-import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
+import { preExecutionGuard, DEFAULT_MANUAL_EDGE, costVenueOf } from '@/lib/broker-adapters/execution-guard'
 import { checkWashSaleBlocklist } from '@/lib/tax/wash-sale-guard'
 import { estimateRebalanceTaxDrag } from '@/lib/tax/tax-aware-rebalance'
 import type { Asset, PortfolioTarget } from '@/lib/types'
@@ -106,8 +106,14 @@ export async function POST(req: NextRequest) {
         errors.push(`${trade.asset_class}: skipped — ${meta.blocked_reason}`)
         continue
       }
-      // Pre-execution guard per order: kill switch + sleeve halts.
-      const guard = await preExecutionGuard({ supabase, userId })
+      // Pre-execution guard per order: kill switch + sleeve halts + cost
+      // gate (conservative default edge — high-cost venues are refused).
+      const guard = await preExecutionGuard({
+        supabase,
+        userId,
+        expectedReturn: DEFAULT_MANUAL_EDGE,
+        assetClass: costVenueOf(trade.asset_class),
+      })
       if (!guard.ok) {
         errors.push(`${trade.asset_class}: blocked — ${guard.reason}`)
         await supabase.from('audit_logs').insert({

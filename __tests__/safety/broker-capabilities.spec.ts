@@ -37,12 +37,24 @@ function fetchTrap() {
   return spy
 }
 
+
+// execute()/placeBracketOrder() are now FINAL gates that short-circuit in the
+// paper phase before adapter code runs. The per-adapter sizing guards below
+// are LIVE-mode defense-in-depth, so these tests call the protected
+// implementations directly; the public gate is covered further down.
+function doExecute(adapter: object, params: Record<string, unknown>) {
+  return (adapter as unknown as { doExecute(p: unknown): Promise<{ status: string; reason?: string }> }).doExecute(params)
+}
+function doBracket(adapter: object, params: Record<string, unknown>) {
+  return (adapter as unknown as { doPlaceBracketOrder(p: unknown): Promise<{ status: string; reason?: string }> }).doPlaceBracketOrder(params)
+}
+
 describe('blocked unsafe sizing paths (one test per path)', () => {
   it('OANDA execute refuses notional-only sizing (units are base-currency, not USD)', async () => {
     vi.stubEnv('OANDA_API_KEY', 'k')
     vi.stubEnv('OANDA_ACCOUNT_ID', 'a')
     const spy = fetchTrap()
-    const r = await new OandaAdapter().execute({ symbol: 'EUR/USD', asset_class: 'forex', side: 'buy', notional_usd: 500 })
+    const r = await doExecute(new OandaAdapter(), { symbol: 'EUR/USD', asset_class: 'forex', side: 'buy', notional_usd: 500 })
     expect(r.status).toBe('skipped')
     expect(r.reason).toContain('base-currency units')
     expect(spy).not.toHaveBeenCalled()
@@ -52,7 +64,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('OANDA_API_KEY', 'k')
     vi.stubEnv('OANDA_ACCOUNT_ID', 'a')
     const spy = fetchTrap()
-    const r = await new OandaAdapter().placeBracketOrder({
+    const r = await doBracket(new OandaAdapter(), {
       symbol: 'EUR/USD', asset_class: 'forex', side: 'buy', notional_usd: 500, stop_price: 1.05,
     })
     expect(r.status).toBe('skipped')
@@ -63,7 +75,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('IBKR_ACCOUNT_ID', 'a')
     vi.stubEnv('IBKR_API_URL', 'http://localhost:5000')
     const spy = fetchTrap()
-    const r = await new IBKRAdapter().execute({ symbol: 'AAPL', asset_class: 'stock', side: 'buy', notional_usd: 500 })
+    const r = await doExecute(new IBKRAdapter(), { symbol: 'AAPL', asset_class: 'stock', side: 'buy', notional_usd: 500 })
     expect(r.status).toBe('skipped')
     expect(r.reason).toContain('explicit quantity')
     expect(spy).not.toHaveBeenCalled()
@@ -73,7 +85,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('IBKR_ACCOUNT_ID', 'a')
     vi.stubEnv('IBKR_API_URL', 'http://localhost:5000')
     const spy = fetchTrap()
-    const r = await new IBKRAdapter().placeBracketOrder({
+    const r = await doBracket(new IBKRAdapter(), {
       symbol: 'AAPL', asset_class: 'stock', side: 'buy', notional_usd: 500, stop_price: 90,
     })
     expect(r.status).toBe('skipped')
@@ -84,7 +96,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('KRAKEN_API_KEY', 'k')
     vi.stubEnv('KRAKEN_API_SECRET', Buffer.from('secret').toString('base64'))
     const spy = fetchTrap()
-    const r = await new KrakenAdapter().execute({ symbol: 'BTC', asset_class: 'crypto', side: 'buy', notional_usd: 500 })
+    const r = await doExecute(new KrakenAdapter(), { symbol: 'BTC', asset_class: 'crypto', side: 'buy', notional_usd: 500 })
     expect(r.status).toBe('skipped')
     expect(r.reason).toContain('base-currency units')
     expect(spy).not.toHaveBeenCalled()
@@ -94,7 +106,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('COINBASE_API_KEY', 'k')
     vi.stubEnv('COINBASE_API_SECRET', 's')
     const spy = fetchTrap()
-    const r = await new CoinbaseAdapter().placeBracketOrder({
+    const r = await doBracket(new CoinbaseAdapter(), {
       symbol: 'BTC', asset_class: 'crypto', side: 'buy', notional_usd: 500, stop_price: 90_000,
     })
     expect(r.status).toBe('skipped')
@@ -106,7 +118,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('COINBASE_API_KEY', 'k')
     vi.stubEnv('COINBASE_API_SECRET', 's')
     const spy = fetchTrap()
-    const r = await new CoinbaseAdapter().execute({ symbol: 'BTC', asset_class: 'crypto', side: 'buy' })
+    const r = await doExecute(new CoinbaseAdapter(), { symbol: 'BTC', asset_class: 'crypto', side: 'buy' })
     expect(r.status).toBe('skipped')
     expect(spy).not.toHaveBeenCalled()
   })
@@ -115,7 +127,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('TASTYTRADE_SESSION_TOKEN', 't')
     vi.stubEnv('TASTYTRADE_ACCOUNT_NUMBER', 'a')
     const spy = fetchTrap()
-    const r = await new TastytradeAdapter().execute({ symbol: 'SPY', asset_class: 'stock', side: 'buy', notional_usd: 500 })
+    const r = await doExecute(new TastytradeAdapter(), { symbol: 'SPY', asset_class: 'stock', side: 'buy', notional_usd: 500 })
     expect(r.status).toBe('skipped')
     expect(r.reason).toContain('default to 1 contract')
     expect(spy).not.toHaveBeenCalled()
@@ -125,7 +137,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('DERIBIT_CLIENT_ID', 'c')
     vi.stubEnv('DERIBIT_CLIENT_SECRET', 's')
     const spy = fetchTrap()
-    const r = await new DeribitAdapter().execute({ symbol: 'BTC-PERPETUAL', asset_class: 'crypto_futures', side: 'buy', notional_usd: 500 })
+    const r = await doExecute(new DeribitAdapter(), { symbol: 'BTC-PERPETUAL', asset_class: 'crypto_futures', side: 'buy', notional_usd: 500 })
     expect(r.status).toBe('skipped')
     expect(spy).not.toHaveBeenCalled()
   })
@@ -134,7 +146,7 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('WEBULL_ACCESS_TOKEN', 't')
     vi.stubEnv('WEBULL_ACCOUNT_ID', 'a')
     const spy = fetchTrap()
-    const r = await new WebullAdapter().execute({ symbol: 'AAPL', asset_class: 'stock', side: 'buy', notional_usd: 500 })
+    const r = await doExecute(new WebullAdapter(), { symbol: 'AAPL', asset_class: 'stock', side: 'buy', notional_usd: 500 })
     expect(r.status).toBe('skipped')
     expect(spy).not.toHaveBeenCalled()
   })
@@ -143,9 +155,71 @@ describe('blocked unsafe sizing paths (one test per path)', () => {
     vi.stubEnv('KALSHI_API_KEY', 'k')
     vi.stubEnv('KALSHI_API_SECRET', 's')
     const spy = fetchTrap()
-    const r = await new KalshiAdapter().execute({ symbol: 'KALSHI:KXHIGH-25APR28-T70', asset_class: 'prediction_market', side: 'buy', notional_usd: 100 })
+    const r = await doExecute(new KalshiAdapter(), { symbol: 'KALSHI:KXHIGH-25APR28-T70', asset_class: 'prediction_market', side: 'buy', notional_usd: 100 })
     expect(r.status).toBe('skipped')
     expect(r.reason).toContain('price guess')
+    expect(spy).not.toHaveBeenCalled()
+  })
+})
+
+describe('FINAL in-adapter gate — no direct caller can bypass (audit residue 1)', () => {
+  it('direct adapter.execute() in the paper phase never reaches broker HTTP, even with keys', async () => {
+    vi.stubEnv('ALPACA_API_KEY', 'fake')
+    vi.stubEnv('ALPACA_SECRET_KEY', 'fake')
+    const spy = fetchTrap()
+
+    const r = await new AlpacaAdapter().execute({
+      symbol: 'SPY', asset_class: 'stock', side: 'buy', notional_usd: 100,
+    })
+
+    expect(r.status).toBe('skipped')
+    expect(r.reason).toContain('live trading disabled')
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('with the master switch ON, direct execute() still refuses — not liveReady', async () => {
+    vi.stubEnv('LIVE_TRADING_ENABLED', 'true')
+    vi.stubEnv('ALPACA_API_KEY', 'fake')
+    vi.stubEnv('ALPACA_SECRET_KEY', 'fake')
+    const spy = fetchTrap()
+
+    const r = await new AlpacaAdapter().execute({
+      symbol: 'SPY', asset_class: 'stock', side: 'buy', notional_usd: 100,
+    })
+
+    expect(r.status).toBe('skipped')
+    expect(r.reason).toContain('broker_not_live_ready')
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('direct placeBracketOrder() is gated identically', async () => {
+    vi.stubEnv('ALPACA_API_KEY', 'fake')
+    vi.stubEnv('ALPACA_SECRET_KEY', 'fake')
+    const spy = fetchTrap()
+
+    const r = await new AlpacaAdapter().placeBracketOrder({
+      symbol: 'SPY', asset_class: 'stock', side: 'buy', notional_usd: 100, stop_price: 90,
+    })
+
+    expect(r.status).toBe('skipped')
+    expect(r.reason).toContain('live trading disabled')
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('with switch ON + liveReady, capability violations still block at the gate', async () => {
+    vi.stubEnv('LIVE_TRADING_ENABLED', 'true')
+    const adapter = new OandaAdapter()
+    // Simulate a sandbox-verified adapter WITHOUT touching source constants.
+    vi.spyOn(adapter, 'config', 'get').mockReturnValue({
+      ...new OandaAdapter().config,
+      capabilities: { ...new OandaAdapter().config.capabilities, liveReady: true },
+    })
+    const spy = fetchTrap()
+
+    // OANDA does not accept USD-notional sizing — gate refuses before doExecute.
+    const r = await adapter.execute({ symbol: 'EUR/USD', asset_class: 'forex', side: 'buy', notional_usd: 500 })
+    expect(r.status).toBe('skipped')
+    expect(r.reason).toContain('capability_blocked')
     expect(spy).not.toHaveBeenCalled()
   })
 })

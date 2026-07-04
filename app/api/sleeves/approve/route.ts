@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiSuccess, apiError } from '@/lib/api'
 import { submitOrder } from '@/lib/broker-adapters/router'
-import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
+import { preExecutionGuard, DEFAULT_MANUAL_EDGE, costVenueOf } from '@/lib/broker-adapters/execution-guard'
 import { sendDrawdownAlert } from '@/lib/notifications'
 import { logAudit, extractRequestMeta } from '@/lib/audit-log'
 
@@ -49,8 +49,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (request.symbol && request.action && request.notional_usd) {
-      // Pre-execution guard: kill switch + sleeve halts. Blocked → 423 + audit.
-      const guard = await preExecutionGuard({ supabase, userId: user.id, sleeveId: request.sleeve_id as string | undefined })
+      // Pre-execution guard: kill switch + sleeve halts + cost gate. Blocked → 423 + audit.
+      const guard = await preExecutionGuard({
+        supabase,
+        userId: user.id,
+        sleeveId: request.sleeve_id as string | undefined,
+        expectedReturn: DEFAULT_MANUAL_EDGE,
+        assetClass: costVenueOf(request.sleeve?.approved_asset_classes?.[0] ?? 'stock'),
+      })
       if (!guard.ok) {
         await supabase.from('audit_logs').insert({
           user_id: user.id, strategy_key: 'sleeve_approval', symbol: request.symbol,

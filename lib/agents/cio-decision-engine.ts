@@ -426,8 +426,25 @@ Write a CIO synthesis as JSON:
       adjustedNotional = tailHedgeOverride * portfolio
     }
 
-    // Apply regime haircut from detectWithConfluence metadata
-    const regimeHaircut = (opp.metadata?.regimeHaircut as number | undefined) ?? 1.0
+    // Apply regime haircut from detectWithConfluence metadata; when the
+    // detector didn't compute one, consume the ALLOCATOR's regime state
+    // directly (W-audit residue 3 — regime-conditional weights now shape
+    // live capital allocation, not just the display API). Fail-open to 1.0
+    // when regime_state is empty/unreadable.
+    let regimeHaircut = (opp.metadata?.regimeHaircut as number | undefined) ?? 1.0
+    let allocatorRegime: string | null = null
+    if (opp.metadata?.regimeHaircut == null) {
+      try {
+        const { regimeCapitalMultiplier } = await import('@/lib/regime/allocator')
+        const { data: rs } = await supabase
+          .from('regime_state')
+          .select('regime')
+          .order('as_of', { ascending: false })
+          .limit(1)
+        allocatorRegime = ((rs ?? [])[0]?.regime as string | undefined) ?? null
+        regimeHaircut = regimeCapitalMultiplier(allocatorRegime)
+      } catch { regimeHaircut = 1.0 }
+    }
     adjustedFraction *= regimeHaircut
     adjustedNotional *= regimeHaircut
 
@@ -462,7 +479,9 @@ Write a CIO synthesis as JSON:
       confluenceMultiplier !== 1.0 ? `confluence x${confluenceMultiplier.toFixed(2)}` : null,
       brierMultiplier !== 1.0 ? `brier x${brierMultiplier.toFixed(2)} (score=${brierResult?.brierScore.toFixed(3)})` : null,
       tailHedgeOverride !== null ? `hedge override ${(tailHedgeOverride * 100).toFixed(1)}%` : null,
-      regimeHaircut < 1.0 ? `RISK_OFF haircut ${(regimeHaircut * 100).toFixed(0)}%` : null,
+      regimeHaircut < 1.0
+        ? `regime haircut ${(regimeHaircut * 100).toFixed(0)}%${allocatorRegime ? ` (${allocatorRegime})` : ''}`
+        : null,
       corr.capApplied ? `${corr.capApplied} cap applied` : null,
       profileCapped ? `profile cap ${(profileCapPct * 100).toFixed(0)}%` : null,
     ].filter(Boolean).join(' | ')

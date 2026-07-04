@@ -28,7 +28,7 @@ export class AlpacaAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.ALPACA_API_KEY
     const secret = process.env.ALPACA_SECRET_KEY
     if (!key || !secret) return { status: 'skipped', reason: 'ALPACA_API_KEY not configured' }
@@ -68,7 +68,7 @@ export class AlpacaAdapter extends BrokerAdapter {
    * Alpaca native bracket: single POST with order_class='bracket',
    * stop_loss.stop_price, and take_profit.limit_price attached.
    */
-  async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     const key = process.env.ALPACA_API_KEY
     const secret = process.env.ALPACA_SECRET_KEY
     if (!key || !secret) return { status: 'skipped', broker: 'alpaca', reason: 'ALPACA_API_KEY not configured' }
@@ -208,7 +208,7 @@ export class KrakenAdapter extends BrokerAdapter {
     return map[symbol.toUpperCase()] ?? `${symbol.toUpperCase()}USD`
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.KRAKEN_API_KEY
     const secret = process.env.KRAKEN_API_SECRET
     if (!key || !secret) return { status: 'skipped', reason: 'KRAKEN_API_KEY not configured' }
@@ -248,7 +248,7 @@ export class KrakenAdapter extends BrokerAdapter {
    * Kraken conditional close: entry order with close[ordertype]=stop-loss
    * and close[price]=<stop>. Take-profit uses a separate GTC limit order.
    */
-  async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     const key = process.env.KRAKEN_API_KEY
     const secret = process.env.KRAKEN_API_SECRET
     if (!key || !secret) return { status: 'skipped', broker: 'kraken', reason: 'KRAKEN_API_KEY not configured' }
@@ -333,7 +333,7 @@ export class CoinbaseAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.COINBASE_API_KEY
     const secret = process.env.COINBASE_API_SECRET
     if (!key || !secret) return { status: 'skipped', reason: 'COINBASE_API_KEY not configured' }
@@ -373,7 +373,7 @@ export class CoinbaseAdapter extends BrokerAdapter {
    * Coinbase has no native OCO. We place a market entry then separate stop-loss
    * and take-profit limit orders. The position monitor cancels the survivor on fill.
    */
-  async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     const key = process.env.COINBASE_API_KEY
     const secret = process.env.COINBASE_API_SECRET
     if (!key || !secret) return { status: 'skipped', broker: 'coinbase', reason: 'COINBASE_API_KEY not configured' }
@@ -509,7 +509,7 @@ export class BinanceAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.BINANCE_API_KEY
     const secret = process.env.BINANCE_API_SECRET
     if (!key || !secret) return { status: 'skipped', reason: 'BINANCE_API_KEY not configured' }
@@ -560,7 +560,7 @@ export class OandaAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.OANDA_API_KEY
     const accountId = process.env.OANDA_ACCOUNT_ID
     if (!key || !accountId) return { status: 'skipped', reason: 'OANDA_API_KEY not configured' }
@@ -592,7 +592,7 @@ export class OandaAdapter extends BrokerAdapter {
   /**
    * OANDA native bracket: takeProfitOnFill + stopLossOnFill in MarketOrderRequest.
    */
-  async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     const key = process.env.OANDA_API_KEY
     const accountId = process.env.OANDA_ACCOUNT_ID
     if (!key || !accountId) return { status: 'skipped', broker: 'oanda', reason: 'OANDA_API_KEY not configured' }
@@ -700,7 +700,7 @@ export class IBKRAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const accountId = process.env.IBKR_ACCOUNT_ID
     const baseUrl = process.env.IBKR_API_URL
     if (!accountId || !baseUrl) return { status: 'skipped', reason: 'IBKR_API_URL not configured' }
@@ -734,7 +734,7 @@ export class IBKRAdapter extends BrokerAdapter {
    * IBKR bracket: parent entry + two child orders (stop-loss and take-profit)
    * linked via parentId field in the order array.
    */
-  async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     const accountId = process.env.IBKR_ACCOUNT_ID
     const baseUrl = process.env.IBKR_API_URL
     if (!accountId || !baseUrl) return { status: 'skipped', broker: 'ibkr', reason: 'IBKR_API_URL not configured' }
@@ -826,7 +826,7 @@ export class RobinhoodAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.ROBINHOOD_API_KEY
     if (!key) return { status: 'skipped', reason: 'ROBINHOOD_API_KEY not configured' }
     if (!params.notional_usd && !params.quantity) {
@@ -871,7 +871,7 @@ export class WebullAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const token = process.env.WEBULL_ACCESS_TOKEN
     const accountId = process.env.WEBULL_ACCOUNT_ID
     if (!token || !accountId) return { status: 'skipped', reason: 'WEBULL_ACCESS_TOKEN not configured' }
@@ -920,7 +920,7 @@ export class EToroAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const key = process.env.ETORO_API_KEY
     if (!key) return { status: 'skipped', reason: 'ETORO_API_KEY not configured' }
     // eToro Partner API is invitation-only — no real order is placed, so this
@@ -946,7 +946,7 @@ export class TastytradeAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const token = process.env.TASTYTRADE_SESSION_TOKEN
     const account = process.env.TASTYTRADE_ACCOUNT_NUMBER
     if (!token || !account) return { status: 'skipped', reason: 'TASTYTRADE_SESSION_TOKEN not configured' }
@@ -977,7 +977,7 @@ export class TastytradeAdapter extends BrokerAdapter {
     }
   }
 
-  async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     const token = process.env.TASTYTRADE_SESSION_TOKEN
     const account = process.env.TASTYTRADE_ACCOUNT_NUMBER
     if (!token || !account) return { status: 'skipped', broker: 'tastytrade', reason: 'TASTYTRADE_SESSION_TOKEN not configured' }
@@ -1040,7 +1040,7 @@ export class PolymarketAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(_params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(_params: OrderParams): Promise<BrokerResult> {
     if (!process.env.POLYMARKET_PRIVATE_KEY) return { status: 'skipped', reason: 'POLYMARKET_PRIVATE_KEY not configured' }
     return { status: 'skipped', reason: 'Polymarket CLOB: full CLOB client implementation pending' }
   }
@@ -1049,7 +1049,7 @@ export class PolymarketAdapter extends BrokerAdapter {
    * Polymarket: no native stop-loss. Pre-arm a take-profit limit order at target1.
    * The position monitor handles -30% drawdown exit by cancelling and placing a market sell.
    */
-  async placeBracketOrder(params: BracketParams): Promise<BracketResult> {
+  protected async doPlaceBracketOrder(params: BracketParams): Promise<BracketResult> {
     if (!process.env.POLYMARKET_PRIVATE_KEY) return { status: 'skipped', broker: 'polymarket', reason: 'POLYMARKET_PRIVATE_KEY not configured' }
     if (!params.take_profit_price) return { status: 'skipped', broker: 'polymarket', reason: 'no take-profit target provided' }
     // CLOB integration placeholder — no real order reaches Polymarket, so this
@@ -1074,7 +1074,7 @@ export class DeribitAdapter extends BrokerAdapter {
     },
   }
 
-  async execute(params: OrderParams): Promise<BrokerResult> {
+  protected async doExecute(params: OrderParams): Promise<BrokerResult> {
     const clientId = process.env.DERIBIT_CLIENT_ID
     const clientSecret = process.env.DERIBIT_CLIENT_SECRET
     if (!clientId || !clientSecret) return { status: 'skipped', reason: 'DERIBIT_CLIENT_ID not configured' }
