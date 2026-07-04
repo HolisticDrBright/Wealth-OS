@@ -69,6 +69,15 @@ export const NEXT_DOLLAR_DISCLAIMER =
   'Verify current rates and limits, and review with a CPA or fiduciary advisor before acting. ' +
   'Nothing here moves money.'
 
+/**
+ * Emergency-debt exception (explicitly designed + tested, per the upgrade
+ * brief): the employer match normally ranks before debt, because a 50–100%
+ * match beats any APR the first year. But debt at ≥25% APR (penalty-rate
+ * credit cards) compounds faster than typical match value accrues when
+ * vesting or payroll timing delays capture — so it jumps ahead of the match.
+ */
+export const EMERGENCY_DEBT_APR_PCT = 25
+
 export function rankNextDollar(i: NextDollarInputs): NextDollarPlan {
   const steps: NextDollarStep[] = []
   let rank = 0
@@ -102,32 +111,49 @@ export function rankNextDollar(i: NextDollarInputs): NextDollarPlan {
       'At or above target.', ['liquid cash balance', 'target'], [], { cpa: false })
   }
 
-  // 2 — employer match
-  if (i.employerMatchAvailable == null) {
-    push('employer_match', 'Employer 401(k) match', 'needs_data',
-      'Unknown whether an unclaimed match exists — it is a guaranteed 50–100% return when it does.',
-      [], ['employer match availability'])
-  } else if (i.employerMatchAvailable) {
-    push('employer_match', 'Employer 401(k) match', 'recommended',
-      'Contribute at least enough to capture the full match — no investment beats a guaranteed match.',
-      ['employer match availability'], [], { cpa: false })
-  } else {
-    push('employer_match', 'Employer 401(k) match', 'not_applicable',
-      'No unclaimed employer match.', ['employer match availability'], [], { cpa: false })
+  // 2 & 3 — employer match and high-interest debt. The match normally ranks
+  // first; the EMERGENCY_DEBT_APR_PCT exception (≥25% APR) flips the order.
+  const pushMatch = () => {
+    if (i.employerMatchAvailable == null) {
+      push('employer_match', 'Employer 401(k) match', 'needs_data',
+        'Unknown whether an unclaimed match exists — it is a guaranteed 50–100% return when it does.',
+        [], ['employer match availability'])
+    } else if (i.employerMatchAvailable) {
+      push('employer_match', 'Employer 401(k) match', 'recommended',
+        'Contribute at least enough to capture the full match — no investment beats a guaranteed match.',
+        ['employer match availability'], [], { cpa: false })
+    } else {
+      push('employer_match', 'Employer 401(k) match', 'not_applicable',
+        'No unclaimed employer match.', ['employer match availability'], [], { cpa: false })
+    }
   }
 
-  // 3 — high-interest debt
-  if (i.highInterestDebtAprPct == null) {
-    push('high_interest_debt', 'High-interest debt payoff', 'needs_data',
-      `No debt data collected. Debt above ~${(i.debtPayoffHurdleAprPct * 100).toFixed(0)}% APR beats expected market returns when paid down.`,
-      [], ['debt balances and APRs'])
-  } else if (i.highInterestDebtAprPct > i.debtPayoffHurdleAprPct * 100 && (i.highInterestDebtBalanceUsd ?? 0) > 0) {
-    push('high_interest_debt', 'High-interest debt payoff', 'recommended',
-      `${i.highInterestDebtAprPct.toFixed(1)}% APR exceeds the ${(i.debtPayoffHurdleAprPct * 100).toFixed(0)}% hurdle — paying it down is a risk-free return of the APR.`,
-      ['debt APR', 'debt balance'], [], { cpa: false })
+  const pushDebt = (emergency: boolean) => {
+    if (i.highInterestDebtAprPct == null) {
+      push('high_interest_debt', 'High-interest debt payoff', 'needs_data',
+        `No debt data collected. Debt above ~${(i.debtPayoffHurdleAprPct * 100).toFixed(0)}% APR beats expected market returns when paid down.`,
+        [], ['debt balances and APRs'])
+    } else if (i.highInterestDebtAprPct > i.debtPayoffHurdleAprPct * 100 && (i.highInterestDebtBalanceUsd ?? 0) > 0) {
+      push('high_interest_debt', 'High-interest debt payoff', 'recommended',
+        `${i.highInterestDebtAprPct.toFixed(1)}% APR exceeds the ${(i.debtPayoffHurdleAprPct * 100).toFixed(0)}% hurdle — paying it down is a risk-free return of the APR.` +
+        (emergency ? ` At ≥${EMERGENCY_DEBT_APR_PCT}% this ranks even ahead of the employer match.` : ''),
+        ['debt APR', 'debt balance'], [], { cpa: false })
+    } else {
+      push('high_interest_debt', 'High-interest debt payoff', 'satisfied',
+        'No debt above the payoff hurdle.', ['debt APR'], [], { cpa: false })
+    }
+  }
+
+  const emergencyDebt =
+    i.highInterestDebtAprPct != null &&
+    i.highInterestDebtAprPct >= EMERGENCY_DEBT_APR_PCT &&
+    (i.highInterestDebtBalanceUsd ?? 0) > 0
+  if (emergencyDebt) {
+    pushDebt(true)
+    pushMatch()
   } else {
-    push('high_interest_debt', 'High-interest debt payoff', 'satisfied',
-      'No debt above the payoff hurdle.', ['debt APR'], [], { cpa: false })
+    pushMatch()
+    pushDebt(false)
   }
 
   // 4 — HSA

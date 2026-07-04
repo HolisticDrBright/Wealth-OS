@@ -17,6 +17,7 @@ import type { PaperScorecard } from '@/lib/paper-trading/scorecard-core'
 import { buildCoverageReport, type StrategyCoverageReport } from '@/lib/paper-trading/strategy-coverage'
 import { buildSynergyReport, type SynergyReport } from '@/lib/paper-trading/synergy'
 import { buildRunbookChecklist, type RunbookChecklist } from '@/lib/paper-trading/runbook-checklist'
+import { buildReadinessMatrix, type BrokerReadinessRow, type CertificationRow } from '@/lib/paper-trading/broker-certification'
 import { findDeadWorkers } from '@/lib/ops/reconcile'
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 
@@ -69,6 +70,8 @@ export interface RunView {
 
 export interface PaperValidationData {
   safety: SafetyStatus
+  /** Sandbox certification matrix (item 5) — NEVER flips liveReady. */
+  brokerReadiness: BrokerReadinessRow[]
   runs: RunView[]
   lastRunAt: string | null
   openPositions: OpenPositionView[]
@@ -86,6 +89,10 @@ function emptyData(error?: string): PaperValidationData {
   const safety = buildSafetyStatus()
   return {
     safety,
+    brokerReadiness: buildReadinessMatrix(
+      safety.brokers.map(b => ({ id: b.id, displayName: b.displayName, configured: b.configured, liveReady: b.liveReady })),
+      []
+    ),
     runs: [],
     lastRunAt: null,
     openPositions: [],
@@ -134,7 +141,7 @@ export async function getPaperValidationData(): Promise<PaperValidationData> {
   if (!user) return emptyData('not signed in')
 
   try {
-    const [scorecards, runsRes, openRes, closedRes, regimeRes, beatsRes] = await Promise.all([
+    const [scorecards, runsRes, openRes, closedRes, regimeRes, beatsRes, certsRes] = await Promise.all([
       loadScorecardsForUser(supabase, user.id),
       supabase
         .from('paper_trade_runs')
@@ -164,6 +171,10 @@ export async function getPaperValidationData(): Promise<PaperValidationData> {
       supabase
         .from('worker_heartbeats')
         .select('worker, last_seen'),
+      supabase
+        .from('broker_certifications')
+        .select('*')
+        .then(r => (r.data ?? []) as CertificationRow[], () => [] as CertificationRow[]),
     ])
 
     const runs: RunView[] = ((runsRes.data ?? []) as Array<Record<string, unknown>>).map(r => ({
@@ -221,6 +232,10 @@ export async function getPaperValidationData(): Promise<PaperValidationData> {
 
     return {
       safety,
+      brokerReadiness: buildReadinessMatrix(
+        safety.brokers.map(b => ({ id: b.id, displayName: b.displayName, configured: b.configured, liveReady: b.liveReady })),
+        certsRes
+      ),
       runs,
       lastRunAt,
       openPositions,

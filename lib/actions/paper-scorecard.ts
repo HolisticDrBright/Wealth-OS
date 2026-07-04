@@ -22,6 +22,7 @@ import {
   type ClosedTrade,
   type SkippedDetailRow,
 } from '@/lib/paper-trading/scorecard-core'
+import { computeAttribution, type AttributionTrade } from '@/lib/paper-trading/attribution'
 
 interface PositionRow {
   strategy_key: string
@@ -29,6 +30,8 @@ interface PositionRow {
   status: string
   closed_at: string | null
   realized_pnl_pct: number | null
+  notional_usd: number | null
+  exit_reason: string | null
 }
 
 interface TradeRow {
@@ -73,7 +76,7 @@ export async function loadScorecardsForUser(
   const [positions, trades, audits, shadows, runs, enabled] = await Promise.all([
     supabase
       .from('paper_positions')
-      .select('strategy_key, asset_class, status, closed_at, realized_pnl_pct')
+      .select('strategy_key, asset_class, status, closed_at, realized_pnl_pct, notional_usd, exit_reason')
       .eq('user_id', userId)
       .limit(5000)
       .then(r => (r.data ?? []) as PositionRow[], () => [] as PositionRow[]),
@@ -113,6 +116,7 @@ export async function loadScorecardsForUser(
 
   // ── Per-strategy aggregation ────────────────────────────────────────────────
   const closedByStrategy = new Map<string, ClosedTrade[]>()
+  const attributionTradesBy = new Map<string, AttributionTrade[]>()
   const openCountByStrategy = new Map<string, number>()
   const assetClassByStrategy = new Map<string, string>()
   for (const p of positions) {
@@ -123,6 +127,14 @@ export async function loadScorecardsForUser(
       const list = closedByStrategy.get(p.strategy_key) ?? []
       list.push({ closedAt: p.closed_at, returnPct: p.realized_pnl_pct })
       closedByStrategy.set(p.strategy_key, list)
+      const at = attributionTradesBy.get(p.strategy_key) ?? []
+      at.push({
+        returnPct: p.realized_pnl_pct,
+        notionalUsd: p.notional_usd,
+        exitReason: p.exit_reason,
+        closedAt: p.closed_at,
+      })
+      attributionTradesBy.set(p.strategy_key, at)
     }
   }
 
@@ -202,7 +214,7 @@ export async function loadScorecardsForUser(
     const shadowRets = shadowBy.get(strategyKey) ?? []
     const auditCounts = auditBy.get(strategyKey) ?? { blocked: 0, vetoes: 0 }
 
-    out.push(assembleScorecard({
+    const card = assembleScorecard({
       strategyKey,
       assetClass,
       paperEnabled: paperEnabledKeys.has(strategyKey),
@@ -222,7 +234,17 @@ export async function loadScorecardsForUser(
         ? shadowRets.reduce((s, r) => s + r, 0) / shadowRets.length
         : null,
       closedShadowTrades: shadowRets.length,
-    }))
+    })
+    // Item 7: attribution decomposition — 'not enough data' components stay
+    // null instead of being fabricated.
+    card.attribution = computeAttribution({
+      strategyKey,
+      trades: attributionTradesBy.get(strategyKey) ?? [],
+      entrySlipsBps: entrySlipsBy.get(strategyKey) ?? [],
+      exitSlipsBps: exitSlipsBy.get(strategyKey) ?? [],
+      shadowReturnsPct: shadowRets,
+    })
+    out.push(card)
   }
 
   return out.sort((a, b) => (b.expectancyPct ?? -Infinity) - (a.expectancyPct ?? -Infinity))

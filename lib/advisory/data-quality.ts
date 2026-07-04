@@ -78,6 +78,52 @@ export function buildQualityLabel(args: {
   }
 }
 
+// ─── Panel-level quality (item 11 — the shared backbone) ─────────────────────
+// Every major panel labels itself with ONE of these shapes instead of ad-hoc
+// chips scattered across components.
+
+export type PanelDataState = 'complete' | 'partial' | 'stale' | 'missing_required' | 'empty'
+export type PanelDataSource = 'manual' | 'synced' | 'derived' | 'mixed' | 'none'
+
+export interface PanelQuality {
+  state: PanelDataState
+  source: PanelDataSource
+  /** ISO timestamp of the newest underlying record, null when none. */
+  lastUpdated: string | null
+  /** Short human note: what is missing or stale. */
+  note: string | null
+}
+
+export function panelQualityOf(args: {
+  presentCount: number
+  requiredMissing: string[]
+  optionalMissing?: string[]
+  source: PanelDataSource
+  lastUpdated?: string | null
+  /** Data older than this (ms) is 'stale'. Default: 7 days. */
+  staleAfterMs?: number
+}): PanelQuality {
+  const staleAfter = args.staleAfterMs ?? 7 * 86_400_000
+  const lastUpdated = args.lastUpdated ?? null
+  const isStale = lastUpdated != null &&
+    Date.now() - new Date(lastUpdated).getTime() > staleAfter
+
+  let state: PanelDataState
+  if (args.presentCount === 0 && args.requiredMissing.length === 0) state = 'empty'
+  else if (args.requiredMissing.length > 0) state = 'missing_required'
+  else if (isStale) state = 'stale'
+  else if ((args.optionalMissing?.length ?? 0) > 0) state = 'partial'
+  else state = 'complete'
+
+  const note =
+    args.requiredMissing.length > 0 ? `missing: ${args.requiredMissing.join(', ')}`
+    : isStale ? 'data is older than the freshness window — refresh needed'
+    : (args.optionalMissing?.length ?? 0) > 0 ? `would improve with: ${args.optionalMissing!.join(', ')}`
+    : null
+
+  return { state, source: args.source, lastUpdated, note }
+}
+
 /** Split a record's fields into present/missing lists using display names. */
 export function splitInputs(
   values: Record<string, unknown>,

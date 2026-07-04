@@ -375,6 +375,109 @@ function RunsPanel({ data }: { data: PaperValidationData }) {
   )
 }
 
+// ─── broker sandbox certification matrix (item 5) ─────────────────────────────
+
+function BrokerReadinessPanel({ data }: { data: PaperValidationData }) {
+  const rows = data.brokerReadiness
+  return (
+    <Panel icon={ShieldCheck} title="Broker sandbox certification" right={
+      <span className="text-[11px] text-gray-600">certification records NEVER flip liveReady — that is a reviewed code change</span>
+    }>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-[11px]">
+          <thead>
+            <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-gray-600">
+              <th className="py-1 pr-2">Broker</th>
+              <th className="px-2">Configured</th>
+              <th className="px-2">Sandbox checks</th>
+              <th className="px-2">Status</th>
+              <th className="px-2">Certified by</th>
+              <th className="px-2">liveReady</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.broker} className="border-b border-white/5" title={r.notes ?? undefined}>
+                <td className="py-1 pr-2 font-medium text-gray-200">{r.displayName}</td>
+                <td className="px-2 text-gray-500">{r.configured ? 'keys present' : '—'}</td>
+                <td className="px-2 tabular-nums text-gray-400">{r.checksPassed}/{r.checksTotal}</td>
+                <td className="px-2">
+                  <Badge variant={r.status === 'certified_sandbox' ? 'info' : r.status === 'in_progress' ? 'warning' : 'default'}>
+                    {r.status.replace(/_/g, ' ')}
+                  </Badge>
+                </td>
+                <td className="px-2 text-gray-500">{r.certifiedBy ?? '—'}</td>
+                <td className={cn('px-2 font-semibold', r.liveReady ? 'text-red-400' : 'text-emerald-400')}>
+                  {r.liveReady ? 'TRUE — investigate' : 'false'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[10px] text-gray-600">
+        Pre-live sequence per broker: order placement → cancel → status → partial fill → rejection → bracket/OCO →
+        reconciliation → quantity conversion, all against the broker&apos;s sandbox, then liveReady flips in a reviewed PR.
+        No broker has completed any of it.
+      </p>
+    </Panel>
+  )
+}
+
+// ─── strategy attribution (item 7) ────────────────────────────────────────────
+
+function AttributionPanel({ cards }: { cards: PaperScorecard[] }) {
+  const withData = cards.filter(c => c.attribution && c.closedTrades > 0)
+  return (
+    <Panel icon={GitBranch} title="Strategy attribution" right={
+      <span className="text-[11px] text-gray-600">components without enough data say so — nothing is fabricated</span>
+    }>
+      {withData.length === 0 ? (
+        <EmptyState icon={GitBranch} title="Not enough closed trades"
+          hint="Attribution needs ≥5 closed trades per strategy. It appears as evidence accumulates." />
+      ) : (
+        <div className="space-y-2">
+          {withData.slice(0, 10).map(c => {
+            const a = c.attribution!
+            const comp = (label: string, v: { valuePct: number | null; note: string }) => (
+              <span className="mr-3 whitespace-nowrap" title={v.note}>
+                <span className="text-gray-600">{label}</span>{' '}
+                {v.valuePct == null
+                  ? <span className="text-gray-600">n/a</span>
+                  : <span className={cn('tabular-nums', v.valuePct > 0 ? 'text-emerald-400' : v.valuePct < 0 ? 'text-red-400' : 'text-gray-400')}>
+                      {v.valuePct > 0 ? '+' : ''}{v.valuePct.toFixed(2)}%
+                    </span>}
+              </span>
+            )
+            return (
+              <details key={c.strategyKey} className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
+                <summary className="cursor-pointer text-[11px]">
+                  <span className="font-medium text-gray-200">{c.strategyKey}</span>
+                  <span className="ml-2 text-[10px] text-gray-500">
+                    {comp('cost', a.costDrag)}
+                    {comp('sizing', a.sizingContribution)}
+                    {comp('veto', a.vetoBenefit)}
+                    {comp('residual', a.residual)}
+                  </span>
+                </summary>
+                <div className="mt-1.5 space-y-1 text-[10px] text-gray-500">
+                  <p>Exit contribution: {a.exitContribution.valuePct != null ? `${a.exitContribution.valuePct}%` : 'n/a'} — {a.exitContribution.note}</p>
+                  {a.exitBreakdown.length > 0 && (
+                    <p>Exit mix: {a.exitBreakdown.map(x => `${x.reason} ×${x.count} (${x.avgReturnPct > 0 ? '+' : ''}${x.avgReturnPct}%)`).join(' · ')}</p>
+                  )}
+                  <p>Regime: {a.regimeContribution.note}</p>
+                  <p>Synergy: {a.synergyEffect.note}</p>
+                  <p>Residual: {a.residual.note}</p>
+                </div>
+              </details>
+            )
+          })}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 // ─── fill model assumptions ───────────────────────────────────────────────────
 
 function FillModelPanel({ data }: { data: PaperValidationData }) {
@@ -513,9 +616,11 @@ export function PaperValidationClient({ data }: { data: PaperValidationData }) {
 
       <RunbookPanel data={data} />
       <ScorecardsPanel cards={data.scorecards} />
+      <AttributionPanel cards={data.scorecards} />
       <CoveragePanel data={data} />
       <PositionsPanel data={data} />
       <SynergyPanel data={data} />
+      <BrokerReadinessPanel data={data} />
       <RunsPanel data={data} />
       <FillModelPanel data={data} />
 

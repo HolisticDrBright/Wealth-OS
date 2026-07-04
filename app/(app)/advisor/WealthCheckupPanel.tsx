@@ -13,6 +13,31 @@ import { Wallet, ArrowDownWideNarrow, HelpCircle } from 'lucide-react'
 import type { WealthCheckup, CheckupItem } from '@/lib/actions/wealth-checkup'
 import type { NextDollarStep } from '@/lib/advisory/next-dollar'
 import type { DataQualityLabel } from '@/lib/advisory/data-quality'
+import type { Explanation } from '@/lib/advisory/suitability'
+
+/** Expandable "why / risks / verify" block (item 9) — same shape everywhere. */
+function ExplanationDetails({ e }: { e: Explanation }) {
+  return (
+    <details className="mt-1.5">
+      <summary className="cursor-pointer text-[10px] text-gray-500 hover:text-gray-400">
+        Why this, what could go wrong, what to verify
+      </summary>
+      <dl className="mt-1.5 space-y-1 rounded border border-white/5 bg-white/[0.02] p-2 text-[10px] leading-relaxed">
+        <div><dt className="font-semibold text-gray-400">Why now</dt><dd className="text-gray-500">{e.whyNow}</dd></div>
+        <div><dt className="font-semibold text-gray-400">What could go wrong</dt><dd className="text-gray-500">{e.whatCouldGoWrong}</dd></div>
+        <div><dt className="font-semibold text-gray-400">Data used</dt><dd className="text-gray-500">{e.dataUsed.join(', ') || 'none'}</dd></div>
+        {e.missingData.length > 0 && (
+          <div><dt className="font-semibold text-gray-400">Missing data</dt><dd className="text-gray-500">{e.missingData.join(', ')}</dd></div>
+        )}
+        <div><dt className="font-semibold text-gray-400">What to verify</dt><dd className="text-gray-500">{e.whatToVerify}</dd></div>
+        <div>
+          <dt className="font-semibold text-gray-400">Professional review</dt>
+          <dd className="text-gray-500">{e.professionalReviewNeeded ? 'Required before acting' : 'Not required — still verify inputs'}</dd>
+        </div>
+      </dl>
+    </details>
+  )
+}
 
 const STATUS_TONE: Record<CheckupItem['status'], { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' }> = {
   ok: { label: 'OK', variant: 'success' },
@@ -64,6 +89,12 @@ export function WealthCheckupPanel({ checkup }: { checkup: WealthCheckup }) {
         <p className="mb-3 text-[11px] text-amber-400">Checkup unavailable: {checkup.error}</p>
       )}
 
+      {checkup.staleness.stale && (
+        <p className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 px-2 py-1 text-[11px] text-amber-300">
+          {checkup.staleness.reasons.join(' · ')}
+        </p>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* status items */}
         <div className="space-y-2">
@@ -75,6 +106,7 @@ export function WealthCheckupPanel({ checkup }: { checkup: WealthCheckup }) {
               </div>
               <p className="text-[11px] leading-relaxed text-gray-400">{item.summary}</p>
               <div className="mt-1.5"><QualityChips q={item.quality} /></div>
+              <ExplanationDetails e={item.explanation} />
             </div>
           ))}
           {checkup.items.length === 0 && !checkup.error && (
@@ -122,6 +154,11 @@ export function WealthCheckupPanel({ checkup }: { checkup: WealthCheckup }) {
 
       <p className="mt-3 text-[10px] leading-relaxed text-gray-600">{checkup.disclaimer}</p>
       <p className="mt-1 text-[10px] text-gray-600">{checkup.nextDollar.disclaimer}</p>
+      <p className="mt-1 text-[10px] text-gray-700">
+        {checkup.governance.ruleVersion} · generated {checkup.governance.generatedAt.slice(0, 16).replace('T', ' ')}
+        {checkup.governance.constantsYear ? ` · ${checkup.governance.constantsYear} tax constants` : ' · tax constants unavailable'}
+        {checkup.bestNextSuitability ? ' · suitability file available for the top recommendation' : ''}
+      </p>
     </section>
   )
 }

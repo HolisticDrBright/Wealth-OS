@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ExternalLink, CheckCircle2, XCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { AccountConnectionsSection } from '@/components/wealth/AccountConnectionsSection'
 
 interface IntegrationHealth {
   status: 'ok' | 'degraded' | 'down' | 'unknown'
@@ -359,6 +360,8 @@ export default function IntegrationsPage() {
       />
 
       <div className="p-6 max-w-4xl mx-auto space-y-4">
+        <AccountConnectionsSection />
+
         <p className="text-sm text-muted-foreground">
           12 integrations configured. All paid-path integrations route through the{' '}
           <span className="font-mono text-xs bg-muted px-1 rounded">FeatureFlagService</span>{' '}

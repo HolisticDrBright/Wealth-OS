@@ -9,6 +9,7 @@
  */
 
 import { evaluatePaperToLive, type PromotionReadiness } from '@/lib/strategies/promotion-gates'
+import type { StrategyAttribution } from './attribution'
 
 // ─── Core trade math ──────────────────────────────────────────────────────────
 
@@ -225,6 +226,8 @@ export interface PaperScorecard extends ScorecardCore, ActivityCounters, Slippag
   promotion: PromotionReadiness
   maturityRecommendation: string
   validationStatus: ValidationStatus
+  /** Attribution decomposition (item 7) — attached by the loader when computed. */
+  attribution?: StrategyAttribution
 }
 
 export interface ScorecardInputs {

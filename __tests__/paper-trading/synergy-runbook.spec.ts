@@ -211,4 +211,24 @@ describe('getPaperValidationData', () => {
     expect(data.safety.liveTradingEnabled).toBe(false)
     expect(data.scorecards).toEqual([])
   })
+
+  it('a full sandbox certification in the DB never flips liveReady (item 5 invariant)', async () => {
+    loaderDb.tables.broker_certifications = [{
+      broker: 'alpaca', environment: 'sandbox',
+      tested_order_placement: true, tested_cancel: true, tested_status: true,
+      tested_partial_fill: true, tested_rejection: true, tested_bracket_oco: true,
+      tested_reconciliation: true, tested_quantity_conversion: true,
+      evidence_notes: 'run', certified_by: 'op',
+      certified_at: new Date().toISOString(), expires_at: null,
+    }]
+
+    const data = await getPaperValidationData()
+    const alpaca = data.brokerReadiness.find(r => r.broker === 'alpaca')!
+    expect(alpaca.status).toBe('certified_sandbox')
+    expect(alpaca.liveReady).toBe(false)
+    expect(data.safety.liveReadyCount).toBe(0)
+    // Everything else renders honestly pending.
+    expect(data.brokerReadiness.filter(r => r.broker !== 'alpaca')
+      .every(r => r.status === 'not_certified')).toBe(true)
+  })
 })
