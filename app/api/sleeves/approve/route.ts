@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { apiSuccess, apiError } from '@/lib/api'
-import { submitOrder } from '@/lib/broker-router'
+import { submitOrder } from '@/lib/broker-adapters/router'
 import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
 import { sendDrawdownAlert } from '@/lib/notifications'
 import { logAudit, extractRequestMeta } from '@/lib/audit-log'
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         side: request.action === 'buy' ? 'buy' : 'sell',
         order_type: (request.order_type ?? 'market') as 'market' | 'limit',
         notional_usd: request.notional_usd,
+        jurisdiction: 'US',
       }, guard.token)
 
       // Write order record
@@ -130,5 +131,9 @@ export async function POST(req: NextRequest) {
     ...extractRequestMeta(req),
   })
 
-  return apiSuccess({ status: action, broker: brokerResult })
+  return apiSuccess({
+    status: action,
+    broker: brokerResult,
+    broker_order_placed: brokerResult != null && (brokerResult.status === 'open' || brokerResult.status === 'submitted'),
+  })
 }

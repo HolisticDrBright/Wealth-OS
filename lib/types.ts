@@ -224,7 +224,8 @@ export interface Order {
   asset_class: string
   side: 'buy' | 'sell'
   order_type: 'market' | 'limit' | 'stop' | 'stop_limit' | 'trailing_stop'
-  status: 'pending' | 'submitted' | 'open' | 'partially_filled' | 'filled' | 'cancelled' | 'rejected' | 'expired'
+  /** 'skipped' = no broker order was placed (paper phase / capability / jurisdiction block). */
+  status: 'pending' | 'submitted' | 'open' | 'partially_filled' | 'filled' | 'cancelled' | 'rejected' | 'expired' | 'skipped'
   quantity?: number
   notional_usd?: number
   limit_price?: number

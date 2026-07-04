@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import { diffPositions, findDeadWorkers } from '@/lib/ops/reconcile'
 import { executeIdempotent } from '@/lib/broker-adapters/order-intents'
 import { clientOrderId } from '@/lib/broker-adapters/idempotency'
@@ -49,6 +49,29 @@ describe('findDeadWorkers', () => {
 // ─── R7c key hygiene (CI grep) ───────────────────────────────────────────────
 
 describe('key hygiene', () => {
+  /**
+   * Cross-platform `git grep`: execFileSync with an argument ARRAY — no
+   * shell, so no `|| true`, no quoting differences between bash/PowerShell.
+   * git grep exits 1 when nothing matches (that's the PASS case) and >1 on
+   * real errors, which we rethrow.
+   */
+  function gitGrepFiles(pattern: string): string {
+    try {
+      // Long-form pathspec magic — the short ':!' form is parsed differently
+      // across git versions/platforms.
+      return execFileSync(
+        'git',
+        // '-e' so patterns beginning with '-' are never parsed as options.
+        ['grep', '-lE', '-e', pattern, '--', ':(exclude)__tests__/ops/hardening.spec.ts'],
+        { encoding: 'utf8' }
+      ).trim()
+    } catch (err) {
+      const e = err as { status?: number; stderr?: Buffer | string }
+      if (e.status === 1) return ''   // no matches — clean
+      throw err
+    }
+  }
+
   it('no live secrets committed to tracked source', () => {
     // Patterns assembled at runtime so this file never matches itself.
     const patterns = [
@@ -56,10 +79,7 @@ describe('key hygiene', () => {
       'sbp_' + '[0-9a-f]{40}',
     ]
     for (const p of patterns) {
-      const out = execSync(
-        `git grep -lE "${p}" -- ':!__tests__/ops/hardening.spec.ts' || true`,
-        { encoding: 'utf8' }
-      ).trim()
+      const out = gitGrepFiles(p)
       expect(out, `secret pattern ${p} found in: ${out}`).toBe('')
     }
   })

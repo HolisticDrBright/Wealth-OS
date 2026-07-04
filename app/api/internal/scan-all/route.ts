@@ -145,7 +145,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           const size = await strategy.sizePosition(opp, verdicts, userId, supabase)
           const execResult = await strategy.execute(opp, size, userId, supabase, undefined)
 
-          await strategy.logAudit(opp, { action: execResult.status === 'submitted' ? 'execute' : 'block' }, verdicts, supabase)
+          // userId MUST be attributed — user-scoped audit rows feed the paper
+          // scorecards (blocked/veto counts); an unattributed row is invisible.
+          await strategy.logAudit(opp, { action: execResult.status === 'submitted' ? 'execute' : 'block' }, verdicts, supabase, userId)
 
           if (execResult.status === 'submitted') executed++
           else blocked++

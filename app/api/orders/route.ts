@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, getBearerToken } from '@/lib/api'
-import { submitOrder } from '@/lib/broker-router'
+import { submitOrder } from '@/lib/broker-adapters/router'
 import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
 import type { Order } from '@/lib/types'
 
@@ -103,12 +103,15 @@ export async function POST(req: NextRequest) {
     notional_usd, quantity, limit_price, stop_price,
     trail_amount, trail_percent, time_in_force,
     broker_override,
+    jurisdiction: 'US',
   }, guard.token)
 
-  // Update order with broker result
+  // Update order with broker result. A skipped result means NO broker order
+  // was placed (paper phase / capability block / no legal broker) — it is
+  // persisted as 'skipped', never masqueraded as 'submitted'.
   const newStatus: Order['status'] = result.status === 'open' ? 'open'
     : result.status === 'submitted' ? 'submitted'
-    : result.status === 'skipped' ? 'submitted' // treat skipped as submitted in paper mode
+    : result.status === 'skipped' ? 'skipped'
     : 'rejected'
 
   const { data: updatedOrder } = await supabase
@@ -118,7 +121,7 @@ export async function POST(req: NextRequest) {
       broker: result.broker,
       broker_order_id: result.broker_order_id,
       error_message: result.error ?? result.reason,
-      submitted_at: new Date().toISOString(),
+      submitted_at: newStatus === 'skipped' ? null : new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', order.id)
@@ -129,5 +132,12 @@ export async function POST(req: NextRequest) {
     return apiError(result.error ?? 'Broker rejected order', 502, { order: updatedOrder })
   }
 
-  return apiSuccess(updatedOrder ?? order, { broker: result.broker, broker_order_id: result.broker_order_id })
+  return apiSuccess(updatedOrder ?? order, {
+    broker: result.broker,
+    broker_order_id: result.broker_order_id,
+    broker_order_placed: newStatus === 'open' || newStatus === 'submitted',
+    ...(newStatus === 'skipped'
+      ? { message: `No broker order was placed: ${result.reason ?? 'skipped'}` }
+      : {}),
+  })
 }

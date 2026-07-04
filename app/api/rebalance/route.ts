@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError, getBearerToken } from '@/lib/api'
 import { computeRebalanceTrades, DEFAULT_TARGETS } from '@/lib/rebalance-engine'
-import { submitOrder } from '@/lib/broker-router'
+import { submitOrder } from '@/lib/broker-adapters/router'
 import { preExecutionGuard } from '@/lib/broker-adapters/execution-guard'
 import { checkWashSaleBlocklist } from '@/lib/tax/wash-sale-guard'
 import { estimateRebalanceTaxDrag } from '@/lib/tax/tax-aware-rebalance'
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
 
   let executed = 0
   const errors: string[] = []
+  const skippedOrders: string[] = []
 
   if (execute) {
     for (const trade of trades) {
@@ -123,6 +124,7 @@ export async function POST(req: NextRequest) {
         side: trade.action,
         order_type: 'market',
         notional_usd: trade.suggested_notional,
+        jurisdiction: 'US',
       }, guard.token)
 
       if (result.status === 'open' || result.status === 'submitted') {
@@ -134,13 +136,22 @@ export async function POST(req: NextRequest) {
             .update({ status: 'executed', executed_at: new Date().toISOString() })
             .eq('id', suggestion.id)
         }
+      } else if (result.status === 'skipped') {
+        // No broker order was placed — say so instead of silently dropping it.
+        skippedOrders.push(`${trade.asset_class}: no order placed — ${result.reason ?? 'skipped'}`)
       } else if (result.status === 'failed') {
         errors.push(`${trade.asset_class}: ${result.error}`)
       }
     }
   }
 
-  return apiSuccess({ trades, suggestions: suggestions ?? [], executed, errors: errors.length ? errors : undefined })
+  return apiSuccess({
+    trades,
+    suggestions: suggestions ?? [],
+    executed,
+    skipped_orders: skippedOrders.length ? skippedOrders : undefined,
+    errors: errors.length ? errors : undefined,
+  })
 }
 
 export async function GET(req: NextRequest) {
