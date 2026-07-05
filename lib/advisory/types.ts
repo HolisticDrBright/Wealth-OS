@@ -39,6 +39,8 @@ export interface FinancialProfile {
    * for it. NEVER used in any dollar/tax computation or Monte Carlo.
    */
   business_context?: BusinessContext | null
+  /** Coaching context for income-growth ideas. Never a computed input. */
+  income_context?: IncomeContext | null
 }
 
 export interface BusinessContext {
@@ -50,6 +52,13 @@ export interface BusinessContext {
   two_week_absence_breakage?: string
   /** The single task the user selected for the Operations Architect follow-up. */
   selected_task?: string
+}
+
+/** Coaching context for the Income-Growth pillar (never a computed input). */
+export interface IncomeContext {
+  occupation?: string
+  skills?: string[]
+  weekly_hours_available?: number
 }
 
 /** Year-keyed constants from tax_constants; key → value. */

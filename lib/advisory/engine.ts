@@ -15,6 +15,7 @@ import { r5BusinessDeductions } from './rules/r5-business-deductions'
 import { r6Solo401k } from './rules/r6-solo-401k'
 import { r7BusinessBanking } from './rules/r7-business-banking'
 import { r8BusinessSystemization } from './rules/r8-business-systemization'
+import { r9IncomeGrowth } from './rules/r9-income-growth'
 
 export const ALL_ADVISORY_RULES: AdvisoryRule[] = [
   r1ScorpElection,
@@ -25,6 +26,7 @@ export const ALL_ADVISORY_RULES: AdvisoryRule[] = [
   r6Solo401k,
   r7BusinessBanking,
   r8BusinessSystemization,
+  r9IncomeGrowth,
 ]
 
 /** A recommendation's grade, defaulting to 'quantified' for the r1–r7 rules. */

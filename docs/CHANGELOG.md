@@ -1,5 +1,43 @@
 # Wealth OS Changelog
 
+## 2026-07-04 — Advisory / R&D layer (P1–P3), burn-in untouched
+
+Three additive advisory/R&D features. HARD CONSTRAINT honored: zero diffs in
+lib/risk, lib/broker-adapters, lib/brokers, orchestrator, BasePipelineStrategy,
+or any strategy file — verified with `git diff --stat` before each commit. All
+three are advisory-only; nothing trades.
+
+**P1 — Strategy-Scientist ideation** (`lib/research/ideation.ts`): LLM proposes
+hypotheses, code computes/validates numbers. riskRewardReview /
+optimizationProposal inject the real paper scorecard; alphaScan (quarterly)
+is hypotheses-only. Guardrails in code, not prompt: performance-number claims
+are dropped from risk/reward proposals and void an entire alpha scan.
+`research_proposals` table (migration g) with proposed→accepted→backtested→
+rejected/promoted workflow; maturity pinned to 'stub' by CHECK. ESLint
+no-restricted-imports + a guard test keep the research layer out of the
+execution path. Weekly `strategy-scientist` cron (files proposals only; NOT in
+daily/daily-ops).
+
+**P2 — Owner Dependency Audit** (`r8-business-systemization.ts`): new coaching
+grade. `Recommendation.grade` ('quantified' | 'coaching'); coaching cards never
+enter benefit totals or the Monte Carlo and always rank below quantified.
+Triggers on a profitable business entity; asks the three context questions,
+then produces the audit + Operations Architect follow-up.
+`financial_profile.business_context` jsonb (migration h). UI badge
+"Coaching — not calculated advice".
+
+**P3 — Income-Growth pillar** (`r9-income-growth.ts` + `lib/advisory/
+income-growth.ts` + `lib/actions/income-growth.ts`): the earning lever below
+mass-affluent investable. Quantified income-vs-allocation header from the REAL
+Monte Carlo (same-seeded, monotonic); coaching idea cards classified by
+ease/speed/investment/profit/scalability. Speculative income never enters the
+planner unless the user converts it to a real profile income change
+(convertIncomeIdeaToProfile). Thresholds seeded in kb_parameters (migration i).
+
+Tests: +54 (ideation 17, r8 coaching 8, r9 income 15, import boundary, plus
+verdict-count updates). Suite 1050 green; build + lint clean (0 errors).
+
+
 ## 2026-07-04 — Round-2 audit residues closed
 
 1. **FINAL in-adapter gate**: `BrokerAdapter.execute()` / `placeBracketOrder()`
