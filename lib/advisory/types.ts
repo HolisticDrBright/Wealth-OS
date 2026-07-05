@@ -33,6 +33,23 @@ export interface FinancialProfile {
   has_separate_business_bank: boolean | null
   home_office_sqft: number | null
   business_miles_annual: number | null
+  /**
+   * Free-form business coaching context (jsonb) — answers to the Owner
+   * Dependency Audit questions. Optional; absent → the coaching card prompts
+   * for it. NEVER used in any dollar/tax computation or Monte Carlo.
+   */
+  business_context?: BusinessContext | null
+}
+
+export interface BusinessContext {
+  /** Tasks the owner personally does each week. */
+  weekly_owner_tasks?: string[]
+  /** Delegations that have failed before (and why, if known). */
+  failed_delegations?: string[]
+  /** What breaks if the owner is absent for two weeks. */
+  two_week_absence_breakage?: string
+  /** The single task the user selected for the Operations Architect follow-up. */
+  selected_task?: string
 }
 
 /** Year-keyed constants from tax_constants; key → value. */
@@ -53,6 +70,13 @@ export interface Recommendation {
   ruleId: string
   ruleVersion: number
   title: string
+  /**
+   * 'quantified' — computed dollar/tax math (r1–r7); may feed benefit totals
+   * and Monte Carlo. 'coaching' — LLM/framework-guided qualitative guidance;
+   * NEVER feeds benefit totals or Monte Carlo and always ranks below
+   * quantified cards. Absent = 'quantified' (existing rules).
+   */
+  grade?: 'quantified' | 'coaching'
   /** Plain-language rationale — rendered as education, never advice. */
   rationale: string
   /** Computed benefit; null when genuinely unquantifiable. */

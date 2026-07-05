@@ -14,6 +14,7 @@ import { r4Hsa } from './rules/r4-hsa'
 import { r5BusinessDeductions } from './rules/r5-business-deductions'
 import { r6Solo401k } from './rules/r6-solo-401k'
 import { r7BusinessBanking } from './rules/r7-business-banking'
+import { r8BusinessSystemization } from './rules/r8-business-systemization'
 
 export const ALL_ADVISORY_RULES: AdvisoryRule[] = [
   r1ScorpElection,
@@ -23,7 +24,13 @@ export const ALL_ADVISORY_RULES: AdvisoryRule[] = [
   r5BusinessDeductions,
   r6Solo401k,
   r7BusinessBanking,
+  r8BusinessSystemization,
 ]
+
+/** A recommendation's grade, defaulting to 'quantified' for the r1–r7 rules. */
+export function gradeOf(r: { grade?: 'quantified' | 'coaching' }): 'quantified' | 'coaching' {
+  return r.grade ?? 'quantified'
+}
 
 export interface AdvisoryEvaluation {
   verdicts: RuleVerdict[]
@@ -56,9 +63,19 @@ export function evaluateAllRules(
 
   const recommendations = verdicts
     .filter((v): v is Extract<RuleVerdict, { kind: 'recommendation' }> => v.kind === 'recommendation')
-    .sort((a, b) => (b.estimatedAnnualBenefitUsd ?? -1) - (a.estimatedAnnualBenefitUsd ?? -1))
+    // Coaching cards ALWAYS rank below quantified cards, regardless of any
+    // estimated benefit; within a grade, by benefit desc (nulls last).
+    .sort((a, b) => {
+      const ga = gradeOf(a) === 'coaching' ? 1 : 0
+      const gb = gradeOf(b) === 'coaching' ? 1 : 0
+      if (ga !== gb) return ga - gb
+      return (b.estimatedAnnualBenefitUsd ?? -1) - (a.estimatedAnnualBenefitUsd ?? -1)
+    })
 
+  // Coaching cards NEVER contribute to the benefit total (they are not
+  // calculated advice); quantified cards only.
   const totalEstimatedAnnualBenefitUsd = recommendations
+    .filter(r => gradeOf(r) === 'quantified')
     .reduce((s, r) => s + (r.estimatedAnnualBenefitUsd ?? 0), 0)
 
   return { verdicts, recommendations, totalEstimatedAnnualBenefitUsd }

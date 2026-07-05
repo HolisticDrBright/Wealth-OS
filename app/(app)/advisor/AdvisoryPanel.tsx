@@ -100,14 +100,24 @@ function RecommendationCard({
   const isEmergencyFund = rec.ruleId === 'r3_emergency_fund'
   const nextStatus = STATUS_FLOW[Math.min(STATUS_FLOW.indexOf(status as typeof STATUS_FLOW[number]) + 1, STATUS_FLOW.length - 1)]
 
+  const isCoaching = (rec.grade ?? 'quantified') === 'coaching'
+
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className={cn('rounded-xl border p-4',
+      isCoaching ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-white/10 bg-white/[0.02]')}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-white">{rec.title}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-white">{rec.title}</h3>
+            {isCoaching && (
+              <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-400">
+                Coaching — not calculated advice
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-xs leading-relaxed text-gray-400">{rec.rationale}</p>
         </div>
-        {rec.estimatedAnnualBenefitUsd != null && (
+        {!isCoaching && rec.estimatedAnnualBenefitUsd != null && (
           <div className="shrink-0 text-right">
             <div className="text-lg font-bold tabular-nums text-emerald-400">
               {usd(rec.estimatedAnnualBenefitUsd)}

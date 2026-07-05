@@ -285,7 +285,7 @@ describe('evaluateAllRules', () => {
   it('ranks recommendations by estimated benefit and totals them', () => {
     const { recommendations, totalEstimatedAnnualBenefitUsd, verdicts } =
       evaluateAllRules(profile({ liquid_cash_usd: 80_000 }), C, P)
-    expect(verdicts).toHaveLength(7)
+    expect(verdicts).toHaveLength(8)   // r1–r8 (r8 = coaching Owner Dependency Audit)
     expect(recommendations.length).toBeGreaterThanOrEqual(3)
     // Sorted descending by benefit (nulls last)
     for (let i = 1; i < recommendations.length; i++) {

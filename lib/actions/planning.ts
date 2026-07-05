@@ -51,8 +51,11 @@ async function fetchSpxMonthlyReturns(): Promise<number[]> {
 }
 
 export async function getPlanningView(
-  recommendations: Array<Pick<Recommendation, 'ruleId' | 'title' | 'estimatedAnnualBenefitUsd'>>
+  recommendations: Array<Pick<Recommendation, 'ruleId' | 'title' | 'estimatedAnnualBenefitUsd' | 'grade'>>
 ): Promise<PlanningView | null> {
+  // COACHING cards never feed the Monte Carlo (P2/P3). They carry null benefit
+  // already, but exclude by grade explicitly so it is provable, not incidental.
+  recommendations = recommendations.filter(r => (r.grade ?? 'quantified') !== 'coaching')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
