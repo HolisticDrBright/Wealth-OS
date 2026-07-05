@@ -194,6 +194,69 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    if (task === 'strategy-scientist') {
+      // R&D ONLY — runs WEEKLY, never part of the burn-in daily/daily-ops
+      // tasks. The LLM proposes hypotheses; every proposal is FILED to
+      // research_proposals (status 'proposed', maturity 'stub') and NEVER
+      // applied. Touches no gate, sizing, or strategy runtime.
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const supabase = createAdminClient()
+      const {
+        riskRewardReview, optimizationProposal, alphaScan,
+        toRiskRewardRows, toAlphaRows,
+      } = await import('@/lib/research/ideation')
+      const { loadScorecardsForUser } = await import('@/lib/actions/paper-scorecard')
+
+      const rows: unknown[] = []
+      let scored = 0
+      try {
+        // One representative user's scorecards drive the review (research is
+        // system-level; any paper-enabled user's evidence works).
+        const { data: enabled } = await supabase
+          .from('user_enabled_strategies')
+          .select('user_id')
+          .eq('paper_enabled', true)
+          .limit(1)
+        const uid = (enabled ?? [])[0]?.user_id as string | undefined
+
+        if (uid) {
+          const cards = await loadScorecardsForUser(supabase, uid)
+          // Only review strategies with enough evidence to reason about.
+          const reviewable = cards.filter(c => c.closedTrades >= 20).slice(0, 5)
+          for (const card of reviewable) {
+            scored++
+            const rr = await riskRewardReview(card).catch(() => ({ proposals: [] }))
+            rows.push(...toRiskRewardRows(card.strategyKey, rr, 'risk_reward'))
+            const opt = await optimizationProposal(card).catch(() => ({ proposals: [] }))
+            rows.push(...toRiskRewardRows(card.strategyKey, opt, 'optimization'))
+          }
+        }
+
+        // Quarterly alpha scan — only in the first week of a quarter month.
+        const now = new Date()
+        const isQuarterStart = [0, 3, 6, 9].includes(now.getUTCMonth()) && now.getUTCDate() <= 7
+        if (isQuarterStart) {
+          for (const market of ['crypto', 'us_equities', 'prediction_markets']) {
+            const scan = await alphaScan(market).catch(() => null)
+            if (scan) rows.push(...toAlphaRows(scan))
+          }
+        }
+
+        if (rows.length > 0) {
+          await supabase.from('research_proposals').insert(rows)
+        }
+      } catch (err) {
+        console.warn('[strategy-scientist]', err instanceof Error ? err.message : err)
+      }
+
+      return NextResponse.json({
+        task: 'strategy-scientist',
+        strategiesReviewed: scored,
+        proposalsFiled: rows.length,
+        note: 'proposals filed only — nothing applied; burn-in untouched',
+      })
+    }
+
     if (task === 'advisory-staleness') {
       // Flags tax_constants / kb_parameters unverified for >90 days — stale
       // limits must surface as alerts, never silently produce outdated advice.

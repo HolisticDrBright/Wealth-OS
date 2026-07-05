@@ -27,6 +27,23 @@ const eslintConfig = defineConfig([
       }],
     },
   },
+  {
+    // R&D ideation layer must NEVER reach execution/broker/sizing/strategy
+    // runtime — it cannot be allowed to touch the burn-in. Import boundary.
+    files: ["lib/research/**/*.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["@/lib/broker-adapters/*", "**/broker-adapters/*"], message: "research layer must not import broker/execution code" },
+          { group: ["@/lib/broker-router", "**/broker-router"], message: "research layer must not import broker/execution code" },
+          { group: ["@/lib/risk/*", "**/lib/risk/*"], message: "research layer must not import risk/sizing code" },
+          { group: ["@/lib/brokers/*", "**/lib/brokers/*"], message: "research layer must not import broker routing code" },
+          { group: ["@/lib/strategies/orchestrator", "**/strategies/orchestrator"], message: "research layer must not import the orchestrator" },
+          { group: ["@/lib/strategies/BasePipelineStrategy", "**/BasePipelineStrategy"], message: "research layer must not import strategy runtime" },
+        ],
+      }],
+    },
+  },
 ]);
 
 export default eslintConfig;
