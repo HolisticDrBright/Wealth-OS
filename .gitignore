@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Graphify knowledge-graph output (local build artifact)
+graphify-out/
