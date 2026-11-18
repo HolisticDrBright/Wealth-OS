@@ -27,7 +27,7 @@ export function RiskMeter({ decision, showLabel = true }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        {showLabel && <p className="text-xs font-medium text-gray-400">Portfolio Risk</p>}
+        {showLabel && <p className="text-xs font-medium text-text-1">Portfolio Risk</p>}
         <p className="text-xs font-bold ml-auto" style={{ color }}>{label}</p>
       </div>
       <div className="flex items-center gap-1">

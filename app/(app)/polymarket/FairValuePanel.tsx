@@ -17,10 +17,10 @@ export function FairValuePanel({ points }: { points: FairValuePoint[] }) {
   const diagonal = [{ marketPrice: 0, modelProb: 0 }, { marketPrice: 1, modelProb: 1 }]
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className="rounded-xl border border-line-strong bg-white/[0.02] p-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
         <Crosshair className="h-4 w-4 text-indigo-400" /> Model vs Market
-        <span className="text-[10px] font-normal text-gray-600">
+        <span className="text-xs font-normal text-gray-600">
           entry fills · above the diagonal = edge the market didn’t price
         </span>
       </h3>
@@ -35,10 +35,10 @@ export function FairValuePanel({ points }: { points: FairValuePoint[] }) {
             <ComposedChart margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="marketPrice" type="number" domain={[0, 1]}
-                tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false}
-                label={{ value: 'market price paid', position: 'insideBottom', fontSize: 10, fill: '#4b5563' }} />
+                tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false}
+                label={{ value: 'market price paid', position: 'insideBottom', fontSize: 12, fill: '#4b5563' }} />
               <YAxis dataKey="modelProb" type="number" domain={[0, 1]}
-                tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} width={30} />
+                tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={30} />
               <Tooltip
                 contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
                 formatter={(v, name) => [Number(v).toFixed(3), name === 'modelProb' ? 'Model P(win)' : 'Market price']}

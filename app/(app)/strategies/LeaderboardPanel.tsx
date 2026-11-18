@@ -40,15 +40,15 @@ export function LeaderboardPanel({ metrics }: { metrics: StrategyMetrics[] }) {
   const sorted = [...metrics].sort((a, b) => ((b[sortBy] ?? -Infinity) as number) - ((a[sortBy] ?? -Infinity) as number))
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className="rounded-xl border border-line-strong bg-white/[0.02] p-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
         <Trophy className="h-4 w-4 text-amber-400" /> Strategy Leaderboard
-        <span className="text-[10px] font-normal text-gray-600">closed paper trades, net of modeled costs</span>
+        <span className="text-xs font-normal text-gray-600">closed paper trades, net of modeled costs</span>
       </h3>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full font-mono text-[11px]">
+        <table className="w-full font-mono text-xs">
           <thead>
-            <tr className="text-left text-[10px] uppercase tracking-wider text-gray-600">
+            <tr className="text-left text-xs uppercase tracking-wider text-gray-600">
               <th className="pb-1.5 pr-3">Strategy</th>
               {COLUMNS.map(c => (
                 <th key={c.key} title={c.title} className="pb-1.5 pr-3">
@@ -71,7 +71,7 @@ export function LeaderboardPanel({ metrics }: { metrics: StrategyMetrics[] }) {
                   const { text, cls } = cell(m[c.key] as number | null, c.key === 'maxDrawdownPct')
                   return <td key={c.key} className={cn('py-1 pr-3 tabular-nums', cls)}>{text}</td>
                 })}
-                <td className="py-1 tabular-nums text-gray-400">{m.winRatePct.toFixed(0)}%</td>
+                <td className="py-1 tabular-nums text-text-1">{m.winRatePct.toFixed(0)}%</td>
               </tr>
             ))}
           </tbody>

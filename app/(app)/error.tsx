@@ -25,15 +25,15 @@ export default function Error({
       <div className="w-full max-w-md rounded-xl border border-red-500/30 bg-red-950/20 p-6 text-center">
         <AlertOctagon className="mx-auto h-8 w-8 text-red-400" />
         <h2 className="mt-3 text-sm font-bold text-red-300">Something went wrong on this page</h2>
-        <p className="mt-2 text-xs text-gray-400">
+        <p className="mt-2 text-xs text-text-1">
           This is a display error only — your positions, limits and the kill switch are unaffected.
         </p>
         {error.digest && (
-          <p className="mt-1 text-[10px] text-gray-600">Error reference: {error.digest}</p>
+          <p className="mt-1 text-xs text-gray-600">Error reference: {error.digest}</p>
         )}
         <button
           onClick={() => unstable_retry()}
-          className="mt-4 rounded bg-white/10 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+          className="mt-4 rounded bg-fill px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
         >
           Try again
         </button>

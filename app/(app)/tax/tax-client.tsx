@@ -178,7 +178,7 @@ export default function TaxClient({ assets, transactions, goals }: Props) {
                 .sort(([, a], [, b]) => b - a)
                 .map(([cat, val]) => (
                   <div key={cat} className="rounded-lg bg-white/5 p-3">
-                    <p className="text-xs text-gray-400 capitalize">{cat.replace('_', ' ')}</p>
+                    <p className="text-xs text-text-1 capitalize">{cat.replace('_', ' ')}</p>
                     <p className="mt-1 text-sm font-semibold text-white">{formatCurrency(val)}</p>
                     <p className="text-xs text-gray-500">
                       {((val / totalAssetValue) * 100).toFixed(1)}% of portfolio
@@ -243,11 +243,11 @@ export default function TaxClient({ assets, transactions, goals }: Props) {
               <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-red-400">Analysis failed</p>
-                <p className="text-xs text-gray-400 mt-1">{error}</p>
+                <p className="text-xs text-text-1 mt-1">{error}</p>
                 {error.includes('not configured') && (
                   <p className="text-xs text-gray-500 mt-2">
-                    Add <code className="bg-white/10 px-1 rounded">ANTHROPIC_API_KEY</code> to your{' '}
-                    <code className="bg-white/10 px-1 rounded">.env.local</code> and Vercel environment variables.
+                    Add <code className="bg-fill px-1 rounded">ANTHROPIC_API_KEY</code> to your{' '}
+                    <code className="bg-fill px-1 rounded">.env.local</code> and Vercel environment variables.
                   </p>
                 )}
               </div>
@@ -263,7 +263,7 @@ export default function TaxClient({ assets, transactions, goals }: Props) {
                 </div>
               )}
               {analysis && (
-                <div className="rounded-xl bg-white/5 border border-white/10 p-5">
+                <div className="rounded-xl bg-white/5 border border-line-strong p-5">
                   <MarkdownRenderer content={analysis} />
                   {loading && (
                     <span className="inline-block w-1.5 h-4 bg-indigo-400 animate-pulse ml-0.5 align-middle rounded-sm" />
@@ -280,7 +280,7 @@ export default function TaxClient({ assets, transactions, goals }: Props) {
         <Info className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-semibold text-amber-400">2026 Tax Deadlines</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-text-1 mt-1">
             Q1 estimated taxes due <strong className="text-white">April 15, 2026</strong> &bull;{' '}
             IRA contribution deadline (2025): <strong className="text-white">April 15, 2026</strong> &bull;{' '}
             HSA contribution deadline: <strong className="text-white">April 15, 2026</strong>
@@ -289,7 +289,7 @@ export default function TaxClient({ assets, transactions, goals }: Props) {
       </div>
 
       {/* Disclaimer */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-start gap-3">
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4 flex items-start gap-3">
         <AlertCircle className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
         <p className="text-xs text-gray-500 leading-relaxed">
           AI-generated tax analysis is for educational purposes only. Tax laws are complex and change frequently.

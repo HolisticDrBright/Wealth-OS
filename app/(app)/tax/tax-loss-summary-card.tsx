@@ -13,7 +13,7 @@ export function TaxLossSummaryCard({ summary }: { summary: TaxLossSummary }) {
     <div className="px-6 pt-6">
       <Card>
         <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          <p className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-4">
             Tax-Loss Harvesting — {summary.taxYear}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

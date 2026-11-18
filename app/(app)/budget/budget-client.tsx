@@ -63,7 +63,7 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo, cash
       {isDemo && (
         <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex items-start gap-3">
           <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-text-1">
             Showing <strong className="text-indigo-400">demo data</strong>. Add your income and expenses to track real spending.
           </p>
         </div>
@@ -149,9 +149,9 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo, cash
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={cashFlow}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis
-                    tick={{ fill: '#6b7280', fontSize: 11 }}
+                    tick={{ fill: '#6b7280', fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
@@ -183,7 +183,7 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo, cash
               </div>
               <button
                 onClick={() => { setEditingBudget(null); setShowBudgetForm(true) }}
-                className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-fill text-text-1 hover:text-white transition-colors"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -241,7 +241,7 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo, cash
       {/* Budget Category Cards */}
       {budgets.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Budget Categories</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Budget Categories</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {budgets.map((budget) => {
               const pct = budget.monthly_limit > 0 ? (budget.spent / budget.monthly_limit) * 100 : 0
@@ -258,7 +258,7 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo, cash
                       </Badge>
                       <button
                         onClick={() => { setEditingBudget(budget); setShowBudgetForm(true) }}
-                        className="h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+                        className="h-5 w-5 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-fill transition-colors"
                       >
                         <span className="text-xs">✏️</span>
                       </button>
@@ -321,7 +321,7 @@ export function BudgetClient({ transactions, budgets, currentMonth, isDemo, cash
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10">
+                  <tr className="border-b border-line-strong">
                     <th className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     <th className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                     <th className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>

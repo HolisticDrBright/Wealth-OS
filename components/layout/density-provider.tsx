@@ -58,7 +58,7 @@ export function DensityToggle() {
     <button
       onClick={toggle}
       title="Switch between Advisor (cards) and Terminal (dense) layouts"
-      className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400 hover:bg-white/5 hover:text-gray-200"
+      className="rounded border border-line-strong px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-text-1 hover:bg-white/5 hover:text-gray-200"
     >
       {density === 'advisor' ? 'Advisor' : 'Terminal'}
     </button>

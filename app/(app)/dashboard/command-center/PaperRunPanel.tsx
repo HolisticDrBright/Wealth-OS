@@ -26,14 +26,14 @@ function StatCell({ label, value, tone }: { label: string; value: string | numbe
   return (
     <div className="text-center">
       <p className={cn('text-sm font-semibold tabular-nums', cls)}>{value}</p>
-      <p className="text-[10px] text-gray-600 mt-0.5">{label}</p>
+      <p className="text-xs text-gray-600 mt-0.5">{label}</p>
     </div>
   )
 }
 
 export function PaperRunPanel({ lastRun }: { lastRun: PaperRunView | null }) {
   const right = lastRun ? (
-    <span className="text-[11px] text-gray-600">{relativeTime(lastRun.runAt)}</span>
+    <span className="text-xs text-gray-600">{relativeTime(lastRun.runAt)}</span>
   ) : undefined
 
   return (
@@ -47,7 +47,7 @@ export function PaperRunPanel({ lastRun }: { lastRun: PaperRunView | null }) {
       ) : (
         <div className="space-y-3">
           {/* Stat row */}
-          <div className="grid grid-cols-5 divide-x divide-white/5 rounded-lg border border-white/10 bg-white/[0.02] py-2.5">
+          <div className="grid grid-cols-5 divide-x divide-white/5 rounded-lg border border-line-strong bg-white/[0.02] py-2.5">
             <StatCell label="Strategies" value={lastRun.strategiesRun} />
             <StatCell label="Signals" value={lastRun.opportunitiesFound} />
             <StatCell
@@ -68,7 +68,7 @@ export function PaperRunPanel({ lastRun }: { lastRun: PaperRunView | null }) {
           </div>
 
           {/* Plain-English summary */}
-          <p className="text-xs text-gray-400 leading-relaxed">{lastRun.plainEnglish}</p>
+          <p className="text-xs text-text-1 leading-relaxed">{lastRun.plainEnglish}</p>
 
           {/* Top skip reason + per-category breakdown */}
           {lastRun.totalSkipped > 0 && (
@@ -96,11 +96,11 @@ export function PaperRunPanel({ lastRun }: { lastRun: PaperRunView | null }) {
           {/* Price feed errors */}
           {lastRun.errors.length > 0 && (
             <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5">
-              <p className="text-[11px] text-amber-400/80 truncate" title={lastRun.errors[0]}>
+              <p className="text-xs text-amber-400/80 truncate" title={lastRun.errors[0]}>
                 ⚠ {lastRun.errors[0]}
               </p>
               {lastRun.errors.length > 1 && (
-                <p className="text-[10px] text-gray-600 mt-0.5">+{lastRun.errors.length - 1} more errors</p>
+                <p className="text-xs text-gray-600 mt-0.5">+{lastRun.errors.length - 1} more errors</p>
               )}
             </div>
           )}

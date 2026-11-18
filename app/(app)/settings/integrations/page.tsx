@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ExternalLink, CheckCircle2, XCircle, AlertCircle, RefreshCw } from 'lucide-react'
 import { AccountConnectionsSection } from '@/components/wealth/AccountConnectionsSection'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface IntegrationHealth {
   status: 'ok' | 'degraded' | 'down' | 'unknown'
@@ -438,23 +439,23 @@ export default function IntegrationsPage() {
                 {integration.id === 'polymarket_engine' && h.status !== 'unknown' && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
                     <div className="bg-muted/30 rounded p-2 text-center">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Wallet</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Wallet</p>
                       <p className={`text-xs font-semibold ${h.walletConnected ? 'text-green-400' : 'text-red-400'}`}>
                         {h.walletConnected == null ? '—' : h.walletConnected ? 'Connected' : 'Disconnected'}
                       </p>
                     </div>
                     <div className="bg-muted/30 rounded p-2 text-center">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Trades (30d)</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Trades (30d)</p>
                       <p className="text-xs font-semibold text-foreground">{h.trades30d ?? '—'}</p>
                     </div>
                     <div className="bg-muted/30 rounded p-2 text-center">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Avg PnL (30d)</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Avg PnL (30d)</p>
                       <p className={`text-xs font-semibold ${h.avgPnl30d == null ? 'text-muted-foreground' : h.avgPnl30d >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {h.avgPnl30d == null ? '—' : `${(h.avgPnl30d * 100).toFixed(1)}%`}
+                        {h.avgPnl30d == null ? '—' : <><TrendArrow value={h.avgPnl30d} />{`${(h.avgPnl30d * 100).toFixed(1)}%`}</>}
                       </p>
                     </div>
                     <div className="bg-muted/30 rounded p-2 text-center">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Brier (30d)</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Brier (30d)</p>
                       <p className={`text-xs font-semibold ${h.brierScore30d == null ? 'text-muted-foreground' : h.brierScore30d < 0.10 ? 'text-green-400' : h.brierScore30d < 0.20 ? 'text-yellow-400' : 'text-red-400'}`}>
                         {h.brierScore30d == null ? '—' : h.brierScore30d.toFixed(3)}
                       </p>

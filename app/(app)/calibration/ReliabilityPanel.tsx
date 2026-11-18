@@ -19,10 +19,10 @@ export function ReliabilityPanel({ data }: { data: CalibrationReliabilityView | 
   const diagonal = [{ predicted: 0, realized: 0 }, { predicted: 1, realized: 1 }]
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className="rounded-xl border border-line-strong bg-white/[0.02] p-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
         <Target className="h-4 w-4 text-indigo-400" /> Calibration reliability
-        <span className="text-[10px] font-normal text-gray-600">
+        <span className="text-xs font-normal text-gray-600">
           {data.gradedDecisions} graded decisions — the diagonal is perfect calibration
         </span>
       </h3>
@@ -37,10 +37,10 @@ export function ReliabilityPanel({ data }: { data: CalibrationReliabilityView | 
             <ComposedChart margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="predicted" type="number" domain={[0, 1]}
-                tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false}
-                label={{ value: 'predicted', position: 'insideBottom', fontSize: 10, fill: '#4b5563' }} />
+                tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false}
+                label={{ value: 'predicted', position: 'insideBottom', fontSize: 12, fill: '#4b5563' }} />
               <YAxis dataKey="realized" type="number" domain={[0, 1]}
-                tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} width={30} />
+                tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={30} />
               <Tooltip
                 contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
                 formatter={(v, name) => [Number(v).toFixed(2), name === 'realized' ? 'Realized win rate' : String(name)]}
@@ -55,12 +55,12 @@ export function ReliabilityPanel({ data }: { data: CalibrationReliabilityView | 
 
       {data.sizerInputs.length > 0 && (
         <div className="mt-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
             Empirical-Kelly sizer inputs (live)
           </p>
-          <table className="mt-1.5 w-full font-mono text-[11px]">
+          <table className="mt-1.5 w-full font-mono text-xs">
             <thead>
-              <tr className="text-left text-[10px] uppercase text-gray-600">
+              <tr className="text-left text-xs uppercase text-gray-600">
                 <th className="pb-1">Strategy</th><th className="pb-1">Win prob used</th>
                 <th className="pb-1">Brier</th><th className="pb-1">n</th>
               </tr>
@@ -72,7 +72,7 @@ export function ReliabilityPanel({ data }: { data: CalibrationReliabilityView | 
                   <td className="py-0.5 tabular-nums text-indigo-300">
                     {s.winRate != null ? `${(s.winRate * 100).toFixed(0)}%` : 'maturity floor'}
                   </td>
-                  <td className="py-0.5 tabular-nums text-gray-400">{s.brierScore}</td>
+                  <td className="py-0.5 tabular-nums text-text-1">{s.brierScore}</td>
                   <td className="py-0.5 tabular-nums text-gray-500">{s.sampleCount}</td>
                 </tr>
               ))}

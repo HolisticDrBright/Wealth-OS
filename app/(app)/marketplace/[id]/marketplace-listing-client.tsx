@@ -6,6 +6,7 @@ import type { MarketplaceListing, MarketplaceSubscription, MarketplaceReview } f
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { ArrowLeft, Star, Users, Shield, CheckCircle, TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface Props {
   listing: MarketplaceListing
@@ -61,8 +62,8 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
   }
 
   const stats = [
-    { label: 'Total Return', value: listing.total_return_pct != null ? `${listing.total_return_pct >= 0 ? '+' : ''}${listing.total_return_pct.toFixed(2)}%` : '—', color: (listing.total_return_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400' },
-    { label: 'YTD Return', value: listing.ytd_return_pct != null ? `${listing.ytd_return_pct >= 0 ? '+' : ''}${listing.ytd_return_pct.toFixed(2)}%` : '—', color: (listing.ytd_return_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400' },
+    { label: 'Total Return', trend: listing.total_return_pct, value: listing.total_return_pct != null ? `${listing.total_return_pct >= 0 ? '+' : ''}${listing.total_return_pct.toFixed(2)}%` : '—', color: (listing.total_return_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400' },
+    { label: 'YTD Return', trend: listing.ytd_return_pct, value: listing.ytd_return_pct != null ? `${listing.ytd_return_pct >= 0 ? '+' : ''}${listing.ytd_return_pct.toFixed(2)}%` : '—', color: (listing.ytd_return_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400' },
     { label: 'Sharpe Ratio', value: listing.sharpe_ratio?.toFixed(2) ?? '—', color: 'text-white' },
     { label: 'Max Drawdown', value: listing.max_drawdown_pct != null ? `-${listing.max_drawdown_pct.toFixed(2)}%` : '—', color: 'text-red-400' },
     { label: 'Win Rate', value: listing.win_rate_pct != null ? `${listing.win_rate_pct.toFixed(1)}%` : '—', color: 'text-white' },
@@ -71,7 +72,7 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-4xl">
-      <Link href="/marketplace" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors w-fit">
+      <Link href="/marketplace" className="flex items-center gap-2 text-sm text-text-1 hover:text-white transition-colors w-fit">
         <ArrowLeft className="h-4 w-4" />
         Marketplace
       </Link>
@@ -89,7 +90,7 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
             )}
           </div>
           {listing.description && (
-            <p className="text-gray-400 mb-3">{listing.description}</p>
+            <p className="text-text-1 mb-3">{listing.description}</p>
           )}
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
             <span className="flex items-center gap-1">
@@ -143,18 +144,18 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
           <span key={ac} className="text-xs px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 capitalize">{ac}</span>
         ))}
         {listing.strategy_type && (
-          <span className="text-xs px-3 py-1 rounded-full bg-white/10 text-gray-300 capitalize">{listing.strategy_type.replace('_', ' ')}</span>
+          <span className="text-xs px-3 py-1 rounded-full bg-fill text-gray-300 capitalize">{listing.strategy_type.replace('_', ' ')}</span>
         )}
       </div>
 
       {/* Performance stats */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Performance</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-3">Performance</h2>
         <div className="grid grid-cols-3 gap-3">
           {stats.map(s => (
-            <div key={s.label} className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div key={s.label} className="rounded-xl border border-line-strong bg-white/5 p-4">
               <p className="text-xs text-gray-500 mb-1">{s.label}</p>
-              <p className={cn('text-xl font-bold', s.color)}>{s.value}</p>
+              <p className={cn('text-xl font-bold', s.color)}>{'trend' in s && <TrendArrow value={s.trend} />}{s.value}</p>
             </div>
           ))}
         </div>
@@ -163,7 +164,7 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
       {/* Reviews */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider">
             Reviews ({reviews.length})
           </h2>
           {mySub && !showReviewForm && (
@@ -193,14 +194,14 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
               value={reviewTitle}
               onChange={e => setReviewTitle(e.target.value)}
               placeholder="Review title"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
             />
             <textarea
               value={reviewBody}
               onChange={e => setReviewBody(e.target.value)}
               placeholder="Share your experience..."
               rows={3}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none"
+              className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none"
             />
             <div className="flex gap-2">
               <button
@@ -212,7 +213,7 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
               </button>
               <button
                 onClick={() => setShowReviewForm(false)}
-                className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-white/10"
+                className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-fill"
               >
                 Cancel
               </button>
@@ -225,7 +226,7 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
         ) : (
           <div className="flex flex-col gap-3">
             {reviews.map(r => (
-              <div key={r.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div key={r.id} className="rounded-xl border border-line-strong bg-white/5 p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <div className="flex items-center gap-2">
@@ -238,7 +239,7 @@ export function MarketplaceListingClient({ listing, reviews: initialReviews, myS
                   </div>
                   <p className="text-xs text-gray-500">{new Date(r.created_at).toLocaleDateString()}</p>
                 </div>
-                {r.body && <p className="text-sm text-gray-400">{r.body}</p>}
+                {r.body && <p className="text-sm text-text-1">{r.body}</p>}
               </div>
             ))}
           </div>

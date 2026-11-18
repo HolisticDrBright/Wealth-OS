@@ -14,7 +14,7 @@ interface Props {
 const STATUS_COLORS: Record<string, string> = {
   active:   'text-green-400 bg-green-400/10',
   prospect: 'text-yellow-400 bg-yellow-400/10',
-  inactive: 'text-gray-400 bg-gray-400/10',
+  inactive: 'text-text-1 bg-fill',
 }
 
 export function AdvisorClient({ initialClients, totalAUM }: Props) {
@@ -77,7 +77,7 @@ export function AdvisorClient({ initialClients, totalAUM }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Advisor Dashboard</h1>
-          <p className="text-sm text-gray-400 mt-1">Manage your client relationships and AUM</p>
+          <p className="text-sm text-text-1 mt-1">Manage your client relationships and AUM</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -90,20 +90,20 @@ export function AdvisorClient({ initialClients, totalAUM }: Props) {
 
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Total AUM</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Total AUM</p>
           <p className="text-2xl font-bold text-white mt-1">${(totalAUM / 1e6).toFixed(2)}M</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Active Clients</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Active Clients</p>
           <p className="text-2xl font-bold text-green-400 mt-1">{activeClients.length}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Prospects</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Prospects</p>
           <p className="text-2xl font-bold text-yellow-400 mt-1">{prospects.length}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Est. Annual Revenue</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Est. Annual Revenue</p>
           <p className="text-2xl font-bold text-indigo-400 mt-1">${annualRevenue.toLocaleString()}</p>
         </div>
       </div>
@@ -114,45 +114,45 @@ export function AdvisorClient({ initialClients, totalAUM }: Props) {
           <p className="font-semibold text-white">New Client</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="text-xs text-gray-400 block mb-1">Client Name</label>
+              <label className="text-xs text-text-1 block mb-1">Client Name</label>
               <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="John & Jane Smith"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Email</label>
+              <label className="text-xs text-text-1 block mb-1">Email</label>
               <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="client@email.com"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">AUM ($)</label>
+              <label className="text-xs text-text-1 block mb-1">AUM ($)</label>
               <input type="number" value={aum} onChange={e => setAum(e.target.value)} placeholder="1000000"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Fee Type</label>
+              <label className="text-xs text-text-1 block mb-1">Fee Type</label>
               <select value={feeType} onChange={e => setFeeType(e.target.value as AdvisorClient['fee_type'])}
-                className="w-full rounded-lg border border-white/10 bg-[#0a0b0f] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                className="w-full rounded-lg border border-line-strong bg-bg-0 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 <option value="percentage">% of AUM</option>
                 <option value="flat">Flat Annual</option>
                 <option value="hybrid">Hybrid</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Fee % (annual)</label>
+              <label className="text-xs text-text-1 block mb-1">Fee % (annual)</label>
               <input type="number" step="0.1" value={feePct} onChange={e => setFeePct(e.target.value)} placeholder="1.0"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-gray-400 block mb-1">Notes</label>
+              <label className="text-xs text-text-1 block mb-1">Notes</label>
               <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Risk profile, goals..."
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleAdd} disabled={pending || !clientName.trim()}
               className="px-4 py-2 rounded-lg bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">Add Client</button>
             <button onClick={resetForm}
-              className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-white/10">Cancel</button>
+              className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-fill">Cancel</button>
           </div>
         </div>
       )}
@@ -165,15 +165,15 @@ export function AdvisorClient({ initialClients, totalAUM }: Props) {
           <p className="text-sm mt-1">Add clients to track their AUM and generate advisory reports</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-white/10 overflow-hidden">
+        <div className="rounded-xl border border-line-strong overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-white/5">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Client</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">AUM</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Fee</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Est. Revenue</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Status</th>
+              <tr className="border-b border-line-strong bg-white/5">
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Client</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">AUM</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Fee</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Est. Revenue</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Status</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>

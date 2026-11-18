@@ -26,7 +26,7 @@ function StatusBadge({ status }: { status: AgentTrust['status'] }) {
   const map = {
     active: { label: 'Active', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
     shadow: { label: 'Shadow', cls: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
-    disabled: { label: 'Disabled', cls: 'text-gray-400 bg-white/5 border-white/10' },
+    disabled: { label: 'Disabled', cls: 'text-text-1 bg-white/5 border-line-strong' },
   } as const
   const { label, cls } = map[status]
   const title =
@@ -38,7 +38,7 @@ function StatusBadge({ status }: { status: AgentTrust['status'] }) {
   return (
     <span
       title={title}
-      className={cn('inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-none', cls)}
+      className={cn('inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium leading-none', cls)}
     >
       {label}
     </span>
@@ -97,19 +97,19 @@ export function AgentTrustBoard({ agents }: { agents: AgentTrust[] }) {
       <div className="mb-4">
         <div className="flex items-center gap-2">
           <Crosshair className="h-4 w-4 text-indigo-400 shrink-0" />
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Agent Trust</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider">Agent Trust</h2>
         </div>
         <p className="text-xs text-gray-500 mt-1">
           How much each AI layer is currently trusted, and whether its vote affects real decisions.
         </p>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/5">
+      <div className="rounded-xl border border-line-strong bg-white/5">
         {/* Desktop / tablet: table */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 text-xs text-gray-500">
+              <tr className="border-b border-line-strong text-xs text-gray-500">
                 <th className="text-left px-4 py-3 font-medium">Agent</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-center px-4 py-3 font-medium">Affects decisions</th>
@@ -153,10 +153,10 @@ export function AgentTrustBoard({ agents }: { agents: AgentTrust[] }) {
                         <BrierCell value={a.brier} />
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-400 tabular-nums">
+                    <td className="px-4 py-3 text-right text-text-1 tabular-nums">
                       {a.gradedCount != null ? a.gradedCount.toLocaleString() : '0'}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-400 text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-right text-text-1 text-xs whitespace-nowrap">
                       {fmtDate(a.lastRecalibrated)}
                     </td>
                   </tr>
@@ -201,13 +201,13 @@ export function AgentTrustBoard({ agents }: { agents: AgentTrust[] }) {
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-gray-500">Graded n</span>
-                    <span className="text-gray-400 tabular-nums">
+                    <span className="text-text-1 tabular-nums">
                       {a.gradedCount != null ? a.gradedCount.toLocaleString() : '0'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-gray-500">Recalibrated</span>
-                    <span className="text-gray-400">{fmtDate(a.lastRecalibrated)}</span>
+                    <span className="text-text-1">{fmtDate(a.lastRecalibrated)}</span>
                   </div>
                 </div>
               </div>
@@ -216,7 +216,7 @@ export function AgentTrustBoard({ agents }: { agents: AgentTrust[] }) {
         </div>
 
         {allMetricsNull && (
-          <div className="px-4 py-3 border-t border-white/10">
+          <div className="px-4 py-3 border-t border-line-strong">
             <p className="text-xs text-gray-500">
               Accuracy and Brier scores populate once predictions are graded against outcomes.
               Status, vote weight, and whether a vote affects decisions are meaningful now.

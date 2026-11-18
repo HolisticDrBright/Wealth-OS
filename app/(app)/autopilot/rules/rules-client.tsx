@@ -111,7 +111,7 @@ export function RulesClient({ initialRules }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Autopilot Rules</h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-text-1 mt-1">
             Rules are evaluated in priority order — first match wins
           </p>
         </div>
@@ -132,16 +132,16 @@ export function RulesClient({ initialRules }: Props) {
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="Rule name (e.g. Skip small-cap stocks)"
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
           />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Action</label>
+              <label className="block text-xs text-text-1 mb-1">Action</label>
               <select
                 value={actionType}
                 onChange={e => setActionType(e.target.value as AutopilotRule['action_type'])}
-                className="w-full rounded-lg border border-white/10 bg-[#0a0b0f] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-line-strong bg-bg-0 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
               >
                 <option value="copy">Copy trade</option>
                 <option value="skip">Skip</option>
@@ -151,13 +151,13 @@ export function RulesClient({ initialRules }: Props) {
             </div>
             {(actionType === 'copy' || actionType === 'reduce') && (
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Sizing % (optional)</label>
+                <label className="block text-xs text-text-1 mb-1">Sizing % (optional)</label>
                 <input
                   type="number"
                   value={sizingPct}
                   onChange={e => setSizingPct(e.target.value)}
                   placeholder="e.g. 50"
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                 />
               </div>
             )}
@@ -165,41 +165,41 @@ export function RulesClient({ initialRules }: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Symbols (comma-separated)</label>
+              <label className="block text-xs text-text-1 mb-1">Symbols (comma-separated)</label>
               <input
                 value={symbols}
                 onChange={e => setSymbols(e.target.value)}
                 placeholder="e.g. AAPL, TSLA"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Asset classes</label>
+              <label className="block text-xs text-text-1 mb-1">Asset classes</label>
               <input
                 value={assetClasses}
                 onChange={e => setAssetClasses(e.target.value)}
                 placeholder="e.g. stock, crypto"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Min trader return (%)</label>
+              <label className="block text-xs text-text-1 mb-1">Min trader return (%)</label>
               <input
                 type="number"
                 value={minReturn}
                 onChange={e => setMinReturn(e.target.value)}
                 placeholder="e.g. 20"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Min CIO score (0–100)</label>
+              <label className="block text-xs text-text-1 mb-1">Min CIO score (0–100)</label>
               <input
                 type="number"
                 value={minCioScore}
                 onChange={e => setMinCioScore(e.target.value)}
                 placeholder="e.g. 65"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
               />
             </div>
           </div>
@@ -214,7 +214,7 @@ export function RulesClient({ initialRules }: Props) {
             </button>
             <button
               onClick={resetForm}
-              className="px-4 py-2 rounded-lg bg-white/5 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+              className="px-4 py-2 rounded-lg bg-white/5 text-sm font-medium text-gray-300 hover:bg-fill transition-colors"
             >
               Cancel
             </button>
@@ -236,7 +236,7 @@ export function RulesClient({ initialRules }: Props) {
               key={rule.id}
               className={cn(
                 'rounded-xl border p-4',
-                rule.is_active ? 'border-white/10 bg-white/5' : 'border-white/5 bg-white/2 opacity-60'
+                rule.is_active ? 'border-line-strong bg-white/5' : 'border-white/5 bg-white/2 opacity-60'
               )}
             >
               <div className="flex items-center gap-3">
@@ -245,14 +245,14 @@ export function RulesClient({ initialRules }: Props) {
                   <button
                     onClick={() => handleMoveUp(index)}
                     disabled={pending || index === 0}
-                    className="text-gray-600 hover:text-gray-400 disabled:opacity-20 transition-colors"
+                    className="text-gray-600 hover:text-text-1 disabled:opacity-20 transition-colors"
                   >
                     <ChevronUp className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleMoveDown(index)}
                     disabled={pending || index === rules.length - 1}
-                    className="text-gray-600 hover:text-gray-400 disabled:opacity-20 transition-colors"
+                    className="text-gray-600 hover:text-text-1 disabled:opacity-20 transition-colors"
                   >
                     <ChevronDown className="h-4 w-4" />
                   </button>
@@ -267,7 +267,7 @@ export function RulesClient({ initialRules }: Props) {
                       {ACTION_LABELS[rule.action_type]}
                     </span>
                     {rule.action_sizing_pct && (
-                      <span className="text-xs text-gray-400 shrink-0">{rule.action_sizing_pct}%</span>
+                      <span className="text-xs text-text-1 shrink-0">{rule.action_sizing_pct}%</span>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2 mt-1">

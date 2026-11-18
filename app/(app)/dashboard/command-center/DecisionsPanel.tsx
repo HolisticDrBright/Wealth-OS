@@ -43,7 +43,7 @@ export function DecisionsPanel({ decisions }: { decisions: DecisionItem[] }) {
                 >
                   <Icon className={cn('h-4 w-4 shrink-0', meta.color)} />
                   <span className="min-w-0 flex-1 truncate text-gray-300">{d.text}</span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-600 group-hover:text-gray-400" />
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-600 group-hover:text-text-1" />
                 </Link>
               </li>
             )

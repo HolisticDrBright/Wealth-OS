@@ -16,6 +16,7 @@ import {
   Settings2, Trash2, AlertCircle, CheckCircle2, Clock,
   XCircle, DollarSign, BarChart2, Brain,
 } from 'lucide-react'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface FollowedTrader {
   id: string
@@ -43,7 +44,7 @@ interface Props {
 const STATUS_ICONS = {
   pending: <Clock className="h-3.5 w-3.5 text-amber-400" />,
   open: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />,
-  closed: <XCircle className="h-3.5 w-3.5 text-gray-400" />,
+  closed: <XCircle className="h-3.5 w-3.5 text-text-1" />,
   failed: <AlertCircle className="h-3.5 w-3.5 text-red-400" />,
 }
 
@@ -81,7 +82,7 @@ function TraderSettingsRow({ follow, onSaved }: {
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+    <div className="rounded-xl border border-line-strong bg-white/5 overflow-hidden">
       <div className="flex items-center gap-4 p-4">
         {/* Trader info */}
         <div className="flex-1 min-w-0">
@@ -110,7 +111,7 @@ function TraderSettingsRow({ follow, onSaved }: {
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
               autoCopy
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white'
+                : 'bg-white/5 text-text-1 border border-line-strong hover:text-white'
             }`}
           >
             {autoCopy ? <Zap className="h-3.5 w-3.5" /> : <ZapOff className="h-3.5 w-3.5" />}
@@ -118,7 +119,7 @@ function TraderSettingsRow({ follow, onSaved }: {
           </button>
           <button
             onClick={() => setExpanded(e => !e)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-fill text-text-1 hover:text-white transition-colors"
           >
             <Settings2 className="h-4 w-4" />
           </button>
@@ -127,7 +128,7 @@ function TraderSettingsRow({ follow, onSaved }: {
 
       {/* Settings panel */}
       {expanded && (
-        <div className="border-t border-white/10 p-4 space-y-4 bg-white/[0.02]">
+        <div className="border-t border-line-strong p-4 space-y-4 bg-white/[0.02]">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
               label="Max allocation per trade (%)"
@@ -285,7 +286,7 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
         <Card>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total P&L</p>
           <p className={`mt-2 text-2xl font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl)}
+            <TrendArrow value={totalPnl} />{totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl)}
           </p>
           <p className="mt-1 text-xs text-gray-500">on open positions</p>
         </Card>
@@ -296,10 +297,10 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
         <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
         <div className="flex-1">
           <p className="text-sm font-semibold text-amber-400">Connect your broker to enable live execution</p>
-          <p className="text-xs text-gray-400 mt-1">
-            Add <code className="bg-white/10 px-1 rounded">ALPACA_API_KEY</code> + <code className="bg-white/10 px-1 rounded">ALPACA_SECRET_KEY</code> for stocks,
-            {' '}<code className="bg-white/10 px-1 rounded">BINANCE_API_KEY</code> for crypto,
-            {' '}<code className="bg-white/10 px-1 rounded">OANDA_API_KEY</code> for forex.
+          <p className="text-xs text-text-1 mt-1">
+            Add <code className="bg-fill px-1 rounded">ALPACA_API_KEY</code> + <code className="bg-fill px-1 rounded">ALPACA_SECRET_KEY</code> for stocks,
+            {' '}<code className="bg-fill px-1 rounded">BINANCE_API_KEY</code> for crypto,
+            {' '}<code className="bg-fill px-1 rounded">OANDA_API_KEY</code> for forex.
             Paper trading is active by default (Alpaca paper endpoint).
           </p>
         </div>
@@ -308,9 +309,9 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
       {/* Followed Traders + Settings */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Followed Traders</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider">Followed Traders</h2>
           <div className="flex items-center gap-2">
-            {execMsg && <span className="text-xs text-gray-400">{execMsg}</span>}
+            {execMsg && <span className="text-xs text-text-1">{execMsg}</span>}
             <Button size="sm" onClick={runCopyEngine} disabled={executing}>
               {executing
                 ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Running...</>
@@ -323,7 +324,7 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
         {followedTraders.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/20 p-10 text-center">
             <Zap className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">No traders followed yet</p>
+            <p className="text-sm text-text-1">No traders followed yet</p>
             <p className="text-xs text-gray-600 mt-1">Go to Top Traders and follow traders you want to copy</p>
           </div>
         ) : (
@@ -337,12 +338,12 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
 
       {/* Positions table */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Copied Positions</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Copied Positions</h2>
 
         {positions.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/20 p-10 text-center">
             <BarChart2 className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">No copied positions yet</p>
+            <p className="text-sm text-text-1">No copied positions yet</p>
             <p className="text-xs text-gray-600 mt-1">Enable auto-copy on a trader and run the copy engine</p>
           </div>
         ) : (
@@ -350,7 +351,7 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10">
+                  <tr className="border-b border-line-strong">
                     {['Trader', 'Symbol', 'Action', 'Size', 'P&L', 'Status', 'Broker', 'Date', 'Analysis'].map(h => (
                       <th key={h} className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider pr-4">{h}</th>
                     ))}
@@ -369,13 +370,13 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
                       <td className="py-3 pr-4 text-white">{formatCurrency(p.notional_value)}</td>
                       <td className="py-3 pr-4">
                         <span className={`font-semibold ${p.pnl_usd >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {p.pnl_usd >= 0 ? '+' : ''}{formatCurrency(p.pnl_usd)}
+                          <TrendArrow value={p.pnl_usd} />{p.pnl_usd >= 0 ? '+' : ''}{formatCurrency(p.pnl_usd)}
                         </span>
                       </td>
                       <td className="py-3 pr-4">
                         <div className="flex items-center gap-1.5">
                           {STATUS_ICONS[p.status]}
-                          <span className="text-xs text-gray-400 capitalize">{p.status}</span>
+                          <span className="text-xs text-text-1 capitalize">{p.status}</span>
                         </div>
                       </td>
                       <td className="py-3 pr-4 text-xs text-gray-500 capitalize">{p.broker ?? '—'}</td>
@@ -412,7 +413,7 @@ export function AutopilotClient({ followedTraders, positions: initialPositions }
       )}
 
       {/* Disclaimer */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-start gap-3">
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4 flex items-start gap-3">
         <AlertCircle className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
         <p className="text-xs text-gray-500 leading-relaxed">
           Auto-copy executes real trades using your connected broker API keys. Wealth OS is not a licensed broker or investment advisor.

@@ -69,7 +69,7 @@ export function FeatureToggleCard({ definition: def, flag, usage }: Props) {
       className={`rounded-xl border p-4 transition-all duration-200 ${
         optimistic.enabled
           ? 'border-violet-500/30 bg-violet-500/5'
-          : 'border-white/10 bg-white/5'
+          : 'border-line-strong bg-white/5'
       } ${isPending ? 'opacity-60' : ''}`}
     >
       {/* Header row */}
@@ -78,12 +78,12 @@ export function FeatureToggleCard({ definition: def, flag, usage }: Props) {
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-semibold text-white">{def.display_name}</p>
             {/* Estimated $/mo badge */}
-            <span className="inline-block rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-400 leading-tight">
+            <span className="inline-block rounded-full bg-fill px-2 py-0.5 text-xs text-text-1 leading-tight">
               {formatCostRange(estimatedLowCents, estimatedHighCents)}
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-0.5 leading-snug">{def.description}</p>
-          <p className="text-[10px] text-gray-600 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             ~{formatCostCents(Math.round(def.cost_per_use_usd * 100))} / {def.cost_unit}
           </p>
         </div>
@@ -112,13 +112,13 @@ export function FeatureToggleCard({ definition: def, flag, usage }: Props) {
         <div className="mt-4 space-y-3">
           {/* Progress bar */}
           <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] text-gray-400">
+            <div className="flex items-center justify-between text-xs text-text-1">
               <span>This month: {formatCostCents(spentCents)}</span>
               <span>
                 Remaining: {formatCostCents(remaining)} / {formatCostCents(budgetCents)}
               </span>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+            <div className="h-1.5 w-full rounded-full bg-fill overflow-hidden">
               <div
                 className={`h-1.5 rounded-full transition-all duration-300 ${barColor}`}
                 style={{ width: `${pct}%` }}
@@ -128,7 +128,7 @@ export function FeatureToggleCard({ definition: def, flag, usage }: Props) {
 
           {/* Monthly cap input */}
           <div className="flex items-center gap-2">
-            <label className="shrink-0 text-xs text-gray-400 w-24">Monthly cap</label>
+            <label className="shrink-0 text-xs text-text-1 w-24">Monthly cap</label>
             <div className="flex items-center gap-1 flex-1">
               <span className="text-xs text-gray-500">$</span>
               <input
@@ -142,20 +142,20 @@ export function FeatureToggleCard({ definition: def, flag, usage }: Props) {
                   setBudgetInput(String(v))
                   save({ budgetUsd: v })
                 }}
-                className="w-20 rounded-md bg-white/5 border border-white/10 px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
+                className="w-20 rounded-md bg-white/5 border border-line-strong px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
                 aria-label={`Monthly cap for ${def.display_name} in dollars`}
               />
-              <span className="text-[10px] text-gray-600">USD</span>
+              <span className="text-xs text-gray-600">USD</span>
             </div>
           </div>
 
           {/* Alert threshold select */}
           <div className="flex items-center gap-2">
-            <label className="shrink-0 text-xs text-gray-400 w-24">Alert at</label>
+            <label className="shrink-0 text-xs text-text-1 w-24">Alert at</label>
             <select
               value={optimistic.alertPct}
               onChange={e => save({ alertPct: Number(e.target.value) })}
-              className="rounded-md bg-white/5 border border-white/10 px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
+              className="rounded-md bg-white/5 border border-line-strong px-2 py-1 text-xs text-white focus:border-violet-500 focus:outline-none"
               aria-label={`Alert threshold for ${def.display_name}`}
             >
               {ALERT_OPTIONS.map(pct => (
@@ -170,7 +170,7 @@ export function FeatureToggleCard({ definition: def, flag, usage }: Props) {
 
       {/* Toast */}
       {toast && (
-        <p className={`mt-2 text-[10px] ${toast.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+        <p className={`mt-2 text-xs ${toast.ok ? 'text-emerald-400' : 'text-red-400'}`}>
           {toast.msg}
         </p>
       )}

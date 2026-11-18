@@ -38,12 +38,12 @@ export function ForexClient({ initialRates, initialPositions, userProfileKey }: 
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Forex</h1>
-          <p className="text-sm text-gray-400 mt-1">Live rates & OANDA positions</p>
+          <p className="text-sm text-text-1 mt-1">Live rates & OANDA positions</p>
         </div>
         <button
           onClick={handleSync}
           disabled={syncing}
-          className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 transition-colors"
+          className="flex items-center gap-2 rounded-lg border border-line-strong bg-white/5 px-4 py-2 text-sm text-gray-300 hover:bg-fill transition-colors"
         >
           <RefreshCw className={cn('h-4 w-4', syncing && 'animate-spin')} />
           Sync OANDA
@@ -61,22 +61,22 @@ export function ForexClient({ initialRates, initialPositions, userProfileKey }: 
 
       {/* Live rates table */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Major Pairs</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-3">Major Pairs</h2>
         {rates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <Globe className="h-8 w-8 mb-2 opacity-30" />
             <p className="text-sm">No rate data — rates sync every minute</p>
           </div>
         ) : (
-          <div className="rounded-xl border border-white/10 overflow-hidden">
+          <div className="rounded-xl border border-line-strong overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 bg-white/5">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Pair</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Bid</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Ask</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Spread (pips)</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Updated</th>
+                <tr className="border-b border-line-strong bg-white/5">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Pair</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Bid</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Ask</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Spread (pips)</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Updated</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,7 +85,7 @@ export function ForexClient({ initialRates, initialPositions, userProfileKey }: 
                     <td className="px-4 py-3 font-medium text-white">{rate.instrument.replace('_', '/')}</td>
                     <td className="px-4 py-3 text-right font-mono text-green-400">{rate.bid.toFixed(5)}</td>
                     <td className="px-4 py-3 text-right font-mono text-red-400">{rate.ask.toFixed(5)}</td>
-                    <td className="px-4 py-3 text-right text-gray-400">
+                    <td className="px-4 py-3 text-right text-text-1">
                       {rate.spread_pips != null ? rate.spread_pips.toFixed(1) : ((rate.ask - rate.bid) * 10000).toFixed(1)}
                     </td>
                     <td className="px-4 py-3 text-right text-gray-500 text-xs">

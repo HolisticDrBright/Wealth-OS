@@ -84,7 +84,7 @@ function AIFeaturesSection({ title, description, icon, category, definitions, fl
       </CardHeader>
       <CardContent className="space-y-4">
         {!anyEnabled && (
-          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-400">
+          <div className="rounded-xl border border-line-strong bg-white/5 px-4 py-3 text-sm text-text-1">
             Wealth OS works fully without paid AI features.
           </div>
         )}
@@ -100,7 +100,7 @@ function AIFeaturesSection({ title, description, icon, category, definitions, fl
             <div
               key={def.feature_key}
               className={`rounded-xl border p-4 transition-colors ${
-                enabled ? 'border-violet-500/20 bg-violet-500/5' : 'border-white/10 bg-white/5'
+                enabled ? 'border-violet-500/20 bg-violet-500/5' : 'border-line-strong bg-white/5'
               }`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -113,11 +113,11 @@ function AIFeaturesSection({ title, description, icon, category, definitions, fl
 
                   {enabled && (
                     <div className="mt-3 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-gray-400">
+                      <div className="flex items-center justify-between text-xs text-text-1">
                         <span>This month: ${spent.toFixed(2)}</span>
                         <span>Budget: ${monthlyBudget.toFixed(0)}</span>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-white/10">
+                      <div className="h-1.5 w-full rounded-full bg-fill">
                         <div
                           className={`h-1.5 rounded-full transition-all ${pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-violet-500'}`}
                           style={{ width: `${pct}%` }}
@@ -140,7 +140,7 @@ function AIFeaturesSection({ title, description, icon, category, definitions, fl
                 <button
                   onClick={() => onToggle(def.feature_key, enabled)}
                   className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    enabled ? 'bg-violet-600' : 'bg-white/10'
+                    enabled ? 'bg-violet-600' : 'bg-fill'
                   }`}
                   aria-pressed={enabled}
                   aria-label={`Toggle ${def.display_name}`}
@@ -161,8 +161,8 @@ function AIFeaturesSection({ title, description, icon, category, definitions, fl
             </p>
             <ResponsiveContainer width="100%" height={120}>
               <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6b7280' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={v => `$${v}`} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={v => `$${v}`} />
                 <Tooltip
                   contentStyle={{ background: '#1a1b23', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
                   formatter={(value, name) => [`$${Number(value).toFixed(2)}`, name === 'spend' ? 'Spent' : 'Budget']}
@@ -350,7 +350,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
           <CardDescription>Controls how copy trading executes</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-line-strong">
             <div>
               <p className="text-sm font-medium text-white">Autopilot Master Switch</p>
               <p className="text-xs text-gray-500 mt-0.5">Globally enable or disable all auto-copy execution</p>
@@ -358,7 +358,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
             <button
               onClick={() => setAutopilot(a => !a)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                autopilot ? 'bg-amber-500' : 'bg-white/10'
+                autopilot ? 'bg-amber-500' : 'bg-fill'
               }`}
             >
               <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
@@ -389,7 +389,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
           </div>
 
           <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-3">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-text-1">
               <strong className="text-indigo-400">How the budget works:</strong> When you follow a trader and set
               &quot;5% max per trade&quot;, that percentage is applied to your total budget (${Number(budget).toLocaleString()}).
               So each copied trade will be max ${(Number(budget) * 0.05).toLocaleString()} — proportional to the
@@ -416,7 +416,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
               const Icon = doc.icon
               return (
                 <div key={key} className={`rounded-xl border p-4 transition-colors ${
-                  connected ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-white/10 bg-white/5'
+                  connected ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-line-strong bg-white/5'
                 }`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -428,7 +428,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
                       {!connected && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {doc.envVars.map(v => (
-                            <code key={v} className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-gray-300">{v}</code>
+                            <code key={v} className="rounded bg-fill px-1.5 py-0.5 text-xs text-gray-300">{v}</code>
                           ))}
                         </div>
                       )}
@@ -518,7 +518,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-line-strong">
             <div>
               <p className="text-sm font-medium text-white">Copy trade alerts</p>
               <p className="text-xs text-gray-500 mt-0.5">Get notified when a copy trade executes or is vetoed</p>
@@ -526,7 +526,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
             <button
               onClick={() => setNotifications(n => !n)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                notifications ? 'bg-indigo-600' : 'bg-white/10'
+                notifications ? 'bg-indigo-600' : 'bg-fill'
               }`}
             >
               <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
@@ -553,7 +553,7 @@ export function SettingsClient({ settings, brokerStatus, aiData }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-400 mb-4">Permanently delete your account and all data. Cannot be undone.</p>
+          <p className="text-sm text-text-1 mb-4">Permanently delete your account and all data. Cannot be undone.</p>
           <Button variant="danger" size="sm">Delete Account</Button>
         </CardContent>
       </Card>

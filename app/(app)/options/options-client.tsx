@@ -7,6 +7,7 @@ import { Input, Select } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import { Plus, X, Calculator, TrendingUp, TrendingDown, Clock } from 'lucide-react'
 import { AssetStrategyPanel } from '@/components/trading/AssetStrategyPanel'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface OptionPos {
   id: string
@@ -152,7 +153,7 @@ export function OptionsClient({ initialPositions }: Props) {
             <div className="p-4">
               <p className="text-xs text-gray-500">Unrealized P&L</p>
               <p className={`text-lg font-bold ${totalPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
+                <TrendArrow value={totalPnL} />{totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
               </p>
             </div>
           </Card>
@@ -168,7 +169,7 @@ export function OptionsClient({ initialPositions }: Props) {
       {/* Positions */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Positions</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider">Positions</h2>
           <Button size="sm" onClick={() => setShowAdd(v => !v)}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Add Position
@@ -178,7 +179,7 @@ export function OptionsClient({ initialPositions }: Props) {
         {showAdd && (
           <Card className="mb-4">
             <div className="p-4 space-y-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">New Option Position</p>
+              <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">New Option Position</p>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Symbol" value={form.symbol} placeholder="AAPL"
                   onChange={e => setForm(f => ({ ...f, symbol: e.target.value.toUpperCase() }))} />
@@ -214,7 +215,7 @@ export function OptionsClient({ initialPositions }: Props) {
         {positions.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/20 p-10 text-center">
             <TrendingUp className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">No open option positions</p>
+            <p className="text-sm text-text-1">No open option positions</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -231,7 +232,7 @@ export function OptionsClient({ initialPositions }: Props) {
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${pos.option_type === 'call' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                             {pos.option_type.toUpperCase()}
                           </span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-gray-400">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-fill text-text-1">
                             {STRATEGY_LABELS[pos.strategy] ?? pos.strategy}
                           </span>
                         </div>
@@ -239,7 +240,7 @@ export function OptionsClient({ initialPositions }: Props) {
                           ${pos.strike} strike · {pos.contracts} contract{pos.contracts !== 1 ? 's' : ''} · expires {pos.expiration}
                         </p>
                       </div>
-                      <button onClick={() => closePosition(pos.id)} className="text-gray-600 hover:text-gray-400 ml-2 shrink-0">
+                      <button onClick={() => closePosition(pos.id)} className="text-gray-600 hover:text-text-1 ml-2 shrink-0">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
@@ -251,12 +252,12 @@ export function OptionsClient({ initialPositions }: Props) {
                       <div>
                         <p className="text-gray-500">P&L</p>
                         <p className={`font-medium ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+                          <TrendArrow value={pnl} />{pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3 text-gray-600" />
-                        <p className={`font-medium ${daysLeft <= 7 ? 'text-red-400' : daysLeft <= 21 ? 'text-amber-400' : 'text-gray-400'}`}>
+                        <p className={`font-medium ${daysLeft <= 7 ? 'text-red-400' : daysLeft <= 21 ? 'text-amber-400' : 'text-text-1'}`}>
                           {daysLeft}d left
                         </p>
                       </div>
@@ -280,7 +281,7 @@ export function OptionsClient({ initialPositions }: Props) {
 
       {/* Greeks Calculator */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Black-Scholes Calculator</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Black-Scholes Calculator</h2>
         <Card>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

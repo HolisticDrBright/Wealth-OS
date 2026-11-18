@@ -18,10 +18,10 @@ export function BacktestDetailClient({ job, result }: Props) {
   if (!result) {
     return (
       <div className="p-6">
-        <Link href="/backtests" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-6">
+        <Link href="/backtests" className="flex items-center gap-2 text-sm text-text-1 hover:text-white mb-6">
           <ArrowLeft className="h-4 w-4" /> Back to Backtests
         </Link>
-        <p className="text-gray-400">Results not yet available for this backtest.</p>
+        <p className="text-text-1">Results not yet available for this backtest.</p>
       </div>
     )
   }
@@ -53,13 +53,13 @@ export function BacktestDetailClient({ job, result }: Props) {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <Link href="/backtests" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white w-fit">
+      <Link href="/backtests" className="flex items-center gap-2 text-sm text-text-1 hover:text-white w-fit">
         <ArrowLeft className="h-4 w-4" /> Back to Backtests
       </Link>
 
       <div>
         <h1 className="text-2xl font-bold text-white mb-1">{job.name}</h1>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-text-1">
           {job.symbols.join(', ')} · {job.start_date} → {job.end_date} · ${Number(job.initial_capital_usd).toLocaleString()} capital
         </p>
       </div>
@@ -67,7 +67,7 @@ export function BacktestDetailClient({ job, result }: Props) {
       {/* KPI grid */}
       <div className="grid grid-cols-4 gap-3">
         {kpis.map(k => (
-          <div key={k.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div key={k.label} className="rounded-xl border border-line-strong bg-white/5 p-3">
             <p className="text-xs text-gray-500 mb-1">{k.label}</p>
             <p className={cn('text-lg font-bold', k.positive ? 'text-green-400' : 'text-red-400')}>{k.value}</p>
           </div>
@@ -76,7 +76,7 @@ export function BacktestDetailClient({ job, result }: Props) {
 
       {/* Equity curve */}
       {equitySampled.length > 1 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+        <div className="rounded-xl border border-line-strong bg-white/5 p-5">
           <p className="text-sm font-semibold text-gray-300 mb-4">Equity Curve vs Benchmark</p>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={equitySampled}>
@@ -87,9 +87,9 @@ export function BacktestDetailClient({ job, result }: Props) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false}
+              <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false}
                 tickFormatter={d => d?.slice(5) ?? ''} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false}
+              <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false}
                 tickFormatter={v => `$${(Number(v)/1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ background: '#0a0b0f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
@@ -104,13 +104,13 @@ export function BacktestDetailClient({ job, result }: Props) {
 
       {/* Monthly returns */}
       {monthlyData.length > 0 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+        <div className="rounded-xl border border-line-strong bg-white/5 p-5">
           <p className="text-sm font-semibold text-gray-300 mb-4">Monthly Returns (%)</p>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-              <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false}
+              <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} tickLine={false} axisLine={false}
                 tickFormatter={v => `${v}%`} />
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
               <Tooltip
@@ -129,18 +129,18 @@ export function BacktestDetailClient({ job, result }: Props) {
 
       {/* Trade stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Winning Trades</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider mb-1">Winning Trades</p>
           <p className="text-2xl font-bold text-green-400">{result.winning_trades}</p>
           <p className="text-xs text-gray-500 mt-1">avg ${result.avg_win_usd?.toFixed(0) ?? 0} gain</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Losing Trades</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider mb-1">Losing Trades</p>
           <p className="text-2xl font-bold text-red-400">{result.losing_trades}</p>
           <p className="text-xs text-gray-500 mt-1">avg ${result.avg_loss_usd?.toFixed(0) ?? 0} loss</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Max DD Duration</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider mb-1">Max DD Duration</p>
           <p className="text-2xl font-bold text-white">{result.max_drawdown_duration_days ?? 0}</p>
           <p className="text-xs text-gray-500 mt-1">trading days</p>
         </div>

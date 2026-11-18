@@ -5,11 +5,12 @@ import { EmptyState } from '@/components/ui/states'
 import { cn, formatCurrency } from '@/lib/utils'
 import { FlaskConical } from 'lucide-react'
 import type { PaperView } from '@/lib/actions/command-center'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 function Chip({ label, value, tone }: { label: string; value: string; tone?: 'pos' | 'neg' }) {
   const color = tone === 'pos' ? 'text-emerald-400' : tone === 'neg' ? 'text-red-400' : 'text-gray-200'
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px]">
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-line-strong bg-white/5 px-2 py-1 text-xs">
       <span className="text-gray-500">{label}</span>
       <span className={cn('font-semibold tabular-nums', color)}>{value}</span>
     </span>
@@ -43,7 +44,7 @@ export function PaperTradesPanel({ paper }: { paper: PaperView }) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-wider text-gray-600">
+              <tr className="text-left text-xs uppercase tracking-wider text-gray-600">
                 <th className="pb-2 pr-3 font-medium">Strategy</th>
                 <th className="pb-2 pr-3 font-medium">Symbol</th>
                 <th className="pb-2 pr-3 font-medium">Dir</th>
@@ -68,7 +69,7 @@ export function PaperTradesPanel({ paper }: { paper: PaperView }) {
                       {formatCurrency(p.notionalUsd)}
                     </td>
                     <td className={cn('py-2 text-right font-semibold tabular-nums', pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                      {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+                      <TrendArrow value={pnl} />{pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
                     </td>
                   </tr>
                 )
@@ -76,7 +77,7 @@ export function PaperTradesPanel({ paper }: { paper: PaperView }) {
             </tbody>
           </table>
           {positions.length > 10 && (
-            <p className="pt-2 text-center text-[11px] text-gray-600">+{positions.length - 10} more open</p>
+            <p className="pt-2 text-center text-xs text-gray-600">+{positions.length - 10} more open</p>
           )}
         </div>
       )}

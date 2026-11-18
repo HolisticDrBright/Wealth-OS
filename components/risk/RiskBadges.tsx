@@ -37,7 +37,7 @@ function RiskBadge({
     <span
       title={title ?? `${label}: ${value}`}
       className={cn(
-        'inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-none',
+        'inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium leading-none',
         tone.text, tone.bg, tone.border, className,
       )}
     >

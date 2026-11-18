@@ -21,7 +21,7 @@ export function SimulationStatusCard({ decision }: Props) {
   const confidence = miroFish?.confidence ?? 'medium'
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="rounded-xl border border-line-strong bg-white/5 p-4">
       <div className="flex items-center gap-2 mb-4">
         <Brain className="h-4 w-4 text-indigo-400" />
         <p className="text-sm font-semibold text-white">MiroFish Simulation</p>
@@ -36,7 +36,7 @@ export function SimulationStatusCard({ decision }: Props) {
             <>
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <div className="flex items-center gap-1.5 text-xs text-text-1">
                     <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                     Bull probability
                   </div>
@@ -44,7 +44,7 @@ export function SimulationStatusCard({ decision }: Props) {
                     {((meta.bullProbability ?? 0.5) * 100).toFixed(0)}%
                   </span>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-white/10">
+                <div className="h-1.5 w-full rounded-full bg-fill">
                   <div
                     className="h-full rounded-full bg-emerald-500 transition-all"
                     style={{ width: `${(meta.bullProbability ?? 0.5) * 100}%` }}
@@ -53,7 +53,7 @@ export function SimulationStatusCard({ decision }: Props) {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <div className="flex items-center gap-1.5 text-xs text-text-1">
                     <TrendingDown className="h-3.5 w-3.5 text-red-400" />
                     Bear probability
                   </div>
@@ -61,7 +61,7 @@ export function SimulationStatusCard({ decision }: Props) {
                     {((meta.bearProbability ?? 0.5) * 100).toFixed(0)}%
                   </span>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-white/10">
+                <div className="h-1.5 w-full rounded-full bg-fill">
                   <div
                     className="h-full rounded-full bg-red-500 transition-all"
                     style={{ width: `${(meta.bearProbability ?? 0.5) * 100}%` }}
@@ -70,7 +70,7 @@ export function SimulationStatusCard({ decision }: Props) {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <div className="flex items-center gap-1.5 text-xs text-text-1">
                     <Minus className="h-3.5 w-3.5 text-amber-400" />
                     Tail risk score
                   </div>
@@ -78,7 +78,7 @@ export function SimulationStatusCard({ decision }: Props) {
                     {meta.tailRiskScore ?? 50}/100
                   </span>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-white/10">
+                <div className="h-1.5 w-full rounded-full bg-fill">
                   <div
                     className="h-full rounded-full bg-amber-500 transition-all"
                     style={{ width: `${meta.tailRiskScore ?? 50}%` }}
@@ -90,7 +90,7 @@ export function SimulationStatusCard({ decision }: Props) {
           {miroFish?.keyPoints && miroFish.keyPoints.length > 0 && (
             <div className="mt-2 space-y-1">
               {miroFish.keyPoints.slice(0, 3).map((pt, i) => (
-                <p key={i} className="text-xs text-gray-400 flex items-start gap-1.5">
+                <p key={i} className="text-xs text-text-1 flex items-start gap-1.5">
                   <span className="text-indigo-400 shrink-0">•</span>{pt}
                 </p>
               ))}

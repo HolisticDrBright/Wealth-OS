@@ -14,7 +14,7 @@ export default async function TradersPage() {
       {view ? (
         <TradersClient view={view} />
       ) : (
-        <div className="p-6 text-sm text-gray-400">
+        <div className="p-6 text-sm text-text-1">
           We couldn&apos;t load traders. Refresh to try again.
         </div>
       )}

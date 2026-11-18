@@ -14,6 +14,7 @@ import {
   ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
 } from 'recharts'
 import type { EquityCurveView } from '@/lib/actions/equity-curve'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 /** Underwater series: distance below the running high-water mark (≤ 0). */
 function withUnderwater(points: EquityCurveView['points']) {
@@ -31,7 +32,7 @@ function fmt(usd: number): string {
 }
 
 function pnlClass(v: number): string {
-  return v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-gray-400'
+  return v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-text-1'
 }
 
 export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
@@ -40,9 +41,9 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
   const right = hasData ? (
     <div className="flex items-baseline gap-3">
       <span className={cn('text-sm font-semibold tabular-nums', pnlClass(data.totalPnlUsd))}>
-        {fmt(data.totalPnlUsd)} total
+        <TrendArrow value={data.totalPnlUsd} />{fmt(data.totalPnlUsd)} total
       </span>
-      <span className="text-[11px] text-gray-600 tabular-nums">
+      <span className="text-xs text-gray-600 tabular-nums">
         {fmt(data.totalRealizedUsd)} realized · {fmt(data.totalUnrealizedUsd)} open
         {data.winRate != null && ` · ${Math.round(data.winRate * 100)}% wins`}
       </span>
@@ -63,8 +64,8 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={withUnderwater(data.points)} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} minTickGap={40} />
-                <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} tickLine={false} axisLine={false} width={46}
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} minTickGap={40} />
+                <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={46}
                   tickFormatter={(v: number) => `$${v}`} />
                 <Tooltip
                   contentStyle={{ background: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
@@ -85,7 +86,7 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex items-center gap-4 text-[11px] text-gray-600">
+          <div className="flex items-center gap-4 text-xs text-gray-600">
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-0.5 w-4 rounded bg-emerald-400" /> Real (accepted trades)
             </span>
@@ -95,7 +96,7 @@ export function EquityCurvePanel({ data }: { data: EquityCurveView | null }) {
             <span className="ml-auto flex items-center gap-2 tabular-nums">
               <a href="/api/ledger/head" target="_blank" rel="noreferrer"
                 title="Every decision, order, and outcome is hash-chained — fetch the head and recompute independently"
-                className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/20">
+                className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20">
                 ✓ Verified ledger
               </a>
               {data.closedTrades} closed trades

@@ -48,7 +48,7 @@ async function RegimeHealthCard() {
           <p className="text-gray-700">Updated {new Date(regime.resolvedAt).toLocaleTimeString()}</p>
         </div>
       </div>
-      <p className="text-xs text-gray-400">{effect}</p>
+      <p className="text-xs text-text-1">{effect}</p>
     </div>
   )
 }
@@ -105,7 +105,7 @@ export default async function SettingsPage() {
       <div className="mx-6 mb-4 max-w-3xl">
         <Link
           href="/admin/paper-trading-stats"
-          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-300 hover:bg-white/10 transition-colors"
+          className="flex items-center gap-3 rounded-xl border border-line-strong bg-white/5 px-4 py-3 text-sm text-gray-300 hover:bg-fill transition-colors"
         >
           <BarChart2 className="h-4 w-4 text-indigo-400" />
           <div>

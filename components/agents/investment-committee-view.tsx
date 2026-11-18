@@ -31,7 +31,7 @@ function AgentRow({ output }: { output: AgentOutput }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className={`text-xs font-bold ${config.color}`}>{output.score}</span>
-          <div className="h-1.5 w-16 rounded-full bg-white/10">
+          <div className="h-1.5 w-16 rounded-full bg-fill">
             <div
               className={`h-full rounded-full ${
                 output.score >= 70 ? 'bg-emerald-500' :
@@ -50,7 +50,7 @@ function AgentRow({ output }: { output: AgentOutput }) {
           {output.keyPoints.length > 0 && (
             <ul className="space-y-1">
               {output.keyPoints.map((pt, i) => (
-                <li key={i} className="flex items-start gap-1.5 text-xs text-gray-400">
+                <li key={i} className="flex items-start gap-1.5 text-xs text-text-1">
                   <span className="text-indigo-400 shrink-0">•</span>{pt}
                 </li>
               ))}
@@ -78,7 +78,7 @@ export function InvestmentCommitteeView({ decision, defaultExpanded = false }: P
   }
 
   return (
-    <div className="rounded-xl border border-white/10 overflow-hidden">
+    <div className="rounded-xl border border-line-strong overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
@@ -92,10 +92,10 @@ export function InvestmentCommitteeView({ decision, defaultExpanded = false }: P
             {votes.reject > 0  && <span className="text-red-400">{votes.reject} reject</span>}
           </div>
         </div>
-        {open ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+        {open ? <ChevronUp className="h-4 w-4 text-text-1" /> : <ChevronDown className="h-4 w-4 text-text-1" />}
       </button>
       {open && (
-        <div className="px-4 pb-4 space-y-2 border-t border-white/10 pt-3">
+        <div className="px-4 pb-4 space-y-2 border-t border-line-strong pt-3">
           {decision.agentOutputs.map(output => (
             <AgentRow key={output.agent} output={output} />
           ))}

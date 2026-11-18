@@ -6,6 +6,7 @@ import type { MarketplaceListing, MarketplaceSubscription } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { Store, Star, Users, TrendingUp, TrendingDown, Shield, CheckCircle, Plus } from 'lucide-react'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface Props {
   initialListings: MarketplaceListing[]
@@ -60,7 +61,7 @@ export function MarketplaceClient({ initialListings, initialSubscriptions }: Pro
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Strategy Marketplace</h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-text-1 mt-1">
             {filtered.length} strategies · {subscriptions.length} subscribed
           </p>
         </div>
@@ -83,14 +84,14 @@ export function MarketplaceClient({ initialListings, initialSubscriptions }: Pro
               'px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all',
               assetFilter === ac
                 ? 'bg-indigo-600 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                : 'bg-white/5 text-text-1 hover:bg-fill hover:text-white'
             )}
           >
             {ac === 'all' ? 'All Classes' : ac}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-text-1 cursor-pointer">
             <input
               type="checkbox"
               checked={showFreeOnly}
@@ -102,7 +103,7 @@ export function MarketplaceClient({ initialListings, initialSubscriptions }: Pro
           <select
             value={sort}
             onChange={e => setSort(e.target.value)}
-            className="rounded-lg border border-white/10 bg-[#0a0b0f] px-3 py-1.5 text-sm text-white focus:outline-none"
+            className="rounded-lg border border-line-strong bg-bg-0 px-3 py-1.5 text-sm text-white focus:outline-none"
           >
             {SORT_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -123,7 +124,7 @@ export function MarketplaceClient({ initialListings, initialSubscriptions }: Pro
             const isSubscribed = subscribedIds.has(listing.id)
             const mySub = subscriptions.find(s => s.listing_id === listing.id)
             return (
-              <div key={listing.id} className="rounded-xl border border-white/10 bg-white/5 p-5 flex flex-col gap-4 hover:border-white/20 transition-colors">
+              <div key={listing.id} className="rounded-xl border border-line-strong bg-white/5 p-5 flex flex-col gap-4 hover:border-white/20 transition-colors">
                 {/* Title row */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -136,7 +137,7 @@ export function MarketplaceClient({ initialListings, initialSubscriptions }: Pro
                       )}
                     </div>
                     {listing.description && (
-                      <p className="text-xs text-gray-400 line-clamp-2">{listing.description}</p>
+                      <p className="text-xs text-text-1 line-clamp-2">{listing.description}</p>
                     )}
                   </div>
                   <div className="text-right shrink-0">
@@ -161,7 +162,7 @@ export function MarketplaceClient({ initialListings, initialSubscriptions }: Pro
                     <p className="text-xs text-gray-500 mb-0.5">Total Return</p>
                     {listing.total_return_pct != null ? (
                       <p className={cn('text-sm font-bold', listing.total_return_pct >= 0 ? 'text-green-400' : 'text-red-400')}>
-                        {listing.total_return_pct >= 0 ? '+' : ''}{listing.total_return_pct.toFixed(1)}%
+                        <TrendArrow value={listing.total_return_pct} />{listing.total_return_pct >= 0 ? '+' : ''}{listing.total_return_pct.toFixed(1)}%
                       </p>
                     ) : <p className="text-sm text-gray-500">—</p>}
                   </div>
@@ -200,7 +201,7 @@ export function MarketplaceClient({ initialListings, initialSubscriptions }: Pro
                     <button
                       onClick={() => mySub && handleCancel(mySub)}
                       disabled={pending}
-                      className="text-xs text-gray-400 hover:text-red-400 transition-colors"
+                      className="text-xs text-text-1 hover:text-red-400 transition-colors"
                     >
                       Unsubscribe
                     </button>

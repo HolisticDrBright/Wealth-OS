@@ -16,23 +16,23 @@ function pct(v: number): string {
 
 const REGIME_TONE: Record<string, string> = {
   RISK_ON: 'text-emerald-400',
-  NEUTRAL: 'text-gray-400',
+  NEUTRAL: 'text-text-1',
   RISK_OFF: 'text-amber-400',
   CRISIS: 'text-red-400',
 }
 
 export function BookAllocationPanel({ data }: { data: BookAllocationView }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="rounded-xl border border-line-strong bg-white/5 p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-indigo-400" />
           <h3 className="text-sm font-semibold text-gray-200">Risk Books</h3>
-          <span className="text-[11px] text-gray-600">
+          <span className="text-xs text-gray-600">
             ${Math.round(data.totalNotionalUsd).toLocaleString()} open notional
           </span>
         </div>
-        <span className={cn('text-xs font-medium', REGIME_TONE[data.regime] ?? 'text-gray-400')}>
+        <span className={cn('text-xs font-medium', REGIME_TONE[data.regime] ?? 'text-text-1')}>
           {data.regime.replace('_', ' ')}
         </span>
       </div>
@@ -43,12 +43,12 @@ export function BookAllocationPanel({ data }: { data: BookAllocationView }) {
           const nearCap = b.utilization >= 0.8 && !overCap
           const cut = b.regimeMultiplier < 1
           return (
-            <div key={b.book} className="rounded-lg border border-white/10 bg-white/[0.02] p-3" title={b.blurb}>
+            <div key={b.book} className="rounded-lg border border-line-strong bg-white/[0.02] p-3" title={b.blurb}>
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-gray-300">{b.label}</p>
                 {cut && (
                   <span className={cn(
-                    'text-[10px] font-medium',
+                    'text-xs font-medium',
                     b.regimeMultiplier === 0 ? 'text-red-400' : 'text-amber-400',
                   )}>
                     {b.regimeMultiplier === 0 ? 'closed' : `×${b.regimeMultiplier}`}
@@ -57,9 +57,9 @@ export function BookAllocationPanel({ data }: { data: BookAllocationView }) {
               </div>
               <p className="mt-1 text-sm font-semibold tabular-nums text-gray-200">
                 {pct(b.share)}
-                <span className="ml-1 text-[10px] font-normal text-gray-600">of {pct(b.capShare)} cap</span>
+                <span className="ml-1 text-xs font-normal text-gray-600">of {pct(b.capShare)} cap</span>
               </p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-fill">
                 <div
                   className={cn(
                     'h-full rounded-full transition-all',

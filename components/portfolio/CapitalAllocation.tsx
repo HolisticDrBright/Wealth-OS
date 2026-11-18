@@ -34,9 +34,9 @@ export function CapitalAllocation({ slices, currentUnavailable = false, classNam
   const totalCurrent = slices.reduce((a, s) => a + (s.currentUsd ?? 0), 0)
 
   return (
-    <div className={cn('rounded-xl border border-white/10 bg-white/5 p-4', className)}>
+    <div className={cn('rounded-xl border border-line-strong bg-white/5 p-4', className)}>
       <div className="mb-3 flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-1">
           <PieChart className="h-3.5 w-3.5" /> Capital Allocation
         </p>
         {showCurrent && totalCurrent > 0 && (
@@ -45,9 +45,9 @@ export function CapitalAllocation({ slices, currentUnavailable = false, classNam
       </div>
 
       {currentUnavailable && (
-        <div className="mb-3 flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-line-strong bg-white/[0.03] p-2.5">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-400" />
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-text-1">
             Live balances unavailable — showing recommended targets only. Connect an account to compare against your actual mix.
           </p>
         </div>
@@ -69,7 +69,7 @@ export function CapitalAllocation({ slices, currentUnavailable = false, classNam
             <span className={cn('h-2 w-2 shrink-0 rounded-sm', s.color)} />
             <span className="flex-1 truncate text-gray-300">{s.label}</span>
             {showCurrent && (
-              <span className="w-14 text-right tabular-nums text-gray-400">
+              <span className="w-14 text-right tabular-nums text-text-1">
                 {s.currentPct != null ? `${s.currentPct.toFixed(0)}%` : '—'}
               </span>
             )}
@@ -81,7 +81,7 @@ export function CapitalAllocation({ slices, currentUnavailable = false, classNam
       </div>
 
       {showCurrent && (
-        <p className="mt-2 text-[11px] text-gray-600">Left = current share · Right = recommended target</p>
+        <p className="mt-2 text-xs text-gray-600">Left = current share · Right = recommended target</p>
       )}
     </div>
   )

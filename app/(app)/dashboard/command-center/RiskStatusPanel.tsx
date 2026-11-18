@@ -7,13 +7,14 @@ import { formatCurrency } from '@/lib/utils'
 import { Shield } from 'lucide-react'
 import type { RiskSummary } from '@/lib/actions/risk'
 import type { RiskControlsView } from '@/lib/actions/command-center'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'pos' | 'neg' }) {
+function Stat({ label, value, tone, trend }: { label: string; value: string; tone?: 'pos' | 'neg'; trend?: number }) {
   const color = tone === 'pos' ? 'text-emerald-400' : tone === 'neg' ? 'text-red-400' : 'text-gray-100'
   return (
     <div className="min-w-0">
-      <p className="text-[10px] uppercase tracking-wider text-gray-600">{label}</p>
-      <p className={`truncate text-sm font-semibold tabular-nums ${color}`}>{value}</p>
+      <p className="text-xs uppercase tracking-wider text-gray-600">{label}</p>
+      <p className={`truncate text-sm font-semibold tabular-nums ${color}`}><TrendArrow value={trend} />{value}</p>
     </div>
   )
 }
@@ -50,6 +51,7 @@ export function RiskStatusPanel({
               label="Today P&L"
               value={`${risk.today_pnl >= 0 ? '+' : ''}${formatCurrency(risk.today_pnl)}`}
               tone={risk.today_pnl >= 0 ? 'pos' : 'neg'}
+              trend={risk.today_pnl}
             />
             <Stat label="Largest position" value={`${risk.largest_position_pct.toFixed(1)}%`} />
           </div>

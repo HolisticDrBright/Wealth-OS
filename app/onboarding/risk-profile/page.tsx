@@ -185,7 +185,7 @@ export default function RiskProfileWizard() {
         <div className="text-center space-y-4">
           <div className="text-6xl">&#10003;</div>
           <p className="text-white text-xl font-semibold">You&#8217;re set up</p>
-          <p className="text-gray-400 text-sm">Taking you to your dashboard&#8230;</p>
+          <p className="text-text-1 text-sm">Taking you to your dashboard&#8230;</p>
         </div>
       </div>
     )
@@ -210,7 +210,7 @@ export default function RiskProfileWizard() {
         {state.step === 1 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">What is this money for?</h1>
-            <p className="text-gray-400 text-sm">
+            <p className="text-text-1 text-sm">
               Everything Wealth OS does is aimed at a goal you choose. You can add more goals later.
             </p>
             <div className="space-y-3">
@@ -233,7 +233,7 @@ export default function RiskProfileWizard() {
             <h1 className="text-2xl font-bold">How much, and by when?</h1>
             <div className="space-y-4">
               <div>
-                <label htmlFor="goal-name" className="mb-1.5 block text-sm text-gray-400">Goal name</label>
+                <label htmlFor="goal-name" className="mb-1.5 block text-sm text-text-1">Goal name</label>
                 <input
                   id="goal-name"
                   type="text"
@@ -243,7 +243,7 @@ export default function RiskProfileWizard() {
                 />
               </div>
               <div>
-                <label htmlFor="goal-amount" className="mb-1.5 block text-sm text-gray-400">Target amount (USD)</label>
+                <label htmlFor="goal-amount" className="mb-1.5 block text-sm text-text-1">Target amount (USD)</label>
                 <input
                   id="goal-amount"
                   type="number"
@@ -256,7 +256,7 @@ export default function RiskProfileWizard() {
                 />
               </div>
               <div>
-                <label htmlFor="goal-date" className="mb-1.5 block text-sm text-gray-400">
+                <label htmlFor="goal-date" className="mb-1.5 block text-sm text-text-1">
                   Target date <span className="text-gray-600">(optional)</span>
                 </label>
                 <input
@@ -282,11 +282,11 @@ export default function RiskProfileWizard() {
         {state.step === 3 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">How much can you put in each month?</h1>
-            <p className="text-gray-400 text-sm">
+            <p className="text-text-1 text-sm">
               A steady monthly amount matters more than picking perfect investments. $0 is fine — you can change it anytime.
             </p>
             <div>
-              <label htmlFor="goal-monthly" className="mb-1.5 block text-sm text-gray-400">Monthly contribution (USD)</label>
+              <label htmlFor="goal-monthly" className="mb-1.5 block text-sm text-text-1">Monthly contribution (USD)</label>
               <input
                 id="goal-monthly"
                 type="number"
@@ -383,7 +383,7 @@ export default function RiskProfileWizard() {
         {state.step === 7 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">Any asset classes you want to exclude?</h1>
-            <p className="text-gray-400 text-sm">Optional. You can change this later.</p>
+            <p className="text-text-1 text-sm">Optional. You can change this later.</p>
             <div className="space-y-3">
               {ASSET_OPTIONS.map(opt => (
                 <button
@@ -415,7 +415,7 @@ export default function RiskProfileWizard() {
         {state.step === 8 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">Auto-execute trades under a threshold?</h1>
-            <p className="text-gray-400 text-sm">
+            <p className="text-text-1 text-sm">
               Trades below this size execute without requiring your approval. Set to $0 to review
               all trades manually.
             </p>
@@ -444,7 +444,7 @@ export default function RiskProfileWizard() {
         {state.step === 9 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">What US state do you live in?</h1>
-            <p className="text-gray-400 text-sm">
+            <p className="text-text-1 text-sm">
               Some prediction market venues are restricted by state law. We use this to
               automatically disable unavailable strategies. Optional — skip if outside the US.
             </p>
@@ -519,7 +519,7 @@ export default function RiskProfileWizard() {
             </button>
             <button
               onClick={() => setState(s => ({ ...s, step: 1, adjustment: 0, baseIndex: 2, stateOfResidence: null }))}
-              className="w-full py-3 text-gray-400 text-sm hover:text-white transition-colors"
+              className="w-full py-3 text-text-1 text-sm hover:text-white transition-colors"
             >
               Start over
             </button>

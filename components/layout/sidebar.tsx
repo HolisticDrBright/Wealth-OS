@@ -109,7 +109,7 @@ function pathActive(pathname: string, href: string): boolean {
 /** Desktop rail: hidden below md (the drawer takes over there). */
 export function Sidebar({ uiMode = 'pro' }: { uiMode?: UiMode }) {
   return (
-    <aside className="hidden h-screen w-64 flex-col border-r border-white/10 bg-[#0a0b0f] md:flex">
+    <aside className="hidden h-screen w-64 flex-col border-r border-line-strong bg-bg-0 md:flex">
       <SidebarContent uiMode={uiMode} />
     </aside>
   )
@@ -123,23 +123,23 @@ export function MobileNav({ uiMode = 'pro' }: { uiMode?: UiMode }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="md:hidden">
-      <div className="flex items-center gap-3 border-b border-white/10 bg-[#0a0b0f] px-4 py-2.5">
+      <div className="flex items-center gap-3 border-b border-line-strong bg-bg-0 px-4 py-2.5">
         <button
           onClick={() => setOpen(true)}
           aria-label="Open navigation menu"
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 text-gray-300 hover:bg-white/5"
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-line-strong text-gray-300 hover:bg-white/5"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
-          <DollarSign className="h-4 w-4 text-white" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-cyan">
+          <DollarSign className="h-4 w-4 text-bg-0" />
         </div>
         <span className="text-sm font-bold text-white">Wealth OS</span>
       </div>
 
       {open && (
         <div className="fixed inset-0 z-50 flex">
-          <aside className="flex h-full w-72 max-w-[85vw] flex-col border-r border-white/10 bg-[#0a0b0f]">
+          <aside className="flex h-full w-72 max-w-[85vw] flex-col border-r border-line-strong bg-bg-0">
             <SidebarContent uiMode={uiMode} onNavigate={() => setOpen(false)} />
           </aside>
           <button
@@ -150,7 +150,7 @@ export function MobileNav({ uiMode = 'pro' }: { uiMode?: UiMode }) {
           <button
             aria-label="Close navigation menu"
             onClick={() => setOpen(false)}
-            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-lg bg-white/10 text-white"
+            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-lg bg-fill text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -180,9 +180,9 @@ function SidebarContent({ uiMode = 'pro', onNavigate }: { uiMode?: UiMode; onNav
   return (
     <>
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600">
-          <DollarSign className="h-5 w-5 text-white" />
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-line-strong">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-cyan">
+          <DollarSign className="h-5 w-5 text-bg-0" />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">Wealth OS</p>
@@ -208,7 +208,7 @@ function SidebarContent({ uiMode = 'pro', onNavigate }: { uiMode?: UiMode; onNav
               <div
                 className={cn(
                   'group flex items-center rounded-lg text-sm font-medium transition-all',
-                  selfActive ? 'text-accent-cyan' : 'text-gray-400 hover:bg-white/5 hover:text-white',
+                  selfActive ? 'text-accent-cyan' : 'text-text-1 hover:bg-white/5 hover:text-white',
                 )}
                 style={selfActive ? ACTIVE_STYLE : undefined}
               >
@@ -234,7 +234,7 @@ function SidebarContent({ uiMode = 'pro', onNavigate }: { uiMode?: UiMode; onNav
 
               {/* Children */}
               {expanded && (
-                <div className="mt-0.5 ml-4 space-y-0.5 border-l border-white/10 pl-2">
+                <div className="mt-0.5 ml-4 space-y-0.5 border-l border-line-strong pl-2">
                   {node.children.map(child => {
                     const active = pathActive(pathname, child.href)
                     const ChildIcon = child.icon
@@ -261,7 +261,7 @@ function SidebarContent({ uiMode = 'pro', onNavigate }: { uiMode?: UiMode; onNav
       </nav>
 
       {/* Footer */}
-      <div className="space-y-0.5 border-t border-white/10 px-3 py-4">
+      <div className="space-y-0.5 border-t border-line-strong px-3 py-4">
         <FooterLink href="/settings" label="Settings" icon={Settings} onNavigate={onNavigate} />
         {uiMode !== 'simple' && (
           <>
@@ -272,7 +272,7 @@ function SidebarContent({ uiMode = 'pro', onNavigate }: { uiMode?: UiMode; onNav
         <form action="/auth/signout" method="post">
           <button
             type="submit"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-400 transition-all hover:bg-white/5 hover:text-red-400"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-1 transition-all hover:bg-white/5 hover:text-red-400"
           >
             <LogOut className="h-4 w-4 text-gray-500" />
             Sign Out
@@ -292,7 +292,7 @@ function TopLink({ href, label, icon: Icon, active, onNavigate }: {
       onClick={onNavigate}
       className={cn(
         'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
-        active ? 'text-accent-cyan' : 'text-gray-400 hover:bg-white/5 hover:text-white',
+        active ? 'text-accent-cyan' : 'text-text-1 hover:bg-white/5 hover:text-white',
       )}
       style={active ? ACTIVE_STYLE : undefined}
     >
@@ -310,7 +310,7 @@ function FooterLink({ href, label, icon: Icon, dim, onNavigate }: {
     <Link
       href={href}
       onClick={onNavigate}
-      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-400 transition-all hover:bg-white/5 hover:text-white"
+      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-1 transition-all hover:bg-white/5 hover:text-white"
     >
       <Icon className={cn('h-4 w-4 text-gray-500', dim && 'opacity-50')} />
       {label}

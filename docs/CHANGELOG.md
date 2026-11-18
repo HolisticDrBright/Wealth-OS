@@ -1,5 +1,35 @@
 # Wealth OS Changelog
 
+## 2026-11-18 — Web polish (Phase 7)
+
+1. **Cyan accent** replaces indigo on the logo (sidebar + mobile drawer),
+   landing, login and signup. Text on cyan is dark (`text-bg-0`); white on
+   cyan would fail contrast. The shared Button/Badge/Input/Progress
+   primitives and ~400 other indigo uses elsewhere are untouched (out of
+   the requested scope) — see "follow-up" below.
+2. **Tokens**: a codemod replaced every `bg-[#07080c]` (→ `bg-background`),
+   `border-white/10` (→ `border-line-strong`), `bg-white/10` and
+   `bg-gray-400/10` (→ new `bg-fill` token), and `text-gray-400` /
+   `bg|ring|border-gray-400` (→ `text-1`) across 116 files, plus the other
+   hardcoded surface hexes (`#0a0b0f`, `#0b0d13`, `#0f1117`, `#161922` →
+   `bg-bg-0..3`). New token: `--color-fill` in `app/globals.css`.
+3. **Topbar**: the dead search button is removed (no search feature exists);
+   the bell links to `/alerts` with a real unread badge (only when > 0) and
+   an accessible label; the hardcoded "W" avatar now shows the signed-in
+   user's initials and links to Settings (`lib/actions/topbar.ts`).
+4. **Text size**: every 9/10/11px class and inline chart tick size raised
+   to 12px (risk strip, every panel, chart axes). The 9px labels' grey-600
+   colour (≈2.4:1) lifted to the muted token on the same lines.
+5. **▲/▼**: shared `TrendArrow` (glyph hidden from screen readers, "up"/
+   "down" spoken instead, nothing for zero) on 40 gain/loss figures in 23
+   files. Threshold colours that aren't gains or losses (correlation, HHI,
+   Brier, hit rate, drift, budget) and sign-coloured chart bars (direction
+   is already shown by the bar) are unchanged.
+
+**Follow-up (not done, out of scope)**: the shared `Button` default variant
+and ~400 indigo uses inside the app are still indigo. Converting them means
+switching white button text to dark text on cyan; worth doing as one pass.
+
 ## 2026-11-18 — Mobile Simple mode (apps/mobile, Phases M1–M6)
 
 The phone app is now the four-tab beginner app from the design canvas —

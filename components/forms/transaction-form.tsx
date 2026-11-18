@@ -65,7 +65,7 @@ export function TransactionForm({ open, onClose }: TransactionFormProps) {
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors capitalize ${
                 type === t
                   ? t === 'income' ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'
-                  : 'border border-white/10 text-gray-400 hover:bg-white/5'
+                  : 'border border-line-strong text-text-1 hover:bg-white/5'
               }`}
             >
               {t}

@@ -91,8 +91,8 @@ export function StrategyToggles({ initialSettings }: Props) {
         />
       )}
 
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+        <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-text-1">
           Strategy toggles
         </p>
 
@@ -127,7 +127,7 @@ export function StrategyToggles({ initialSettings }: Props) {
                     onClick={() => handleToggle(id, !isOn)}
                     className={cn(
                       'relative shrink-0 h-6 w-11 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-[#0f1117]',
-                      isOn ? 'bg-indigo-600' : 'bg-white/10',
+                      isOn ? 'bg-indigo-600' : 'bg-fill',
                       pending && 'cursor-not-allowed opacity-60'
                     )}
                   >

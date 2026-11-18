@@ -73,7 +73,7 @@ export function SignalsTab({ initialSignals }: Props) {
               'rounded-full px-3 py-1 text-xs font-medium transition-all',
               filter === opt.id
                 ? 'bg-white/15 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                : 'bg-white/5 text-text-1 hover:bg-fill hover:text-white'
             )}
           >
             {opt.label}
@@ -85,7 +85,7 @@ export function SignalsTab({ initialSignals }: Props) {
       </div>
 
       {visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-20 text-center">
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-line-strong bg-white/5 py-20 text-center">
           <p className="text-sm font-medium text-white">No signals yet</p>
           <p className="text-xs text-gray-500">
             Signals appear here as the scheduler generates them, or when new ones

@@ -24,6 +24,7 @@ import {
 import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, Info, RefreshCw } from 'lucide-react'
 import { refreshAssetPrices } from '@/lib/actions/prices'
 import type { PriceResult } from '@/lib/prices'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 const categoryColors: Record<string, string> = {
   stock: '#6366f1',
@@ -126,7 +127,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
       {isDemo && (
         <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex items-start gap-3">
           <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-text-1">
             Showing <strong className="text-indigo-400">demo data</strong>. Click <strong className="text-white">Add Asset</strong> to start tracking your real investments.
           </p>
         </div>
@@ -158,7 +159,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
         <Card>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Unrealized Gains</p>
           <p className={`mt-2 text-2xl font-bold ${totalUnrealizedGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {totalUnrealizedGain >= 0 ? '+' : ''}{formatCurrency(totalUnrealizedGain)}
+            <TrendArrow value={totalUnrealizedGain} />{totalUnrealizedGain >= 0 ? '+' : ''}{formatCurrency(totalUnrealizedGain)}
           </p>
           <p className="mt-1 text-xs text-gray-500">
             {totalValue > 0 && totalUnrealizedGain !== 0
@@ -240,7 +241,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                     <XAxis
                       type="number"
-                      tick={{ fill: '#6b7280', fontSize: 11 }}
+                      tick={{ fill: '#6b7280', fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={(v) => `${v.toFixed(0)}%`}
@@ -248,7 +249,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      tick={{ fill: '#9ca3af', fontSize: 11 }}
+                      tick={{ fill: '#9ca3af', fontSize: 12 }}
                       axisLine={false}
                       tickLine={false}
                       width={40}
@@ -299,7 +300,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10">
+                  <tr className="border-b border-line-strong">
                     <th className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
                     <th className="pb-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                     <th className="pb-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
@@ -341,12 +342,12 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
                             if (!p || p.source === 'error') return <span className="text-gray-600 text-xs">—</span>
                             return (
                               <span className={`text-xs font-medium ${p.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {p.changePercent >= 0 ? '+' : ''}{p.changePercent.toFixed(2)}%
+                                <TrendArrow value={p.changePercent} />{p.changePercent >= 0 ? '+' : ''}{p.changePercent.toFixed(2)}%
                               </span>
                             )
                           })()}
                         </td>
-                        <td className="py-3 text-right text-gray-400">
+                        <td className="py-3 text-right text-text-1">
                           {totalValue > 0 ? ((asset.current_value / totalValue) * 100).toFixed(1) : 0}%
                         </td>
                         <td className="py-3 text-right">
@@ -358,7 +359,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
                                 <TrendingDown className="h-3 w-3 text-red-400" />
                               )}
                               <span className={gainLossPct >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                                {formatPercentage(gainLossPct)}
+                                <TrendArrow value={gainLossPct} />{formatPercentage(gainLossPct)}
                               </span>
                             </div>
                           ) : (
@@ -369,7 +370,7 @@ export function PortfolioClient({ assets: initialAssets, isDemo }: Props) {
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => { setEditingAsset(asset); setShowForm(true) }}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-fill text-gray-500 hover:text-white transition-colors"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>

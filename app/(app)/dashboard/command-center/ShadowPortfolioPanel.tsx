@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/states'
 import { cn } from '@/lib/utils'
 import { Ghost, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import type { ShadowPortfolioSummary } from '@/lib/actions/shadow-portfolio'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 function fmt(usd: number): string {
   const abs = Math.abs(usd)
@@ -33,7 +34,7 @@ export function ShadowPortfolioPanel({ data }: { data: ShadowPortfolioSummary | 
   const VIcon = v.tone === 'pos' ? TrendingUp : v.tone === 'neg' ? TrendingDown : Minus
 
   const right = hasData ? (
-    <Link href="/shadow-portfolio" className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors">
+    <Link href="/shadow-portfolio" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
       View all →
     </Link>
   ) : undefined
@@ -68,7 +69,7 @@ export function ShadowPortfolioPanel({ data }: { data: ShadowPortfolioSummary | 
           </div>
 
           {/* P&L comparison */}
-          <div className="grid grid-cols-2 divide-x divide-white/5 rounded-lg border border-white/10 bg-white/[0.02]">
+          <div className="grid grid-cols-2 divide-x divide-white/5 rounded-lg border border-line-strong bg-white/[0.02]">
             <div className="py-2.5 px-3 text-center">
               <p className={cn(
                 'text-sm font-semibold tabular-nums',
@@ -76,9 +77,9 @@ export function ShadowPortfolioPanel({ data }: { data: ShadowPortfolioSummary | 
                   : data.totalShadowPnlUsd < 0 ? 'text-red-400'
                   : 'text-gray-600',
               )}>
-                {fmt(data.totalShadowPnlUsd)}
+                <TrendArrow value={data.totalShadowPnlUsd} />{fmt(data.totalShadowPnlUsd)}
               </p>
-              <p className="text-[10px] text-gray-600 mt-0.5">Shadow (rejected)</p>
+              <p className="text-xs text-gray-600 mt-0.5">Shadow (rejected)</p>
             </div>
             <div className="py-2.5 px-3 text-center">
               <p className={cn(
@@ -87,9 +88,9 @@ export function ShadowPortfolioPanel({ data }: { data: ShadowPortfolioSummary | 
                   : data.totalRealPnlUsd < 0 ? 'text-red-400'
                   : 'text-gray-600',
               )}>
-                {fmt(data.totalRealPnlUsd)}
+                <TrendArrow value={data.totalRealPnlUsd} />{fmt(data.totalRealPnlUsd)}
               </p>
-              <p className="text-[10px] text-gray-600 mt-0.5">Real (accepted)</p>
+              <p className="text-xs text-gray-600 mt-0.5">Real (accepted)</p>
             </div>
           </div>
 
@@ -99,11 +100,11 @@ export function ShadowPortfolioPanel({ data }: { data: ShadowPortfolioSummary | 
               <span className="text-gray-600">Avg return per closed position</span>
               <div className="flex gap-3 tabular-nums">
                 <span className={cn(data.shadowAvgReturnPct != null && data.shadowAvgReturnPct > 0 ? 'text-emerald-400' : 'text-red-400')}>
-                  {pct(data.shadowAvgReturnPct)} shadow
+                  <TrendArrow value={data.shadowAvgReturnPct} />{pct(data.shadowAvgReturnPct)} shadow
                 </span>
                 <span className="text-gray-700">vs</span>
                 <span className={cn(data.realAvgReturnPct != null && data.realAvgReturnPct > 0 ? 'text-emerald-400' : 'text-red-400')}>
-                  {pct(data.realAvgReturnPct)} real
+                  <TrendArrow value={data.realAvgReturnPct} />{pct(data.realAvgReturnPct)} real
                 </span>
               </div>
             </div>

@@ -97,7 +97,7 @@ interface Props {
 const PROFILE_RING: Record<ProfileKey, string> = {
   vault:        'ring-blue-500 bg-blue-950/40 text-blue-300',
   conservative: 'ring-teal-500 bg-teal-950/40 text-teal-300',
-  balanced:     'ring-gray-400 bg-gray-800/60 text-gray-200',
+  balanced:     'ring-text-1 bg-gray-800/60 text-gray-200',
   growth:       'ring-orange-500 bg-orange-950/40 text-orange-300',
   speculative:  'ring-red-500 bg-red-950/40 text-red-300',
 }
@@ -193,7 +193,7 @@ function StrategyCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-400 leading-relaxed">{def.plain_english_description}</p>
+          <p className="text-xs text-text-1 leading-relaxed">{def.plain_english_description}</p>
           {allEnv.length > 0 && (
             <ApiCostBadges envKeys={allEnv} profileKey={profileKey} />
           )}
@@ -246,7 +246,7 @@ function AssetSection({
       {/* Header */}
       <div className="px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400">
+          <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-xs font-bold text-text-1">
             {ASSET_ICONS[assetClass] ?? assetClass.slice(0, 2).toUpperCase()}
           </div>
           <div>
@@ -259,7 +259,7 @@ function AssetSection({
         </div>
         <button
           onClick={() => setOpen(o => !o)}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-gray-700 hover:border-gray-500"
+          className="flex items-center gap-1.5 text-xs text-text-1 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-gray-700 hover:border-gray-500"
         >
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           {open ? 'Hide' : 'Show all'}
@@ -355,7 +355,7 @@ export function AIStrategiesClient({ profiles, userProfile, strategyDefs, curren
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-widest">Risk Profile</p>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <p className="text-sm text-text-1 mt-0.5">
               {totalActive} strategies active &middot; AI manages the rest automatically
             </p>
           </div>
@@ -367,7 +367,7 @@ export function AIStrategiesClient({ profiles, userProfile, strategyDefs, curren
             className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
               uiMode === 'advanced'
                 ? 'border-yellow-700 bg-yellow-950/30 text-yellow-300'
-                : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                : 'border-gray-700 text-text-1 hover:border-gray-500'
             }`}
           >
             {uiMode === 'advanced' ? 'Advanced mode on' : 'Advanced mode'}
@@ -435,7 +435,7 @@ export function AIStrategiesClient({ profiles, userProfile, strategyDefs, curren
           <Zap className="w-4 h-4 text-yellow-400" />
           <p className="text-sm font-semibold text-white">About paid data APIs</p>
         </div>
-        <p className="text-xs text-gray-400 leading-relaxed">
+        <p className="text-xs text-text-1 leading-relaxed">
           Some strategies use third-party data providers to improve signal quality. These are always
           optional — strategies run without them but may produce fewer or weaker signals. Expand any
           asset class above to see which APIs each strategy uses and whether they make sense for your

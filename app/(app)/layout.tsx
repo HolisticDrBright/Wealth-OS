@@ -6,7 +6,7 @@ import { getUiDensity, getUiMode } from '@/lib/actions/ui-prefs'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [density, uiMode] = await Promise.all([getUiDensity(), getUiMode()])
   return (
-    <div className="flex h-screen overflow-hidden bg-[#07080c]">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar uiMode={uiMode} />
       <main className="flex flex-1 flex-col overflow-hidden">
         <DensityProvider initialDensity={density}>

@@ -25,7 +25,7 @@ export function MarketCard({ market, className }: Props) {
     <Link href={`/polymarket/${encodeURIComponent(market.condition_id)}`}>
       <div
         className={cn(
-          'group flex cursor-pointer flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4 transition-all hover:border-white/20 hover:bg-white/[0.08]',
+          'group flex cursor-pointer flex-col gap-3 rounded-xl border border-line-strong bg-white/5 p-4 transition-all hover:border-white/20 hover:bg-white/[0.08]',
           className
         )}
       >
@@ -105,7 +105,7 @@ function PriceRow({
       >
         {side}
       </span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-fill">
         <div
           className={cn(
             'h-full rounded-full transition-all',

@@ -29,16 +29,16 @@ function Table({ title, rows, columns }: {
 }) {
   return (
     <div>
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">{title}</h2>
-      <div className="rounded-xl border border-white/10 overflow-hidden">
+      <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-2">{title}</h2>
+      <div className="rounded-xl border border-line-strong overflow-hidden">
         {rows.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-6">No data yet — run some paper trades first.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-white/5">
+              <tr className="border-b border-line-strong bg-white/5">
                 {columns.map(c => (
-                  <th key={String(c.key)} className="text-left px-4 py-2 text-xs font-medium text-gray-400 uppercase">{c.label}</th>
+                  <th key={String(c.key)} className="text-left px-4 py-2 text-xs font-medium text-text-1 uppercase">{c.label}</th>
                 ))}
               </tr>
             </thead>
@@ -92,7 +92,7 @@ export default async function PaperTradingStatsPage() {
         <form action="/admin/paper-trading-stats">
           <button
             type="submit"
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 transition-colors"
+            className="flex items-center gap-2 rounded-lg border border-line-strong bg-white/5 px-4 py-2 text-sm text-gray-300 hover:bg-fill transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh

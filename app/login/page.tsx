@@ -25,14 +25,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#07080c] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 mb-4">
-            <DollarSign className="h-6 w-6 text-white" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-cyan mb-4">
+            <DollarSign className="h-6 w-6 text-bg-0" />
           </div>
           <h1 className="text-2xl font-bold text-white">Welcome back</h1>
-          <p className="mt-1 text-sm text-gray-400">Sign in to your Wealth OS account</p>
+          <p className="mt-1 text-sm text-text-1">Sign in to your Wealth OS account</p>
         </div>
 
         <form onSubmit={handleSubmit} method="post" className="space-y-4">
@@ -42,24 +42,24 @@ export default function LoginPage() {
             </div>
           )}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-400">Email</label>
+            <label className="mb-1.5 block text-xs font-medium text-text-1">Email</label>
             <input
               type="email"
               name="email"
               required
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-line-strong bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-400">Password</label>
+            <label className="mb-1.5 block text-xs font-medium text-text-1">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
                 required
                 placeholder="••••••••"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-600 outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
               />
               <button
                 type="button"
@@ -73,7 +73,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            className="w-full rounded-lg bg-accent-cyan py-2.5 text-sm font-semibold text-bg-0 hover:brightness-110 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -81,7 +81,7 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-gray-500">
           Don&apos;t have an account?{' '}
-          <Link href="/signup" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/signup" className="text-accent-cyan hover:underline">
             Sign up free
           </Link>
         </p>

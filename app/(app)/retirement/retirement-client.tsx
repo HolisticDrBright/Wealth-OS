@@ -79,7 +79,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
   // Monte Carlo derived view data
   const successPct = monteCarlo ? monteCarlo.successProbability * 100 : null
   const successColor = successPct === null
-    ? 'text-gray-400'
+    ? 'text-text-1'
     : successPct >= 75 ? 'text-emerald-400' : successPct >= 50 ? 'text-amber-400' : 'text-red-400'
   const fanData = monteCarlo?.bands.map(b => ({
     age: b.age,
@@ -138,7 +138,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Dices className="h-4 w-4 text-indigo-400" />
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Monte Carlo Simulation</p>
+                  <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">Monte Carlo Simulation</p>
                 </div>
                 <p className={`text-3xl font-bold ${successColor}`}>{successPct.toFixed(0)}%</p>
                 <p className="text-xs text-gray-500 mt-1">
@@ -156,7 +156,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
                 ].map(({ label, className }) => (
                   <div key={label} className="flex items-center gap-1.5">
                     <span className={`h-2 w-2 rounded-full ${className}`} />
-                    <span className="text-gray-400">{label}</span>
+                    <span className="text-text-1">{label}</span>
                   </div>
                 ))}
               </div>
@@ -164,8 +164,8 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={fanData}>
-                  <XAxis dataKey="age" tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={v => `${v}`} />
-                  <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={v => `$${(v / 1e6).toFixed(1)}M`} />
+                  <XAxis dataKey="age" tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={v => `${v}`} />
+                  <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={v => `$${(v / 1e6).toFixed(1)}M`} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
                     formatter={(value, name) => {
@@ -177,7 +177,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
                     labelFormatter={v => `Age ${v}`}
                   />
                   {plan && (
-                    <ReferenceLine x={plan.target_retirement_age} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Retire', fill: '#f59e0b', fontSize: 11 }} />
+                    <ReferenceLine x={plan.target_retirement_age} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Retire', fill: '#f59e0b', fontSize: 12 }} />
                   )}
                   <Area type="monotone" dataKey="outer" stroke="none" fill="#6366f1" fillOpacity={0.15} activeDot={false} />
                   <Area type="monotone" dataKey="inner" stroke="none" fill="#6366f1" fillOpacity={0.3} activeDot={false} />
@@ -198,7 +198,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
           <div className="p-6">
             <div className="flex items-center gap-2 mb-1">
               <ArrowDownToLine className="h-4 w-4 text-indigo-400" />
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Withdrawal Order</p>
+              <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">Withdrawal Order</p>
             </div>
             <p className="text-xs text-gray-500 mb-4">
               Tax-optimized sequencing for your first retirement year (age {withdrawalFirstYear.age})
@@ -234,7 +234,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
       {projection.length > 0 && (
         <Card>
           <div className="p-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Deterministic Projection (fixed {plan?.expected_return_pct ?? 7}% return)</p>
+            <p className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-4">Deterministic Projection (fixed {plan?.expected_return_pct ?? 7}% return)</p>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={projection}>
@@ -244,15 +244,15 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
                       <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="year" tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={v => `Yr ${v}`} />
-                  <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={v => `$${(v / 1e6).toFixed(1)}M`} />
+                  <XAxis dataKey="year" tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={v => `Yr ${v}`} />
+                  <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={v => `$${(v / 1e6).toFixed(1)}M`} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0f1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
                     formatter={(value) => [formatCurrency(Number(value)), 'Balance']}
                     labelFormatter={v => `Year ${v}`}
                   />
                   {retirementYear > 0 && (
-                    <ReferenceLine x={retirementYear} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Retire', fill: '#f59e0b', fontSize: 11 }} />
+                    <ReferenceLine x={retirementYear} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Retire', fill: '#f59e0b', fontSize: 12 }} />
                   )}
                   <Area type="monotone" dataKey="balance" stroke="#6366f1" fill="url(#retirementGradient)" strokeWidth={2} />
                 </AreaChart>
@@ -265,7 +265,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
       {/* Plan inputs */}
       <Card>
         <div className="p-6 space-y-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Plan</p>
+          <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">Your Plan</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <Input label="Current age" type="number" value={plan?.current_age ?? ''} onChange={e => updateField('current_age', Number(e.target.value))} />
             <Input label="Retire at age" type="number" value={plan?.target_retirement_age ?? 65} onChange={e => updateField('target_retirement_age', Number(e.target.value))} />
@@ -293,7 +293,7 @@ export function RetirementClient({ plan: initialPlan, summary: initialSummary, p
           <div className="p-6">
             <div className="flex items-center gap-2 mb-3">
               <Brain className="h-4 w-4 text-indigo-400" />
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">AI Retirement Advisor</p>
+              <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">AI Retirement Advisor</p>
             </div>
             {isGettingAdvice && !advice && (
               <div className="flex items-center gap-2 text-gray-500 text-sm">

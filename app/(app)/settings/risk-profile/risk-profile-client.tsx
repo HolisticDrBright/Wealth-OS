@@ -37,7 +37,7 @@ interface Props {
 const PROFILE_COLORS: Record<ProfileKey, string> = {
   vault:        'border-blue-600 bg-blue-950/30 text-blue-300',
   conservative: 'border-teal-600 bg-teal-950/30 text-teal-300',
-  balanced:     'border-gray-400 bg-gray-900/60 text-gray-200',
+  balanced:     'border-text-1 bg-gray-900/60 text-gray-200',
   growth:       'border-orange-500 bg-orange-950/30 text-orange-300',
   speculative:  'border-red-600 bg-red-950/30 text-red-300',
 }
@@ -138,7 +138,7 @@ export function RiskProfileClient({ profiles, userProfile, strategyDefs }: Props
                 className={`px-4 py-2 text-sm font-medium transition-colors capitalize ${
                   uiMode === mode
                     ? 'bg-white text-black'
-                    : 'bg-transparent text-gray-400 hover:text-white'
+                    : 'bg-transparent text-text-1 hover:text-white'
                 }`}
               >
                 {mode}
@@ -164,7 +164,7 @@ export function RiskProfileClient({ profiles, userProfile, strategyDefs }: Props
             <p className="font-semibold text-white text-lg">
               Switch to {showModeConfirm === 'basic' ? 'Basic' : 'Advanced'} mode?
             </p>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-text-1">
               {showModeConfirm === 'basic'
                 ? 'Your custom strategy overrides will be preserved but ignored until you return to Advanced mode.'
                 : 'You will be able to override individual strategies and parameters on top of your profile baseline.'}
@@ -203,7 +203,7 @@ export function RiskProfileClient({ profiles, userProfile, strategyDefs }: Props
               }`}
             >
               <p className="font-semibold text-sm">{p.displayName}</p>
-              <p className="text-xs text-gray-400 mt-1 leading-relaxed">{p.description}</p>
+              <p className="text-xs text-text-1 mt-1 leading-relaxed">{p.description}</p>
             </button>
           ))}
         </div>

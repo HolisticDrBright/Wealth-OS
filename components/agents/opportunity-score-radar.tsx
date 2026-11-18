@@ -43,12 +43,12 @@ export function OpportunityScoreRadar({ decision, size = 260 }: Props) {
           <PolarGrid stroke="rgba(255,255,255,0.08)" />
           <PolarAngleAxis
             dataKey="subject"
-            tick={{ fill: '#9ca3af', fontSize: 10 }}
+            tick={{ fill: '#9ca3af', fontSize: 12 }}
           />
           <PolarRadiusAxis
             angle={30}
             domain={[0, 100]}
-            tick={{ fill: '#6b7280', fontSize: 9 }}
+            tick={{ fill: '#6b7280', fontSize: 12 }}
             tickCount={4}
           />
           <Tooltip

@@ -10,14 +10,14 @@ export function Input({ label, error, className, id, ...props }: InputProps) {
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={inputId} className="block text-xs font-medium text-gray-400">
+        <label htmlFor={inputId} className="block text-xs font-medium text-text-1">
           {label}
         </label>
       )}
       <input
         id={inputId}
         className={cn(
-          'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none transition-colors',
+          'w-full rounded-lg border border-line-strong bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none transition-colors',
           'focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500',
           error && 'border-red-500/50',
           className
@@ -40,14 +40,14 @@ export function Select({ label, error, className, id, options, children, ...prop
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={selectId} className="block text-xs font-medium text-gray-400">
+        <label htmlFor={selectId} className="block text-xs font-medium text-text-1">
           {label}
         </label>
       )}
       <select
         id={selectId}
         className={cn(
-          'w-full rounded-lg border border-white/10 bg-[#0f1117] px-4 py-2.5 text-sm text-white outline-none transition-colors',
+          'w-full rounded-lg border border-line-strong bg-bg-2 px-4 py-2.5 text-sm text-white outline-none transition-colors',
           'focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500',
           error && 'border-red-500/50',
           className

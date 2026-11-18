@@ -152,7 +152,7 @@ export function OpportunitiesClient({ initialOpportunities, noTradeEntries, user
   return (
     <div className="space-y-4">
       {/* Main tabs (segmented control) */}
-      <div className="flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+      <div className="flex gap-1 rounded-xl border border-line-strong bg-white/5 p-1">
         {MAIN_TABS.map(t => (
           <button
             key={t.id}
@@ -160,7 +160,7 @@ export function OpportunitiesClient({ initialOpportunities, noTradeEntries, user
             onClick={() => setTab(t.id)}
             className={cn(
               'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-              tab === t.id ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white',
+              tab === t.id ? 'bg-fill text-white' : 'text-text-1 hover:text-white',
             )}
           >
             {t.label}
@@ -174,8 +174,8 @@ export function OpportunitiesClient({ initialOpportunities, noTradeEntries, user
       {tab === 'opportunities' ? (
         <div className="space-y-4">
           {/* AI Screener */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+          <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-1">
               AI Screener
             </p>
             <div className="flex gap-3">
@@ -214,7 +214,7 @@ export function OpportunitiesClient({ initialOpportunities, noTradeEntries, user
 
           {/* Not-signed-in note */}
           {!canReview && (
-            <p className="text-[11px] text-gray-500">
+            <p className="text-xs text-gray-500">
               Sign in to run an Investment Committee review on these ideas.
             </p>
           )}

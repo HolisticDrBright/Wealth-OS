@@ -51,7 +51,7 @@ const ASSET_CLASS_COLORS: Record<string, string> = {
 function Pct({ pct, emphasized }: { pct: number; emphasized?: boolean }) {
   const positive = pct >= 0
   return (
-    <span className={`font-mono text-sm font-bold ${emphasized ? (positive ? 'text-emerald-300' : 'text-orange-300') : 'text-gray-400'}`}>
+    <span className={`font-mono text-sm font-bold ${emphasized ? (positive ? 'text-emerald-300' : 'text-orange-300') : 'text-text-1'}`}>
       <span aria-hidden>{positive ? '▲' : '▼'}</span> {Math.abs(pct).toFixed(1)}%
     </span>
   )
@@ -76,17 +76,17 @@ function ExploreLimitCard({ view }: { view: ExploreView }) {
     <Card>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <p className="text-sm font-semibold text-white">Explore limit</p>
-        <p className="text-xs text-gray-400">{Math.round(usage.capFraction * 100)}% of your money</p>
+        <p className="text-xs text-text-1">{Math.round(usage.capFraction * 100)}% of your money</p>
       </div>
       <div
         role="progressbar"
         aria-label={`${usd(usage.usedUsd)} of your ${usd(usage.capUsd)} Explore limit in use`}
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(usedFraction * 100)}
-        className="mt-3 h-2.5 rounded-full bg-white/10"
+        className="mt-3 h-2.5 rounded-full bg-fill"
       >
         <div className="h-2.5 rounded-full bg-purple-400" style={{ width: `${usedFraction * 100}%` }} />
       </div>
-      <div className="mt-2 flex justify-between text-xs text-gray-400">
+      <div className="mt-2 flex justify-between text-xs text-text-1">
         <span><span className="font-mono text-white">{usd(usage.usedUsd)}</span> in use</span>
         <span><span className="font-mono text-white">{usd(usage.leftUsd)}</span> left</span>
       </div>
@@ -96,14 +96,14 @@ function ExploreLimitCard({ view }: { view: ExploreView }) {
         </p>
       )}
       {view.uiMode === 'pro' && (
-        <div className="mt-3 border-t border-white/10 pt-3">
+        <div className="mt-3 border-t border-line-strong pt-3">
           {editing ? (
             <div className="flex items-center gap-2">
               <input
                 type="number" min={1} max={Math.round(view.hardMaxFraction * 100)} value={pct}
                 onChange={e => setPct(Number(e.target.value))}
                 aria-label="Explore limit percent"
-                className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+                className="w-20 rounded-lg border border-line-strong bg-white/5 px-2 py-1 text-sm text-white"
               />
               <span className="text-xs text-gray-500">% (hard max {Math.round(view.hardMaxFraction * 100)}%)</span>
               <Button size="sm" disabled={isPending} onClick={() => startTransition(async () => {
@@ -115,7 +115,7 @@ function ExploreLimitCard({ view }: { view: ExploreView }) {
               <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
             </div>
           ) : (
-            <button onClick={() => setEditing(true)} className="text-xs text-gray-400 underline hover:text-white">
+            <button onClick={() => setEditing(true)} className="text-xs text-text-1 underline hover:text-white">
               Adjust limit (pro)
             </button>
           )}
@@ -143,13 +143,13 @@ function ApprovalModal({ trader, busy, error, onApprove, onCancel }: {
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-md rounded-xl border border-white/15 bg-[#0b0d13] p-5">
+      <div className="w-full max-w-md rounded-xl border border-white/15 bg-bg-1 p-5">
         <h3 className="text-sm font-bold text-white">Before anything starts</h3>
         <p className="mt-3 text-sm leading-relaxed text-gray-300">{followSummary(trader)}</p>
         {error && <p className="mt-3 rounded-lg border border-red-500/30 bg-red-950/30 p-2 text-xs text-red-300">{error}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <button onClick={onCancel} disabled={busy}
-            className="rounded-lg border border-white/10 px-4 py-2 text-xs text-gray-300 hover:bg-white/5 disabled:opacity-40">
+            className="rounded-lg border border-line-strong px-4 py-2 text-xs text-gray-300 hover:bg-white/5 disabled:opacity-40">
             Not now
           </button>
           <button onClick={onApprove} disabled={busy}
@@ -171,7 +171,7 @@ function TraderCard({ item, onToggleFollow }: {
   const trader = item.trader
   const isFollowing = item.optimisticFollowing ?? !!trader.follow_settings
   const initials = trader.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const assetColorClass = ASSET_CLASS_COLORS[trader.asset_class] ?? 'text-gray-400 bg-white/10'
+  const assetColorClass = ASSET_CLASS_COLORS[trader.asset_class] ?? 'text-text-1 bg-fill'
   const inPracticeRun = isFollowing && item.practiceRun && !item.practiceRun.complete
 
   return (
@@ -186,8 +186,8 @@ function TraderCard({ item, onToggleFollow }: {
             <span className="font-semibold text-white">{trader.name}</span>
             {trader.verified && <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
             <span className="text-xs text-gray-500">@{trader.handle}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-              item.swing === 'bigger' ? 'bg-orange-500/15 text-orange-300' : 'bg-white/10 text-gray-300'
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+              item.swing === 'bigger' ? 'bg-orange-500/15 text-orange-300' : 'bg-fill text-gray-300'
             }`}>
               {item.swing === 'bigger' ? 'Bigger swings' : 'Lower swings'}
             </span>
@@ -196,7 +196,7 @@ function TraderCard({ item, onToggleFollow }: {
             <span className={`rounded-md px-1.5 py-0.5 text-xs font-medium ${assetColorClass}`}>
               {trader.asset_class}
             </span>
-            <span className="rounded-md px-1.5 py-0.5 text-xs font-medium bg-white/5 text-gray-400">
+            <span className="rounded-md px-1.5 py-0.5 text-xs font-medium bg-white/5 text-text-1">
               {SOURCE_LABELS[trader.source] ?? trader.source}
             </span>
           </div>
@@ -244,18 +244,18 @@ function TraderCard({ item, onToggleFollow }: {
             role="progressbar"
             aria-label={`Practice run day ${item.practiceRun.dayN} of ${item.practiceRun.totalDays}`}
             aria-valuemin={0} aria-valuemax={item.practiceRun.totalDays} aria-valuenow={item.practiceRun.dayN}
-            className="mt-2 h-1.5 rounded-full bg-white/10"
+            className="mt-2 h-1.5 rounded-full bg-fill"
           >
             <div className="h-1.5 rounded-full bg-amber-400" style={{ width: `${(item.practiceRun.dayN / item.practiceRun.totalDays) * 100}%` }} />
           </div>
-          <p className="mt-1.5 text-[11px] text-gray-500">Auto-copy unlocks when the practice run finishes.</p>
+          <p className="mt-1.5 text-xs text-gray-500">Auto-copy unlocks when the practice run finishes.</p>
         </div>
       )}
 
       {isFollowing && trader.follow_settings && (
         <div className="mt-3 flex items-center gap-2">
           <Zap className={`h-3.5 w-3.5 ${trader.follow_settings.auto_copy_enabled ? 'text-amber-400' : 'text-gray-600'}`} />
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-text-1">
             {trader.follow_settings.auto_copy_enabled
               ? `Auto-copy ON · max ${trader.follow_settings.max_allocation_pct_per_trade}% per trade`
               : item.autoCopyUnlocked
@@ -375,7 +375,7 @@ export function TradersClient({ view }: Props) {
           <Info className="h-5 w-5 text-indigo-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-indigo-400">No traders loaded yet</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-text-1 mt-1">
               Run the sync to populate traders from all data sources.
               Add API keys in your environment variables to enable live data.
             </p>
@@ -396,7 +396,7 @@ export function TradersClient({ view }: Props) {
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'bg-indigo-600 text-white'
-                  : 'text-gray-400 hover:text-white'
+                  : 'text-text-1 hover:text-white'
               }`}
             >
               {tab.label}
@@ -408,7 +408,7 @@ export function TradersClient({ view }: Props) {
           {view.uiMode === 'simple' && (
             <span className="text-xs text-gray-500">Sorted by what a copier actually keeps, adjusted for swings</span>
           )}
-          {syncMsg && <span className="text-xs text-gray-400">{syncMsg}</span>}
+          {syncMsg && <span className="text-xs text-text-1">{syncMsg}</span>}
           <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
             Sync
@@ -420,7 +420,7 @@ export function TradersClient({ view }: Props) {
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-white/20 p-12 text-center">
           <BarChart2 className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-          <p className="text-sm text-gray-400">No traders found for this filter</p>
+          <p className="text-sm text-text-1">No traders found for this filter</p>
           <p className="text-xs text-gray-600 mt-1">Try syncing or switching to a different asset class</p>
         </div>
       ) : (
@@ -450,7 +450,7 @@ export function TradersClient({ view }: Props) {
       )}
 
       {/* Disclaimer */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-start gap-3">
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4 flex items-start gap-3">
         <AlertCircle className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
         <p className="text-xs text-gray-500 leading-relaxed">
           Copy trading involves significant risk. Past performance of tracked traders does not guarantee future results.

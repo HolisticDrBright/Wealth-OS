@@ -60,7 +60,7 @@ function DiscussWithAI({ rec }: { rec: Recommendation }) {
   return (
     <>
       <button onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1 rounded border border-white/10 px-2 py-0.5 text-[11px] text-indigo-300 hover:bg-white/5">
+        className="flex items-center gap-1 rounded border border-line-strong px-2 py-0.5 text-xs text-indigo-300 hover:bg-white/5">
         <MessageCircle className="h-3 w-3" /> Discuss with the AI
       </button>
       {open && (
@@ -69,14 +69,14 @@ function DiscussWithAI({ rec }: { rec: Recommendation }) {
             <input value={question} onChange={e => setQuestion(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && ask()}
               placeholder="Ask about this recommendation…"
-              className="flex-1 rounded border border-white/10 bg-transparent px-2 py-1 text-[11px] text-gray-200" />
+              className="flex-1 rounded border border-line-strong bg-transparent px-2 py-1 text-xs text-gray-200" />
             <button onClick={ask} disabled={busy}
-              className="rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50">
+              className="rounded bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-50">
               {busy ? '…' : 'Ask'}
             </button>
           </div>
-          {answer && <p className="mt-2 whitespace-pre-wrap text-[11px] leading-relaxed text-gray-300">{answer}</p>}
-          <p className="mt-1 text-[10px] text-gray-600">The AI explains the rule’s computed numbers — it never recomputes them.</p>
+          {answer && <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-gray-300">{answer}</p>}
+          <p className="mt-1 text-xs text-gray-600">The AI explains the rule’s computed numbers — it never recomputes them.</p>
         </div>
       )}
     </>
@@ -104,31 +104,31 @@ function RecommendationCard({
 
   return (
     <div className={cn('rounded-xl border p-4',
-      isCoaching ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-white/10 bg-white/[0.02]')}>
+      isCoaching ? 'border-amber-500/20 bg-amber-500/[0.03]' : 'border-line-strong bg-white/[0.02]')}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-white">{rec.title}</h3>
             {isCoaching && (
-              <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-amber-400">
+              <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-amber-400">
                 Coaching — not calculated advice
               </span>
             )}
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-gray-400">{rec.rationale}</p>
+          <p className="mt-1 text-xs leading-relaxed text-text-1">{rec.rationale}</p>
         </div>
         {!isCoaching && rec.estimatedAnnualBenefitUsd != null && (
           <div className="shrink-0 text-right">
             <div className="text-lg font-bold tabular-nums text-emerald-400">
               {usd(rec.estimatedAnnualBenefitUsd)}
             </div>
-            <div className="text-[10px] uppercase tracking-wide text-gray-600">est. / year</div>
+            <div className="text-xs uppercase tracking-wide text-gray-600">est. / year</div>
           </div>
         )}
       </div>
 
       {isEmergencyFund && yields && (
-        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
           {yields.savingsNationalAvgPct != null && (
             <span className="rounded bg-white/5 px-2 py-0.5 text-gray-300">
               Savings nat’l avg {yields.savingsNationalAvgPct.toFixed(2)}%
@@ -144,7 +144,7 @@ function RecommendationCard({
       )}
 
       {rec.deadline && (
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-400">
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-400">
           <CalendarClock className="h-3.5 w-3.5" /> Deadline: {rec.deadline}
         </p>
       )}
@@ -158,7 +158,7 @@ function RecommendationCard({
       {rec.math.length > 0 && (
         <button
           onClick={() => setShowMath(v => !v)}
-          className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-indigo-400 hover:text-indigo-300"
+          className="mt-3 flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300"
         >
           <Calculator className="h-3.5 w-3.5" />
           {showMath ? 'Hide the math' : 'Show the math'}
@@ -166,7 +166,7 @@ function RecommendationCard({
         </button>
       )}
       {showMath && (
-        <div className="mt-2 space-y-1 rounded-lg bg-black/30 p-3 font-mono text-[11px]">
+        <div className="mt-2 space-y-1 rounded-lg bg-black/30 p-3 font-mono text-xs">
           {rec.math.map((m, i) => (
             <div key={i} className="flex items-baseline justify-between gap-3">
               <span className="text-gray-500">{m.label} <span className="text-gray-700">= {m.formula}</span></span>
@@ -180,10 +180,10 @@ function RecommendationCard({
 
       {rec.counterIndications.length > 0 && (
         <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-500">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-500">
             <ShieldAlert className="h-3 w-3" /> Verify with your CPA
           </p>
-          <ul className="mt-1 space-y-0.5 text-[11px] text-amber-200/70">
+          <ul className="mt-1 space-y-0.5 text-xs text-amber-200/70">
             {rec.counterIndications.map((ci, i) => <li key={i}>• {ci}</li>)}
           </ul>
         </div>
@@ -191,10 +191,10 @@ function RecommendationCard({
 
       {providers.length > 0 && (
         <div className="mt-3 rounded-lg bg-white/[0.03] p-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-600">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
             Current options (refreshed {new Date(providers[0].refreshedAt).toLocaleDateString()} — not endorsements)
           </p>
-          <ul className="mt-1 space-y-0.5 text-[11px] text-gray-300">
+          <ul className="mt-1 space-y-0.5 text-xs text-gray-300">
             {providers.map(o => (
               <li key={`${o.category}-${o.name}`}>
                 • {o.url ? <a href={o.url} target="_blank" rel="noreferrer" className="text-indigo-300 hover:underline">{o.name}</a> : o.name}
@@ -209,18 +209,18 @@ function RecommendationCard({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <DiscussWithAI rec={rec} />
         <span className={cn(
-          'rounded px-2 py-0.5 text-[10px] font-semibold uppercase',
+          'rounded px-2 py-0.5 text-xs font-semibold uppercase',
           status === 'done' ? 'bg-emerald-500/20 text-emerald-400'
           : status === 'in_progress' ? 'bg-indigo-500/20 text-indigo-300'
           : status === 'reviewing' ? 'bg-amber-500/20 text-amber-300'
-          : 'bg-white/10 text-gray-400',
+          : 'bg-fill text-text-1',
         )}>
           {STATUS_LABEL[status] ?? status}
         </span>
         {logId && status !== 'done' && (
           <button
             onClick={() => onStatus(logId, nextStatus)}
-            className="rounded border border-white/10 px-2 py-0.5 text-[11px] text-gray-300 hover:bg-white/5"
+            className="rounded border border-line-strong px-2 py-0.5 text-xs text-gray-300 hover:bg-white/5"
           >
             Mark {STATUS_LABEL[nextStatus].toLowerCase()}
           </button>
@@ -228,7 +228,7 @@ function RecommendationCard({
         {logId && !dismissing && status !== 'done' && (
           <button
             onClick={() => setDismissing(true)}
-            className="rounded border border-white/10 px-2 py-0.5 text-[11px] text-gray-500 hover:bg-white/5"
+            className="rounded border border-line-strong px-2 py-0.5 text-xs text-gray-500 hover:bg-white/5"
           >
             Dismiss
           </button>
@@ -239,12 +239,12 @@ function RecommendationCard({
               value={dismissReason}
               onChange={e => setDismissReason(e.target.value)}
               placeholder="reason (required)"
-              className="w-40 rounded border border-white/10 bg-transparent px-2 py-0.5 text-[11px] text-gray-300"
+              className="w-40 rounded border border-line-strong bg-transparent px-2 py-0.5 text-xs text-gray-300"
             />
             <button
               disabled={!dismissReason.trim()}
               onClick={() => onStatus(logId, 'dismissed', dismissReason.trim())}
-              className="rounded bg-white/10 px-2 py-0.5 text-[11px] text-gray-300 disabled:opacity-40"
+              className="rounded bg-fill px-2 py-0.5 text-xs text-gray-300 disabled:opacity-40"
             >
               Confirm
             </button>
@@ -299,7 +299,7 @@ function ProfileForm({ profile, onSaved }: { profile: FinancialProfile; onSaved:
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className="rounded-xl border border-line-strong bg-white/[0.02] p-4">
       <h3 className="text-sm font-semibold text-white">Financial profile</h3>
       <p className="mt-1 text-xs text-gray-500">
         Each answer unlocks analyses — rules state exactly which fields they need.
@@ -308,13 +308,13 @@ function ProfileForm({ profile, onSaved }: { profile: FinancialProfile; onSaved:
         {PROFILE_FIELDS.map(f => {
           const current = profile[f.key]
           return (
-            <label key={f.key} className="text-[11px] text-gray-500">
+            <label key={f.key} className="text-xs text-gray-500">
               {f.label}
               {f.type === 'select' || f.type === 'boolean' ? (
                 <select
                   defaultValue={current == null ? '' : String(current)}
                   onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                  className="mt-0.5 w-full rounded border border-white/10 bg-[#0b0d13] px-2 py-1 text-xs text-gray-200"
+                  className="mt-0.5 w-full rounded border border-line-strong bg-bg-1 px-2 py-1 text-xs text-gray-200"
                 >
                   <option value="">—</option>
                   {(f.type === 'boolean' ? ['true', 'false'] : f.options!).map(o => (
@@ -326,7 +326,7 @@ function ProfileForm({ profile, onSaved }: { profile: FinancialProfile; onSaved:
                   type="number"
                   defaultValue={current == null ? '' : String(current)}
                   onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                  className="mt-0.5 w-full rounded border border-white/10 bg-[#0b0d13] px-2 py-1 text-xs text-gray-200"
+                  className="mt-0.5 w-full rounded border border-line-strong bg-bg-1 px-2 py-1 text-xs text-gray-200"
                 />
               )}
             </label>
@@ -366,21 +366,21 @@ export function AdvisoryPanel({ view }: { view: AdvisoryView }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-white">Advisory recommendations</h2>
-          <p className="text-[11px] text-gray-500">{view.disclaimer}</p>
+          <p className="text-xs text-gray-500">{view.disclaimer}</p>
         </div>
         {view.totalEstimatedAnnualBenefitUsd > 0 && (
           <div className="text-right">
             <div className="text-xl font-bold tabular-nums text-emerald-400">
               {usd(view.totalEstimatedAnnualBenefitUsd)}
             </div>
-            <div className="text-[10px] uppercase tracking-wide text-gray-600">
+            <div className="text-xs uppercase tracking-wide text-gray-600">
               total est. annual benefit — computed from YOUR profile
             </div>
           </div>
         )}
         <button
           onClick={() => setShowProfile(v => !v)}
-          className="rounded border border-white/10 px-2.5 py-1 text-xs text-gray-300 hover:bg-white/5"
+          className="rounded border border-line-strong px-2.5 py-1 text-xs text-gray-300 hover:bg-white/5"
         >
           {showProfile ? 'Hide profile' : 'Edit profile'}
         </button>
@@ -410,12 +410,12 @@ export function AdvisoryPanel({ view }: { view: AdvisoryView }) {
       ))}
 
       {locked.length > 0 && (
-        <div className="rounded-xl border border-dashed border-white/10 p-4">
-          <p className="text-xs font-medium text-gray-400">Locked analyses</p>
-          <ul className="mt-2 space-y-1 text-[11px] text-gray-500">
+        <div className="rounded-xl border border-dashed border-line-strong p-4">
+          <p className="text-xs font-medium text-text-1">Locked analyses</p>
+          <ul className="mt-2 space-y-1 text-xs text-gray-500">
             {locked.map(v => (
               <li key={v.ruleId}>
-                <span className="text-gray-400">{v.ruleId.replace(/_/g, ' ')}:</span> {v.reason}
+                <span className="text-text-1">{v.ruleId.replace(/_/g, ' ')}:</span> {v.reason}
                 {' '}<button onClick={() => setShowProfile(true)} className="text-indigo-400 hover:underline">answer now</button>
               </li>
             ))}

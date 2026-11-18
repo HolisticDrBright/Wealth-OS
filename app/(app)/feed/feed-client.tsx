@@ -85,7 +85,7 @@ export function FeedClient({ initialTrades, followedTraderIds, userId, hasFollow
     return (
       <div className="rounded-xl border border-dashed border-white/20 p-12 text-center">
         <Users className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-        <p className="text-sm text-gray-400">No traders followed yet</p>
+        <p className="text-sm text-text-1">No traders followed yet</p>
         <p className="text-xs text-gray-600 mt-1">
           <Link href="/traders" className="text-indigo-400 hover:underline">Browse traders</Link> and follow some to see their trades here
         </p>
@@ -97,7 +97,7 @@ export function FeedClient({ initialTrades, followedTraderIds, userId, hasFollow
     return (
       <div className="rounded-xl border border-dashed border-white/20 p-12 text-center">
         <Activity className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-        <p className="text-sm text-gray-400">No trades yet from followed traders</p>
+        <p className="text-sm text-text-1">No trades yet from followed traders</p>
         <p className="text-xs text-gray-600 mt-1">New trades will appear here in real-time</p>
       </div>
     )

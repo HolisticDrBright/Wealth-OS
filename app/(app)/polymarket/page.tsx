@@ -120,7 +120,7 @@ function SetupGuide({ errorCode, errorMessage, fairValuePoints }: { errorCode: s
     <div className="flex flex-col">
       <Topbar title="Polymarket" subtitle="Prediction market intelligence" />
       <div className="flex flex-col items-center justify-center gap-6 p-12">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-line-strong bg-white/5">
           <Terminal className="h-8 w-8 text-indigo-400" />
         </div>
 
@@ -128,7 +128,7 @@ function SetupGuide({ errorCode, errorMessage, fairValuePoints }: { errorCode: s
           <h2 className="text-xl font-bold text-white">
             {isCircuitOpen ? 'Sidecar temporarily unavailable' : 'Meta_Poly_tarder not running'}
           </h2>
-          <p className="mt-2 text-sm text-gray-400 max-w-md">
+          <p className="mt-2 text-sm text-text-1 max-w-md">
             {isCircuitOpen
               ? errorMessage
               : 'The Polymarket intelligence sidecar is not reachable. Start it locally to enable live market data, signals, and portfolio tracking.'}
@@ -139,8 +139,8 @@ function SetupGuide({ errorCode, errorMessage, fairValuePoints }: { errorCode: s
         </div>
 
         {(isUnreachable || !isCircuitOpen) && (
-          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-white/5 p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <div className="w-full max-w-lg rounded-xl border border-line-strong bg-white/5 p-5">
+            <p className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-3">
               Quick start
             </p>
             <div className="space-y-2 font-mono text-sm">

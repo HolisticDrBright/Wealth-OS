@@ -24,10 +24,10 @@ export function RunHistoryStrip({ runs }: { runs: PaperRunView[] }) {
   const ordered = [...runs].reverse()
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5">
+    <div className="rounded-lg border border-line-strong bg-white/[0.02] px-3 py-2.5">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-gray-500">Run history</span>
-        <span className="text-[10px] text-gray-600">{runs.length} runs · latest {relativeTime(runs[0].runAt)}</span>
+        <span className="text-xs font-medium text-gray-500">Run history</span>
+        <span className="text-xs text-gray-600">{runs.length} runs · latest {relativeTime(runs[0].runAt)}</span>
       </div>
       <div className="flex items-end gap-1">
         {ordered.map((r, i) => {

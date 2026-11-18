@@ -6,6 +6,7 @@ import type { PortfolioSleeve, SleeveApprovalRequest } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { ArrowLeft, Plus, CheckCircle, XCircle, AlertTriangle, Clock, Play, Pause, Layers } from 'lucide-react'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface Props {
   sleeve: PortfolioSleeve
@@ -105,7 +106,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <Link href="/sleeves" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white w-fit">
+      <Link href="/sleeves" className="flex items-center gap-2 text-sm text-text-1 hover:text-white w-fit">
         <ArrowLeft className="h-4 w-4" /> All Sleeves
       </Link>
 
@@ -121,12 +122,12 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
               </span>
             )}
           </div>
-          {sleeve.description && <p className="text-sm text-gray-400">{sleeve.description}</p>}
+          {sleeve.description && <p className="text-sm text-text-1">{sleeve.description}</p>}
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowTradeForm(!showTradeForm)}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-300 hover:bg-white/10"
+            className="flex items-center gap-2 rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-gray-300 hover:bg-fill"
           >
             <Plus className="h-4 w-4" /> Submit Trade
           </button>
@@ -145,7 +146,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
       </div>
 
       {/* Risk controls banner */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-wrap gap-6 text-sm">
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4 flex flex-wrap gap-6 text-sm">
         <div>
           <p className="text-xs text-gray-500">Approval threshold</p>
           <p className="text-white font-medium">
@@ -172,7 +173,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
         )}
         <div>
           <p className="text-xs text-gray-500">Halt on breach</p>
-          <p className={cn('font-medium', sleeve.halt_on_breach ? 'text-yellow-400' : 'text-gray-400')}>
+          <p className={cn('font-medium', sleeve.halt_on_breach ? 'text-yellow-400' : 'text-text-1')}>
             {sleeve.halt_on_breach ? 'Yes' : 'No'}
           </p>
         </div>
@@ -188,31 +189,31 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
             </p>
           )}
           {submitMsg && (
-            <div className="rounded-lg bg-white/10 px-3 py-2 text-sm text-gray-200">{submitMsg}</div>
+            <div className="rounded-lg bg-fill px-3 py-2 text-sm text-gray-200">{submitMsg}</div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Symbol</label>
+              <label className="text-xs text-text-1 block mb-1">Symbol</label>
               <input value={tradeSymbol} onChange={e => setTradeSymbol(e.target.value)} placeholder="AAPL"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white uppercase focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white uppercase focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Action</label>
+              <label className="text-xs text-text-1 block mb-1">Action</label>
               <select value={tradeAction} onChange={e => setTradeAction(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-[#0a0b0f] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                className="w-full rounded-lg border border-line-strong bg-bg-0 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 <option value="buy">Buy</option>
                 <option value="sell">Sell</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Notional ($)</label>
+              <label className="text-xs text-text-1 block mb-1">Notional ($)</label>
               <input type="number" value={tradeNotional} onChange={e => setTradeNotional(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Reason</label>
+              <label className="text-xs text-text-1 block mb-1">Reason</label>
               <input value={tradeReason} onChange={e => setTradeReason(e.target.value)} placeholder="Optional rationale"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
             </div>
           </div>
           <div className="flex gap-2">
@@ -221,7 +222,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
               {submitting ? 'Submitting...' : sleeve.approval_required && Number(tradeNotional) >= sleeve.approval_threshold_usd ? 'Request Approval' : 'Execute'}
             </button>
             <button onClick={() => { setShowTradeForm(false); setSubmitMsg(null) }}
-              className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-white/10">Cancel</button>
+              className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-fill">Cancel</button>
           </div>
         </div>
       )}
@@ -243,7 +244,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
                     </span>
                     <span className="text-sm text-gray-300">${req.notional_usd?.toLocaleString()}</span>
                   </div>
-                  {req.reason && <p className="text-xs text-gray-400 mt-0.5">{req.reason}</p>}
+                  {req.reason && <p className="text-xs text-text-1 mt-0.5">{req.reason}</p>}
                   <p className="text-xs text-gray-600 mt-0.5">Expires {new Date(req.expires_at).toLocaleString()}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -252,7 +253,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
                     <CheckCircle className="h-3 w-3" /> Approve
                   </button>
                   <button onClick={() => handleReject(req.id)} disabled={pending}
-                    className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-white/10 disabled:opacity-50">
+                    className="flex items-center gap-1 rounded-lg border border-line-strong bg-white/5 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-fill disabled:opacity-50">
                     <XCircle className="h-3 w-3" /> Reject
                   </button>
                 </div>
@@ -264,20 +265,20 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
 
       {/* Positions */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Positions ({positions.length})</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-3">Positions ({positions.length})</h2>
         {positions.length === 0 ? (
           <p className="text-sm text-gray-500">No positions in this sleeve yet.</p>
         ) : (
-          <div className="rounded-xl border border-white/10 overflow-hidden">
+          <div className="rounded-xl border border-line-strong overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 bg-white/5">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Symbol</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Quantity</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Avg Cost</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Market Value</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">P&L</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Weight</th>
+                <tr className="border-b border-line-strong bg-white/5">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Symbol</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Quantity</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Avg Cost</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Market Value</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">P&L</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Weight</th>
                 </tr>
               </thead>
               <tbody>
@@ -289,11 +290,11 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
                     <td className="px-4 py-3 text-right font-mono text-white">${pos.market_value_usd.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right font-mono">
                       <span className={pos.unrealized_pnl_usd >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {pos.unrealized_pnl_usd >= 0 ? '+' : ''}${pos.unrealized_pnl_usd.toLocaleString()}
+                        <TrendArrow value={pos.unrealized_pnl_usd} />{pos.unrealized_pnl_usd >= 0 ? '+' : ''}${pos.unrealized_pnl_usd.toLocaleString()}
                         <span className="text-xs ml-1">({pos.unrealized_pnl_pct >= 0 ? '+' : ''}{pos.unrealized_pnl_pct.toFixed(2)}%)</span>
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-400">{pos.weight_pct?.toFixed(1) ?? '—'}%</td>
+                    <td className="px-4 py-3 text-right text-text-1">{pos.weight_pct?.toFixed(1) ?? '—'}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -305,7 +306,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
       {/* All approval history */}
       {approvals.filter(a => a.status !== 'pending').length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Approval History</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-3">Approval History</h2>
           <div className="flex flex-col gap-2">
             {approvals.filter(a => a.status !== 'pending').slice(0, 10).map(req => (
               <div key={req.id} className="rounded-xl border border-white/5 bg-white/3 p-3 flex items-center gap-3 opacity-70">
@@ -314,7 +315,7 @@ export function SleeveDetailClient({ sleeve: initialSleeve, allApprovals: initia
                 </span>
                 <span className="text-sm text-white">{req.symbol}</span>
                 <span className={cn('text-xs', req.action === 'buy' ? 'text-green-400' : 'text-red-400')}>{req.action?.toUpperCase()}</span>
-                <span className="text-sm text-gray-400">${req.notional_usd?.toLocaleString()}</span>
+                <span className="text-sm text-text-1">${req.notional_usd?.toLocaleString()}</span>
                 {req.review_notes && <span className="text-xs text-gray-500 ml-auto">{req.review_notes}</span>}
                 <span className="text-xs text-gray-600 ml-auto">{new Date(req.created_at).toLocaleDateString()}</span>
               </div>

@@ -23,7 +23,7 @@ export default async function MarketDetailPage({ params }: Props) {
         <div className="p-6">
           <Link
             href="/polymarket"
-            className="mb-4 flex w-fit items-center gap-1.5 text-sm text-gray-400 hover:text-white"
+            className="mb-4 flex w-fit items-center gap-1.5 text-sm text-text-1 hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" /> Back to markets
           </Link>

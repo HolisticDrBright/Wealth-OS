@@ -158,7 +158,7 @@ function fmt(n: number | null, decimals = 1): string {
 }
 
 function liftColor(n: number | null): string {
-  if (n === null) return 'text-gray-400'
+  if (n === null) return 'text-text-1'
   if (n > 5)  return 'text-green-400'
   if (n > 0)  return 'text-green-300'
   if (n > -5) return 'text-yellow-400'
@@ -166,7 +166,7 @@ function liftColor(n: number | null): string {
 }
 
 function brierColor(n: number | null): string {
-  if (n === null) return 'text-gray-400'
+  if (n === null) return 'text-text-1'
   if (n < 0.10) return 'text-green-400'
   if (n < 0.20) return 'text-yellow-400'
   return 'text-red-400'
@@ -179,7 +179,7 @@ export const metadata = { title: 'AI Calibration — Wealth OS' }
 function multiplierBadge(m: number): { label: string; cls: string } {
   if (m > 1.0) return { label: `${m.toFixed(2)}×`, cls: 'bg-green-900 text-green-300' }
   if (m < 1.0) return { label: `${m.toFixed(2)}×`, cls: 'bg-red-900 text-red-300' }
-  return { label: '1.00×', cls: 'bg-gray-800 text-gray-400' }
+  return { label: '1.00×', cls: 'bg-gray-800 text-text-1' }
 }
 
 function regimeBadge(regime: CrossAssetRegime): { label: string; cls: string } {
@@ -212,7 +212,7 @@ export default async function CalibrationPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold">AI Confluence Calibration</h1>
-              <p className="text-gray-400 mt-1 text-sm">
+              <p className="text-text-1 mt-1 text-sm">
                 Last 90 days · Brier score (lower = better) · Lift in basis points after AI costs
               </p>
             </div>
@@ -237,10 +237,10 @@ export default async function CalibrationPage() {
         <TcaPanel report={tcaReport} />
 
         {/* Legend */}
-        <div className="flex gap-6 text-xs text-gray-400">
+        <div className="flex gap-6 text-xs text-text-1">
           <span><span className="text-green-400">green lift</span> = AI layer is earning</span>
           <span><span className="text-red-400">red lift</span> = AI layer is costing more than it earns</span>
-          <span><span className="text-gray-400">—</span> = insufficient data (&lt;5 trades)</span>
+          <span><span className="text-text-1">—</span> = insufficient data (&lt;5 trades)</span>
           <span><span className="text-green-300">1.25×</span> = well-calibrated Brier → size up</span>
           <span><span className="text-red-300">0.50×</span> = poor Brier → size down</span>
         </div>
@@ -257,7 +257,7 @@ export default async function CalibrationPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="text-gray-400 text-xs uppercase border-b border-gray-800">
+                    <tr className="text-text-1 text-xs uppercase border-b border-gray-800">
                       <th className="text-left py-2 pr-4 font-medium">Strategy</th>
                       <th className="text-left py-2 pr-4 font-medium">Edge</th>
                       <th className="text-center py-2 pr-4 font-medium">MiroFish</th>
@@ -277,7 +277,7 @@ export default async function CalibrationPage() {
                     {group.map(r => (
                       <tr key={r.strategyKey} className="border-b border-gray-900 hover:bg-gray-900/40">
                         <td className="py-2 pr-4 font-medium text-gray-200">{r.displayName}</td>
-                        <td className="py-2 pr-4 text-gray-400 text-xs">{r.edgeType}</td>
+                        <td className="py-2 pr-4 text-text-1 text-xs">{r.edgeType}</td>
                         <td className="py-2 pr-4 text-center">
                           <span className={`text-xs px-1.5 py-0.5 rounded ${
                             r.mirofish === 'high' ? 'bg-purple-900 text-purple-300'
@@ -368,14 +368,14 @@ export default async function CalibrationPage() {
                   <p className="font-medium text-sm">Vibe-Trading Factor Analysis</p>
                   <p className="text-xs text-gray-500">quant_momentum, vcp_minervini</p>
                 </div>
-                <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">Collecting</span>
+                <span className="text-xs bg-gray-800 text-text-1 px-2 py-0.5 rounded">Collecting</span>
               </div>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>With factor_analysis signal</span>
                   <span className="text-gray-600">— bps (n=0)</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Without factor_analysis signal</span>
                   <span className="text-gray-600">— bps (n=0)</span>
                 </div>
@@ -394,14 +394,14 @@ export default async function CalibrationPage() {
                   <p className="font-medium text-sm">Camofox Scraping</p>
                   <p className="text-xs text-gray-500">vs paid Quiver Quant API</p>
                 </div>
-                <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">Collecting</span>
+                <span className="text-xs bg-gray-800 text-text-1 px-2 py-0.5 rounded">Collecting</span>
               </div>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Data freshness (Camofox)</span>
                   <span className="text-gray-600">— hours lag</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Data freshness (Quiver API)</span>
                   <span className="text-gray-600">— hours lag</span>
                 </div>
@@ -420,14 +420,14 @@ export default async function CalibrationPage() {
                   <p className="font-medium text-sm">CIO Prompt Variant A/B</p>
                   <p className="text-xs text-gray-500">AutoHedge distilled vs native</p>
                 </div>
-                <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">Collecting</span>
+                <span className="text-xs bg-gray-800 text-text-1 px-2 py-0.5 rounded">Collecting</span>
               </div>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Native CIO prompt</span>
                   <span className="text-gray-600">— avg decision score</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>AutoHedge distilled prompt</span>
                   <span className="text-gray-600">— avg decision score</span>
                 </div>
@@ -468,14 +468,14 @@ export default async function CalibrationPage() {
                     <p className="font-medium text-sm">{name}</p>
                     <p className="text-xs text-gray-500">{venue}</p>
                   </div>
-                  <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">Collecting</span>
+                  <span className="text-xs bg-gray-800 text-text-1 px-2 py-0.5 rounded">Collecting</span>
                 </div>
                 <div className="space-y-1 text-xs">
-                  <div className="flex justify-between text-gray-400">
+                  <div className="flex justify-between text-text-1">
                     <span>Gate passed trades</span>
                     <span className="text-gray-600">— bps (n=0)</span>
                   </div>
-                  <div className="flex justify-between text-gray-400">
+                  <div className="flex justify-between text-text-1">
                     <span>Gate blocked trades</span>
                     <span className="text-gray-600">— bps (n=0)</span>
                   </div>
@@ -508,14 +508,14 @@ export default async function CalibrationPage() {
                     <p className="font-medium text-sm">{name}</p>
                     <p className="text-xs text-gray-500">Filing types: {forms}</p>
                   </div>
-                  <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">Collecting</span>
+                  <span className="text-xs bg-gray-800 text-text-1 px-2 py-0.5 rounded">Collecting</span>
                 </div>
                 <div className="space-y-1 text-xs">
-                  <div className="flex justify-between text-gray-400">
+                  <div className="flex justify-between text-text-1">
                     <span>With Dexter context</span>
                     <span className="text-gray-600">— avg CIO score (n=0)</span>
                   </div>
-                  <div className="flex justify-between text-gray-400">
+                  <div className="flex justify-between text-text-1">
                     <span>Without Dexter context</span>
                     <span className="text-gray-600">— avg CIO score (n=0)</span>
                   </div>
@@ -546,8 +546,8 @@ export default async function CalibrationPage() {
               { label: 'Leg risk events', value: '—' },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-xl border border-gray-800 bg-gray-900/60 p-3 text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</p>
-                <p className="text-sm font-semibold text-gray-400 mt-1">{value}</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+                <p className="text-sm font-semibold text-text-1 mt-1">{value}</p>
               </div>
             ))}
           </div>
@@ -574,11 +574,11 @@ export default async function CalibrationPage() {
               <p className="font-medium text-sm">30-Day Paper Trade Gate</p>
               <p className="text-xs text-gray-500">Must pass before live execution</p>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Win rate requirement</span>
                   <span className="text-gray-300 font-mono">&gt; 55%</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Sharpe (approx) requirement</span>
                   <span className="text-gray-300 font-mono">&gt; 1.5</span>
                 </div>
@@ -593,15 +593,15 @@ export default async function CalibrationPage() {
               <p className="font-medium text-sm">90-Day Brier Confirmation</p>
               <p className="text-xs text-gray-500">Required before scaling above 2%</p>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Target Brier score</span>
                   <span className="text-gray-300 font-mono">&lt; 0.15</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Min samples</span>
                   <span className="text-gray-300 font-mono">50 entries</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Current Brier</span>
                   <span className="text-gray-600">—</span>
                 </div>
@@ -616,11 +616,11 @@ export default async function CalibrationPage() {
               <p className="font-medium text-sm">Oracle Lag Edge Decay</p>
               <p className="text-xs text-gray-500">Monitor for edge erosion as arb closes</p>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Avg deviation at entry (30d)</span>
                   <span className="text-gray-600">—</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-text-1">
                   <span>Avg lag closed before exit (30d)</span>
                   <span className="text-gray-600">—</span>
                 </div>
@@ -653,7 +653,7 @@ export default async function CalibrationPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="text-gray-400 text-xs uppercase border-b border-gray-800">
+                <tr className="text-text-1 text-xs uppercase border-b border-gray-800">
                   <th className="text-left py-2 pr-4 font-medium">Strategy</th>
                   <th className="text-center py-2 pr-2 font-medium">Trades</th>
                   <th className="text-center py-2 pr-2 font-medium">t-stat &gt;2</th>

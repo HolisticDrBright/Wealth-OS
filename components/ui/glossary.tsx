@@ -45,7 +45,7 @@ export function GlossaryTerm({ term, children }: { term: keyof typeof GLOSSARY |
         <span
           id={id}
           role="tooltip"
-          className="absolute bottom-full left-1/2 z-50 mb-1.5 w-60 -translate-x-1/2 rounded-lg border border-white/15 bg-[#161922] p-2.5 text-xs leading-relaxed text-gray-200 shadow-xl"
+          className="absolute bottom-full left-1/2 z-50 mb-1.5 w-60 -translate-x-1/2 rounded-lg border border-white/15 bg-bg-3 p-2.5 text-xs leading-relaxed text-gray-200 shadow-xl"
         >
           {definition}
         </span>

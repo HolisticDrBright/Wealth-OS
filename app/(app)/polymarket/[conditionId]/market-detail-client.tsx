@@ -66,7 +66,7 @@ export function MarketDetailClient({ market: initial }: Props) {
         {/* Back */}
         <Link
           href="/polymarket"
-          className="flex w-fit items-center gap-1.5 text-sm text-gray-400 hover:text-white"
+          className="flex w-fit items-center gap-1.5 text-sm text-text-1 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to markets
@@ -99,8 +99,8 @@ export function MarketDetailClient({ market: initial }: Props) {
         </div>
 
         {/* Price chart */}
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="mb-4 text-xs uppercase tracking-wider text-gray-400">Live price</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="mb-4 text-xs uppercase tracking-wider text-text-1">Live price</p>
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={history}>
               <defs>
@@ -116,13 +116,13 @@ export function MarketDetailClient({ market: initial }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis
                 dataKey="t"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
                 tickLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis
                 domain={[0, 100]}
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
                 tickLine={false}
                 unit="¢"
               />
@@ -132,7 +132,7 @@ export function MarketDetailClient({ market: initial }: Props) {
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 8,
                 }}
-                labelStyle={{ color: '#9ca3af', fontSize: 11 }}
+                labelStyle={{ color: '#9ca3af', fontSize: 12 }}
                 itemStyle={{ fontSize: 12 }}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 formatter={(v: any) => [`${Number(v).toFixed(1)}¢`]}
@@ -193,7 +193,7 @@ export function MarketDetailClient({ market: initial }: Props) {
                   : '—',
             },
           ].map(({ label, value, color, icon }) => (
-            <div key={label} className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div key={label} className="rounded-xl border border-line-strong bg-white/5 p-3">
               <p className="flex items-center gap-1 text-xs text-gray-500">
                 {icon}
                 {label}

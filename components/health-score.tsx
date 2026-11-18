@@ -221,7 +221,7 @@ export function HealthScore({ assets, transactions, savingsRate, totalAssets }: 
           </div>
           <button
             onClick={() => setExpanded(e => !e)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors rounded-lg px-3 py-1.5 hover:bg-white/5"
+            className="flex items-center gap-1.5 text-xs text-text-1 hover:text-white transition-colors rounded-lg px-3 py-1.5 hover:bg-white/5"
           >
             {expanded ? 'Less detail' : 'See breakdown'}
             {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -252,7 +252,7 @@ export function HealthScore({ assets, transactions, savingsRate, totalAssets }: 
                     /{f.max}
                   </span>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                <div className="h-1.5 w-full rounded-full bg-fill overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${scoreBg((f.score / f.max) * 100)}`}
                     style={{ width: `${(f.score / f.max) * 100}%` }}
@@ -265,7 +265,7 @@ export function HealthScore({ assets, transactions, savingsRate, totalAssets }: 
 
         {/* Expanded breakdown */}
         {expanded && (
-          <div className="mt-6 pt-5 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="mt-6 pt-5 border-t border-line-strong grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {factors.map(f => (
               <div key={f.label} className="rounded-xl bg-white/5 p-3 space-y-1.5">
                 <div className="flex items-center gap-2">
@@ -275,7 +275,7 @@ export function HealthScore({ assets, transactions, savingsRate, totalAssets }: 
                     {f.score}/{f.max}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400">{f.description}</p>
+                <p className="text-xs text-text-1">{f.description}</p>
                 <p className="text-xs text-gray-500 leading-relaxed">{f.tip}</p>
               </div>
             ))}

@@ -54,29 +54,29 @@ function CostSummaryBanner({
 
   const trendIcon = trend === 'rising' ? '↑' : trend === 'falling' ? '↓' : '→'
   const trendColor =
-    trend === 'rising' ? 'text-amber-400' : trend === 'falling' ? 'text-emerald-400' : 'text-gray-400'
+    trend === 'rising' ? 'text-amber-400' : trend === 'falling' ? 'text-emerald-400' : 'text-text-1'
 
   return (
     <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
       <div>
-        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Spent this month</p>
+        <p className="text-xs text-gray-500 uppercase tracking-wider">Spent this month</p>
         <p className="text-lg font-semibold text-white mt-0.5">{formatCostCents(totalSpentCents)}</p>
       </div>
       <div>
-        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Total budget</p>
+        <p className="text-xs text-gray-500 uppercase tracking-wider">Total budget</p>
         <p className="text-lg font-semibold text-white mt-0.5">{formatCostCents(totalBudgetCents)}</p>
       </div>
       <div>
-        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Days remaining</p>
+        <p className="text-xs text-gray-500 uppercase tracking-wider">Days remaining</p>
         <p className="text-lg font-semibold text-white mt-0.5">{daysRemaining}d</p>
       </div>
       <div>
-        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Projected</p>
+        <p className="text-xs text-gray-500 uppercase tracking-wider">Projected</p>
         <p className="text-lg font-semibold text-white mt-0.5">
           {formatCostCents(projectedCents)}{' '}
           <span className={`text-sm font-normal ${trendColor}`}>{trendIcon}</span>
         </p>
-        <p className="text-[10px] text-gray-600">{formatCostCents(dailyAvgCents)}/day avg</p>
+        <p className="text-xs text-gray-600">{formatCostCents(dailyAvgCents)}/day avg</p>
       </div>
     </div>
   )
@@ -117,7 +117,7 @@ function FeatureSection({
         {docsHref && (
           <a
             href={docsHref}
-            className="shrink-0 flex items-center gap-1 text-[10px] text-gray-600 hover:text-violet-400 transition-colors"
+            className="shrink-0 flex items-center gap-1 text-xs text-gray-600 hover:text-violet-400 transition-colors"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -127,7 +127,7 @@ function FeatureSection({
       </div>
 
       {!anyEnabled && (
-        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-500 text-center">
+        <div className="rounded-xl border border-line-strong bg-white/5 px-4 py-3 text-sm text-gray-500 text-center">
           Wealth OS works fully without paid AI features. Toggle on what you want, when you want.
         </div>
       )}
@@ -208,9 +208,9 @@ export default async function AIFeaturesPage() {
 
       {/* Cost chart */}
       {featureKeys.length > 0 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-400 flex items-center gap-1">
+            <p className="text-xs font-medium text-text-1 flex items-center gap-1">
               <TrendingUp className="h-3.5 w-3.5" /> 30-day spend
             </p>
           </div>
@@ -249,9 +249,9 @@ export default async function AIFeaturesPage() {
 
       {/* Empty state — everything off */}
       {definitions.every(d => !(flagMap.get(d.feature_key)?.enabled)) && (
-        <div className="rounded-xl border border-white/10 bg-white/5 px-5 py-6 text-center space-y-2">
+        <div className="rounded-xl border border-line-strong bg-white/5 px-5 py-6 text-center space-y-2">
           <Sparkles className="h-6 w-6 text-gray-600 mx-auto" />
-          <p className="text-sm text-gray-400 font-medium">
+          <p className="text-sm text-text-1 font-medium">
             Wealth OS works fully without paid AI features.
           </p>
           <p className="text-xs text-gray-600">

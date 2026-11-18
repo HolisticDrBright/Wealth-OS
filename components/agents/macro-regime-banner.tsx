@@ -8,7 +8,7 @@ const REGIME_CONFIG: Record<string, { color: string; bg: string; border: string;
   'Risk-Off Bear':  { color: 'text-red-400',     bg: 'bg-red-500/5',      border: 'border-red-500/20',     icon: TrendingDown },
   'Stagflation':    { color: 'text-amber-400',   bg: 'bg-amber-500/5',    border: 'border-amber-500/20',   icon: Minus        },
   'Recovery':       { color: 'text-indigo-400',  bg: 'bg-indigo-500/5',   border: 'border-indigo-500/20',  icon: TrendingUp   },
-  'Transition':     { color: 'text-gray-300',    bg: 'bg-white/5',        border: 'border-white/10',       icon: Globe        },
+  'Transition':     { color: 'text-gray-300',    bg: 'bg-white/5',        border: 'border-line-strong',       icon: Globe        },
 }
 
 interface Props {
@@ -37,7 +37,7 @@ export function MacroRegimeBanner({ decision }: Props) {
           <p className={`text-xs font-semibold ${config.color}`}>Macro Regime: {regime}</p>
           <span className="text-xs text-gray-500">Score: {macroAgent.score}/100</span>
         </div>
-        <p className="text-xs text-gray-400 mt-0.5 truncate">{macroAgent.reasoning.slice(0, 100)}</p>
+        <p className="text-xs text-text-1 mt-0.5 truncate">{macroAgent.reasoning.slice(0, 100)}</p>
       </div>
     </div>
   )

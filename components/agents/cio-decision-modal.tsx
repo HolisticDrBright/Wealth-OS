@@ -87,10 +87,10 @@ export function CIODecisionModal({ open, onClose, tradeContext }: Props) {
             <AlertCircle className="h-5 w-5 text-red-400 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-red-400">Analysis failed</p>
-              <p className="text-xs text-gray-400 mt-1">{error}</p>
+              <p className="text-xs text-text-1 mt-1">{error}</p>
               {error.includes('API_KEY') && (
                 <p className="text-xs text-gray-500 mt-2">
-                  Add your <code className="bg-white/10 px-1 rounded">ANTHROPIC_API_KEY</code> to .env.local and Vercel.
+                  Add your <code className="bg-fill px-1 rounded">ANTHROPIC_API_KEY</code> to .env.local and Vercel.
                 </p>
               )}
             </div>
@@ -111,13 +111,13 @@ export function CIODecisionModal({ open, onClose, tradeContext }: Props) {
                 <p className={`text-lg font-bold ${config.color}`}>{config.label}</p>
                 <span className="text-xs text-gray-500">Score: {decision.finalScore.toFixed(1)}/100</span>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{decision.plainEnglishSummary}</p>
+              <p className="text-xs text-text-1 mt-0.5 leading-relaxed">{decision.plainEnglishSummary}</p>
             </div>
           </div>
 
           {/* Score + Radar */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col items-center justify-center rounded-xl bg-white/5 border border-white/10 p-4">
+            <div className="flex flex-col items-center justify-center rounded-xl bg-white/5 border border-line-strong p-4">
               <p className="text-xs text-gray-500 mb-3">MiroFish Score</p>
               <MiroFishScoreBadge
                 score={decision.miroFishScore ?? decision.finalScore}
@@ -125,7 +125,7 @@ export function CIODecisionModal({ open, onClose, tradeContext }: Props) {
                 size="lg"
               />
             </div>
-            <div className="rounded-xl bg-white/5 border border-white/10 p-2">
+            <div className="rounded-xl bg-white/5 border border-line-strong p-2">
               <p className="text-xs text-gray-500 text-center mb-1">Opportunity Radar</p>
               <AgentRadar agents={agentsFromDecision(decision)} size={200} />
             </div>
@@ -133,8 +133,8 @@ export function CIODecisionModal({ open, onClose, tradeContext }: Props) {
 
           {/* Position Sizing */}
           {decision.decision !== 'reject' && (
-            <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Position Sizing</p>
+            <div className="rounded-xl bg-white/5 border border-line-strong p-4">
+              <p className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-3">Position Sizing</p>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
                   <p className="text-xs text-gray-500">Recommended</p>
@@ -157,7 +157,7 @@ export function CIODecisionModal({ open, onClose, tradeContext }: Props) {
 
           {/* Macro + Risk */}
           <MacroRegimeBanner decision={decision} />
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="rounded-xl bg-white/5 border border-line-strong p-4">
             <RiskMeter decision={decision} />
           </div>
 
@@ -173,7 +173,7 @@ export function CIODecisionModal({ open, onClose, tradeContext }: Props) {
               <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Risk Factors</p>
               <ul className="space-y-1">
                 {decision.riskFactors.map((r, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-gray-400">
+                  <li key={i} className="flex items-start gap-2 text-xs text-text-1">
                     <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
                     {r}
                   </li>

@@ -41,7 +41,7 @@ export function NoTradePanel({ entries }: { entries: NoTradeEntry[] }) {
                 <span
                   title={reason.blurb}
                   className={cn(
-                    'shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-medium',
+                    'shrink-0 rounded-md border px-1.5 py-0.5 text-xs font-medium',
                     tone.text,
                     tone.bg,
                     tone.border,

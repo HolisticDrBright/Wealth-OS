@@ -177,7 +177,7 @@ export function PolymarketClient({
         )}
 
         {/* Tab bar */}
-        <div className="flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+        <div className="flex gap-1 rounded-xl border border-line-strong bg-white/5 p-1">
           {TABS.map(t => (
             <button
               key={t.id}
@@ -185,8 +185,8 @@ export function PolymarketClient({
               className={cn(
                 'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all',
                 tab === t.id
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-fill text-white'
+                  : 'text-text-1 hover:text-white'
               )}
             >
               {t.label}
@@ -230,9 +230,9 @@ function EntropyPlaceholder() {
 
 function TabShell({ label, description }: { label: string; description: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 py-20 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-line-strong bg-white/5 py-20 text-center">
       <p className="text-lg font-semibold text-white">{label}</p>
-      <p className="text-sm text-gray-400 max-w-xs">{description}</p>
+      <p className="text-sm text-text-1 max-w-xs">{description}</p>
     </div>
   )
 }

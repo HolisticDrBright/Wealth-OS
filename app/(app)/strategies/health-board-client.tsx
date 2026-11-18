@@ -33,6 +33,7 @@ import { BookAllocationPanel } from './BookAllocationPanel'
 import { PromotionPipelinePanel } from './PromotionPipelinePanel'
 import { LeaderboardPanel } from './LeaderboardPanel'
 import type { StrategyMetrics } from '@/lib/actions/strategy-metrics'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 // ─── Tabs shell ───────────────────────────────────────────────────────────────
 
@@ -55,12 +56,12 @@ export function StrategiesTabs({
 
   return (
     <div className="px-4 py-4 sm:px-6">
-      <div className="mb-4 inline-flex rounded-lg border border-white/10 bg-white/5 p-0.5 text-sm">
+      <div className="mb-4 inline-flex rounded-lg border border-line-strong bg-white/5 p-0.5 text-sm">
         <button
           onClick={() => setTab('health')}
           className={cn(
             'rounded-md px-3 py-1.5 font-medium transition-colors',
-            tab === 'health' ? 'bg-indigo-500/20 text-indigo-300' : 'text-gray-400 hover:text-gray-200',
+            tab === 'health' ? 'bg-indigo-500/20 text-indigo-300' : 'text-text-1 hover:text-gray-200',
           )}
         >
           Health Board
@@ -69,7 +70,7 @@ export function StrategiesTabs({
           onClick={() => setTab('configure')}
           className={cn(
             'rounded-md px-3 py-1.5 font-medium transition-colors',
-            tab === 'configure' ? 'bg-indigo-500/20 text-indigo-300' : 'text-gray-400 hover:text-gray-200',
+            tab === 'configure' ? 'bg-indigo-500/20 text-indigo-300' : 'text-text-1 hover:text-gray-200',
           )}
         >
           Configure
@@ -111,7 +112,7 @@ function Chip({
         'rounded-md border px-2 py-1 text-xs font-medium whitespace-nowrap transition-colors',
         active
           ? 'border-indigo-500/30 bg-indigo-500/15 text-indigo-300'
-          : 'border-white/10 bg-white/5 text-gray-400 hover:text-gray-200',
+          : 'border-line-strong bg-white/5 text-text-1 hover:text-gray-200',
       )}
     >
       {children}
@@ -122,7 +123,7 @@ function Chip({
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
       {children}
     </div>
   )
@@ -190,7 +191,7 @@ function HealthBoard({ rows }: { rows: StrategyHealthRow[] }) {
   return (
     <div className="space-y-3">
       {/* Filters */}
-      <div className="space-y-2.5 rounded-xl border border-white/10 bg-white/5 p-3">
+      <div className="space-y-2.5 rounded-xl border border-line-strong bg-white/5 p-3">
         <FilterGroup label="Asset">
           <Chip active={assetFilter === 'all'} onClick={() => setAssetFilter('all')}>All</Chip>
           {ASSET_CLASSES.map(ac => (
@@ -236,10 +237,10 @@ function HealthBoard({ rows }: { rows: StrategyHealthRow[] }) {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden overflow-x-auto rounded-xl border border-white/10 bg-white/5 sm:block">
+          <div className="hidden overflow-x-auto rounded-xl border border-line-strong bg-white/5 sm:block">
             <table className="w-full min-w-[1100px] text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-[11px] uppercase tracking-wide text-gray-500">
+                <tr className="border-b border-line-strong text-left text-xs uppercase tracking-wide text-gray-500">
                   <Th onClick={() => toggleSort('name')} sortable active={sortKey === 'name'} dir={sortDir}>Strategy</Th>
                   <Th>Asset</Th>
                   <Th>Edge</Th>
@@ -296,7 +297,7 @@ function Th({
         >
           {children}
           <ArrowUpDown className={cn('h-3 w-3', active ? 'opacity-100' : 'opacity-40')} />
-          {active && <span className="text-[9px]">{dir === 'asc' ? '↑' : '↓'}</span>}
+          {active && <span className="text-xs">{dir === 'asc' ? '↑' : '↓'}</span>}
         </button>
       ) : children}
     </th>
@@ -311,8 +312,8 @@ function BoolDot({ on, label }: { on: boolean; label: string }) {
 
 function Pnl({ value }: { value: number | null }) {
   if (value == null) return <InsufficientData label="—" />
-  const tone = value > 0 ? 'text-emerald-400' : value < 0 ? 'text-red-400' : 'text-gray-400'
-  return <span className={cn('tabular-nums', tone)}>{formatCurrency(value)}</span>
+  const tone = value > 0 ? 'text-emerald-400' : value < 0 ? 'text-red-400' : 'text-text-1'
+  return <span className={cn('tabular-nums', tone)}><TrendArrow value={value} />{formatCurrency(value)}</span>
 }
 
 function shortDate(iso: string | null): string | null {
@@ -336,7 +337,7 @@ function IntegrationCell({ row }: { row: StrategyHealthRow }) {
         <span
           key={v}
           title={`Required integration missing: ${v}`}
-          className="inline-flex items-center gap-1 rounded border border-red-500/20 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-400"
+          className="inline-flex items-center gap-1 rounded border border-red-500/20 bg-red-500/10 px-1.5 py-0.5 text-xs font-medium text-red-400"
         >
           <AlertTriangle className="h-2.5 w-2.5" /> {v}
         </span>
@@ -345,7 +346,7 @@ function IntegrationCell({ row }: { row: StrategyHealthRow }) {
         <span
           key={v}
           title={`Optional integration missing: ${v}`}
-          className="inline-flex items-center gap-1 rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400"
+          className="inline-flex items-center gap-1 rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400"
         >
           <PlugZap className="h-2.5 w-2.5" /> {v}
         </span>
@@ -364,8 +365,8 @@ function Row({ row }: { row: StrategyHealthRow }) {
       <td className="max-w-[220px] px-3 py-2">
         <span className="block truncate font-medium text-gray-100" title={row.displayName}>{row.displayName}</span>
       </td>
-      <td className="px-3 py-2 text-gray-400">{assetClassLabel(row.assetClass)}</td>
-      <td className="px-3 py-2 text-gray-400">{edgeTypeLabel(row.edgeType)}</td>
+      <td className="px-3 py-2 text-text-1">{assetClassLabel(row.assetClass)}</td>
+      <td className="px-3 py-2 text-text-1">{edgeTypeLabel(row.edgeType)}</td>
       <td className="px-3 py-2"><MaturityBadge status={row.maturityStatus} /></td>
       <td className="px-3 py-2"><BoolDot on={row.isEnabled} label="Enabled" /></td>
       <td className="px-3 py-2"><BoolDot on={row.paperEnabled} label="Paper" /></td>
@@ -389,15 +390,15 @@ function Row({ row }: { row: StrategyHealthRow }) {
       <td className="px-3 py-2 text-right tabular-nums text-gray-300">
         {row.tradeCount == null ? <InsufficientData label="—" /> : row.tradeCount}
       </td>
-      <td className="px-3 py-2 text-gray-400">
+      <td className="px-3 py-2 text-text-1">
         {shortDate(row.lastSignal) ?? <InsufficientData label="—" />}
       </td>
-      <td className="px-3 py-2 text-gray-400">
+      <td className="px-3 py-2 text-text-1">
         {shortDate(row.lastCalibration) ?? <InsufficientData label="—" />}
       </td>
       <td className="px-3 py-2"><IntegrationCell row={row} /></td>
       <td className="max-w-[200px] px-3 py-2">
-        <span className="block truncate text-xs text-gray-400" title={row.whyText}>{row.whyText}</span>
+        <span className="block truncate text-xs text-text-1" title={row.whyText}>{row.whyText}</span>
       </td>
     </tr>
   )
@@ -411,7 +412,7 @@ function MobileCard({ row }: { row: StrategyHealthRow }) {
   const brier = brierToLevel(row.brier)
 
   return (
-    <div className={cn('rounded-xl border border-white/10 bg-white/5 p-3', inert && 'opacity-70')}>
+    <div className={cn('rounded-xl border border-line-strong bg-white/5 p-3', inert && 'opacity-70')}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate font-medium text-gray-100" title={row.displayName}>{row.displayName}</p>
@@ -422,7 +423,7 @@ function MobileCard({ row }: { row: StrategyHealthRow }) {
         <MaturityBadge status={row.maturityStatus} />
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-1">
         <span className="inline-flex items-center gap-1"><BoolDot on={row.isEnabled} label="Enabled" /> Enabled</span>
         <span className="inline-flex items-center gap-1"><BoolDot on={row.paperEnabled} label="Paper" /> Paper</span>
         <span className="inline-flex items-center gap-1">
@@ -453,7 +454,7 @@ function MobileCard({ row }: { row: StrategyHealthRow }) {
       </div>
 
       <div className="mt-2"><IntegrationCell row={row} /></div>
-      <p className="mt-2 text-xs text-gray-400">{row.whyText}</p>
+      <p className="mt-2 text-xs text-text-1">{row.whyText}</p>
     </div>
   )
 }

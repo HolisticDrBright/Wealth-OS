@@ -23,7 +23,7 @@ export function JurisdictionModal({ onConfirm, onCancel }: Props) {
       />
 
       {/* Dialog */}
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#0f1117] p-6 shadow-2xl">
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-line-strong bg-bg-2 p-6 shadow-2xl">
         {/* Close */}
         <button
           onClick={onCancel}
@@ -41,7 +41,7 @@ export function JurisdictionModal({ onConfirm, onCancel }: Props) {
         <h2 className="text-lg font-bold text-white">Jurisdiction acknowledgement</h2>
 
         {/* Body */}
-        <div className="mt-3 space-y-3 text-sm text-gray-400">
+        <div className="mt-3 space-y-3 text-sm text-text-1">
           <p>
             Live trading on Polymarket is{' '}
             <span className="font-semibold text-amber-400">
@@ -79,7 +79,7 @@ export function JurisdictionModal({ onConfirm, onCancel }: Props) {
         <div className="mt-6 flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 text-sm text-gray-300 hover:bg-white/10 transition-colors"
+            className="flex-1 rounded-lg border border-line-strong bg-white/5 py-2 text-sm text-gray-300 hover:bg-fill transition-colors"
           >
             Cancel
           </button>

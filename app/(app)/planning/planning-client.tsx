@@ -36,7 +36,7 @@ const goalColors: Record<string, string> = {
   education: 'text-purple-400 bg-purple-500/10',
   emergency: 'text-amber-400 bg-amber-500/10',
   vacation: 'text-pink-400 bg-pink-500/10',
-  other: 'text-gray-400 bg-gray-500/10',
+  other: 'text-text-1 bg-gray-500/10',
 }
 
 const goalBarColors: Record<string, string> = {
@@ -109,7 +109,7 @@ export function PlanningClient({ goals: initialGoals, isDemo, waterfallDefaults 
       {isDemo && (
         <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex items-start gap-3">
           <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-text-1">
             Showing <strong className="text-indigo-400">demo data</strong>. Add your real financial goals to track progress.
           </p>
         </div>
@@ -172,7 +172,7 @@ export function PlanningClient({ goals: initialGoals, isDemo, waterfallDefaults 
               ].map(({ label, color }) => (
                 <div key={label} className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-gray-400">{label}</span>
+                  <span className="text-text-1">{label}</span>
                 </div>
               ))}
             </div>
@@ -194,9 +194,9 @@ export function PlanningClient({ goals: initialGoals, isDemo, waterfallDefaults 
                 ))}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="year" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="year" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis
-                tick={{ fill: '#6b7280', fontSize: 11 }}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`}
@@ -222,7 +222,7 @@ export function PlanningClient({ goals: initialGoals, isDemo, waterfallDefaults 
       {/* Goals Grid */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Financial Goals</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider">Financial Goals</h2>
           <Button size="sm" onClick={() => { setEditingGoal(null); setShowForm(true) }}>
             <Plus className="h-4 w-4" /> Add Goal
           </Button>
@@ -269,7 +269,7 @@ export function PlanningClient({ goals: initialGoals, isDemo, waterfallDefaults 
                       </Badge>
                       <button
                         onClick={() => { setEditingGoal(goal); setShowForm(true) }}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-fill text-gray-500 hover:text-white transition-colors"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>

@@ -7,6 +7,7 @@ import { Brain, RefreshCw, TrendingUp, TrendingDown, CheckCircle2, AlertCircle, 
 import type { StrategyStats } from '@/lib/learning/types'
 import { AgentTrustBoard } from '@/components/calibration/AgentTrustBoard'
 import type { AgentTrust } from '@/lib/actions/agent-trust'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface Props {
   initialWeights: Record<string, number>
@@ -188,14 +189,14 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
             <div className={`rounded-lg border px-4 py-3 flex items-start gap-3 ${
               lastResult.updated
                 ? 'border-emerald-500/20 bg-emerald-500/10'
-                : 'border-white/10 bg-white/5'
+                : 'border-line-strong bg-white/5'
             }`}>
               {lastResult.updated
                 ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                 : <AlertCircle className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
               }
               <div className="text-sm">
-                <p className={lastResult.updated ? 'text-emerald-300' : 'text-gray-400'}>{lastResult.reason}</p>
+                <p className={lastResult.updated ? 'text-emerald-300' : 'text-text-1'}>{lastResult.reason}</p>
                 {lastResult.graded != null && lastResult.graded > 0 && (
                   <p className="text-xs text-gray-500 mt-0.5">Graded {lastResult.graded} new outcome{lastResult.graded !== 1 ? 's' : ''}</p>
                 )}
@@ -210,7 +211,7 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
 
       {/* Active weights */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Active Strategy Weights</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Active Strategy Weights</h2>
         <Card>
           <div className="p-6 space-y-4">
             {sortedWeights.map(([strategy, weight]) => {
@@ -228,20 +229,20 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
                     {!learned && (
                       <span
                         title={`Default prior, not yet learned — only ${graded} graded outcome${graded === 1 ? '' : 's'} (needs ${LEARN_THRESHOLD}+). This weight is not an authoritative track record.`}
-                        className="inline-flex items-center gap-1 rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-sky-400 shrink-0"
+                        className="inline-flex items-center gap-1 rounded-md border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-xs font-medium leading-none text-sky-400 shrink-0"
                       >
                         <Info className="h-2.5 w-2.5" /> shadow
                       </span>
                     )}
                   </div>
                   <span
-                    className="text-gray-400 font-mono shrink-0"
+                    className="text-text-1 font-mono shrink-0"
                     title={learned ? `Learned from ${graded} graded outcomes` : 'Default prior — not yet learned from outcomes'}
                   >
                     {(weight * 100).toFixed(1)}%
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-white/10">
+                <div className="h-2 rounded-full bg-fill">
                   <div
                     className="h-2 rounded-full transition-all"
                     style={{
@@ -266,12 +267,12 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
       {/* Strategy performance table */}
       {stats.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Strategy Performance</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Strategy Performance</h2>
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-xs text-gray-500">
+                  <tr className="border-b border-line-strong text-xs text-gray-500">
                     <th className="text-left px-4 py-3 font-medium">Strategy</th>
                     <th className="text-right px-4 py-3 font-medium">Outcomes</th>
                     <th className="text-right px-4 py-3 font-medium">Brier ↓</th>
@@ -293,7 +294,7 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
                           <span className="font-medium text-white capitalize">{s.strategy}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-400">{s.count}</td>
+                      <td className="px-4 py-3 text-right text-text-1">{s.count}</td>
                       <td className="px-4 py-3 text-right">
                         {s.brier == null ? (
                           <span className="text-gray-600 text-xs">—</span>
@@ -323,7 +324,7 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
                           <span className="text-gray-600 text-xs">—</span>
                         ) : (
                           <span className={s.avg_alpha >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                            {s.avg_alpha >= 0 ? '+' : ''}{formatPct(s.avg_alpha, 2)}
+                            <TrendArrow value={s.avg_alpha} />{s.avg_alpha >= 0 ? '+' : ''}{formatPct(s.avg_alpha, 2)}
                           </span>
                         )}
                       </td>
@@ -340,18 +341,18 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
                 </tbody>
               </table>
             </div>
-            <div className="px-4 py-3 border-t border-white/10">
+            <div className="px-4 py-3 border-t border-line-strong">
               <div className="grid grid-cols-3 gap-4 text-xs text-gray-500">
                 <div>
-                  <span className="font-medium text-gray-400">Brier score</span> — squared error of probability estimate.
+                  <span className="font-medium text-text-1">Brier score</span> — squared error of probability estimate.
                   0 = perfect, 0.25 = random. Lower is better.
                 </div>
                 <div>
-                  <span className="font-medium text-gray-400">Hit rate</span> — fraction of correct direction calls.
+                  <span className="font-medium text-text-1">Hit rate</span> — fraction of correct direction calls.
                   &gt;55% is meaningfully good over many samples.
                 </div>
                 <div>
-                  <span className="font-medium text-gray-400">Alpha</span> — return vs SPY for the same period.
+                  <span className="font-medium text-text-1">Alpha</span> — return vs SPY for the same period.
                   Positive means the signal added value vs just holding the index.
                 </div>
               </div>
@@ -365,9 +366,9 @@ export function LearningClient({ initialWeights, initialStats, totalDecisions, t
         <div className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Zap className="h-4 w-4 text-indigo-400" />
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">How It Works</p>
+            <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">How It Works</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-gray-400">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-text-1">
             {[
               {
                 title: '1. Log decisions',

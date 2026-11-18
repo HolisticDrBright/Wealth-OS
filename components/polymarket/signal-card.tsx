@@ -30,7 +30,7 @@ export function SignalCard({ signal, isLive = false }: Props) {
   const confPct = Math.round(signal.confidence * 100)
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="flex flex-col gap-3 rounded-xl border border-line-strong bg-white/5 p-4">
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -68,11 +68,11 @@ export function SignalCard({ signal, isLive = false }: Props) {
 
       {/* Confidence bar */}
       <div className="space-y-1">
-        <div className="flex justify-between text-xs text-gray-400">
+        <div className="flex justify-between text-xs text-text-1">
           <span>Confidence</span>
           <span className="font-mono text-white">{confPct}%</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-1.5 overflow-hidden rounded-full bg-fill">
           <div
             className={cn(
               'h-full rounded-full transition-all',
@@ -84,7 +84,7 @@ export function SignalCard({ signal, isLive = false }: Props) {
       </div>
 
       {/* Stats row */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-1">
         {signal.price > 0 && (
           <span>
             Price <span className="font-mono text-white">{(signal.price * 100).toFixed(1)}¢</span>

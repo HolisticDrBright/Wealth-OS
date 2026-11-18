@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { StrategyKey, AssetClass, MiroFishTier, KronosTier, ProfileKey } from '@/lib/strategies/strategy-registry'
 import type { PaperSummary, PaperRunResult, SkipCounts, SkippedDetail } from '@/lib/paper-trading/types'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface StrategyRow {
   strategyKey: StrategyKey
@@ -92,7 +93,7 @@ function AiTierBadge({ tier, label, icon }: { tier: MiroFishTier | KronosTier; l
     ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
     : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
   return (
-    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 ${cls}`}>
+    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium border shrink-0 ${cls}`}>
       {icon}{label}
     </span>
   )
@@ -189,11 +190,11 @@ const OUTCOME_LABEL: Record<string, string> = {
 
 function outcomeColor(outcome: string) {
   if (outcome === 'opened') return 'text-emerald-400'
-  if (outcome === 'already_open') return 'text-gray-400'
+  if (outcome === 'already_open') return 'text-text-1'
   if (outcome === 'missing_price' || outcome === 'invalid_price' || outcome === 'no_active_book') return 'text-amber-400'
   if (outcome === 'block' || outcome === 'insert_error' || outcome === 'error') return 'text-red-400'
   if (outcome === 'expiredMarket' || outcome === 'resolvedMarket' || outcome === 'strategyImmature') return 'text-gray-500'
-  return 'text-gray-400'
+  return 'text-text-1'
 }
 
 function SkipBreakdown({ skipped, details }: { skipped: SkipCounts; details: SkippedDetail[] }) {
@@ -203,11 +204,11 @@ function SkipBreakdown({ skipped, details }: { skipped: SkipCounts; details: Ski
   if (totalSkipped === 0) return null
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] text-xs">
+    <div className="rounded-lg border border-line-strong bg-white/[0.02] text-xs">
       <button
         type="button"
         onClick={() => setOpen(p => !p)}
-        className="flex w-full items-center justify-between px-3 py-2 text-left text-gray-400 hover:text-white transition-colors"
+        className="flex w-full items-center justify-between px-3 py-2 text-left text-text-1 hover:text-white transition-colors"
       >
         <span className="flex items-center gap-1.5">
           {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -223,12 +224,12 @@ function SkipBreakdown({ skipped, details }: { skipped: SkipCounts; details: Ski
       </button>
 
       {open && (
-        <div className="border-t border-white/10">
+        <div className="border-t border-line-strong">
           {/* Counts summary row */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-2 text-[11px]">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 py-2 text-xs">
             {(
               [
-                ['Already open', skipped.alreadyOpen, 'text-gray-400'],
+                ['Already open', skipped.alreadyOpen, 'text-text-1'],
                 ['No price', skipped.missingPrice, 'text-amber-400'],
                 ['Expired', skipped.expiredMarket, 'text-gray-500'],
                 ['Resolved', skipped.resolvedMarket, 'text-gray-500'],
@@ -255,7 +256,7 @@ function SkipBreakdown({ skipped, details }: { skipped: SkipCounts; details: Ski
             <div className="max-h-64 overflow-y-auto border-t border-white/5">
               <table className="w-full">
                 <thead>
-                  <tr className="text-[10px] uppercase tracking-wider text-gray-600 border-b border-white/5">
+                  <tr className="text-xs uppercase tracking-wider text-gray-600 border-b border-white/5">
                     <th className="px-3 py-1.5 text-left font-medium">Strategy</th>
                     <th className="px-3 py-1.5 text-left font-medium">Symbol</th>
                     <th className="px-3 py-1.5 text-left font-medium">Outcome</th>
@@ -370,20 +371,20 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
     <div className="flex flex-col gap-4">
       {/* Header with Paper/Live toggle */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider flex items-center gap-2">
           <FlaskConical className="h-4 w-4" />
           Strategies
         </h2>
-        <div className="flex items-center gap-1 rounded-lg bg-white/5 border border-white/10 p-0.5">
+        <div className="flex items-center gap-1 rounded-lg bg-white/5 border border-line-strong p-0.5">
           <button
             onClick={() => setMode('paper')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'paper' ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${mode === 'paper' ? 'bg-accent-cyan/20 text-accent-cyan' : 'text-text-1 hover:text-white'}`}
           >
             Paper
           </button>
           <button
             onClick={() => setMode('live')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${mode === 'live' ? 'bg-green-500/20 text-green-400' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${mode === 'live' ? 'bg-green-500/20 text-green-400' : 'text-text-1 hover:text-white'}`}
           >
             <Zap className="h-3 w-3" />
             Live
@@ -392,16 +393,16 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
       </div>
 
       {mode === 'live' ? (
-        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center">
+        <div className="rounded-xl border border-line-strong bg-white/5 px-4 py-8 text-center">
           <Zap className="h-6 w-6 text-gray-500 mx-auto mb-2" />
-          <p className="text-sm text-gray-400">Live strategy execution coming soon</p>
+          <p className="text-sm text-text-1">Live strategy execution coming soon</p>
           <p className="text-xs text-gray-600 mt-1">Enable Paper mode to simulate trades with live prices</p>
         </div>
       ) : (
         <>
           {/* Profile filter banner */}
           {userProfileKey && hiddenCount > 0 && (
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-gray-400 flex items-center justify-between">
+            <div className="rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-xs text-text-1 flex items-center justify-between">
               <span>
                 Showing <strong className="text-white">{visibleStrategies.length}</strong> of {strategies.length} strategies available in your{' '}
                 <strong className="text-white capitalize">{userProfileKey}</strong> profile.
@@ -413,13 +414,13 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
           )}
 
           {/* Strategy toggles */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-xl border border-line-strong bg-white/5 p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <p className="text-xs text-gray-500">
                   {enabledCount > 0 ? `${enabledCount} strategy${enabledCount !== 1 ? 'ies' : 'y'} in paper mode` : 'Toggle strategies to simulate'}
                 </p>
-                <span className="text-[10px] text-gray-600 hidden sm:inline">
+                <span className="text-xs text-gray-600 hidden sm:inline">
                   <span className="text-indigo-400">MF</span>=MiroFish · <span className="text-indigo-400">KR</span>=Kronos
                 </span>
               </div>
@@ -441,7 +442,7 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
                 >
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     <span className="text-xs font-medium text-foreground truncate">{s.displayName}</span>
-                    <Badge variant="default" className="text-[10px] shrink-0 text-gray-500 border-gray-600/50">{s.edgeType}</Badge>
+                    <Badge variant="default" className="text-xs shrink-0 text-gray-500 border-gray-600/50">{s.edgeType}</Badge>
                     <AiTierBadge tier={s.mirofish} label="MF" icon={<Fish className="h-2.5 w-2.5" />} />
                     <AiTierBadge tier={s.kronos} label="KR" icon={<Atom className="h-2.5 w-2.5" />} />
                   </div>
@@ -481,14 +482,14 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
           {/* P&L summary */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Total P&L', value: fmt(totalPnl), cls: pnlColor(totalPnl) },
+              { label: 'Total P&L', value: fmt(totalPnl), cls: pnlColor(totalPnl), trend: totalPnl },
               { label: 'Win Rate', value: summary?.winRate != null ? `${(summary.winRate * 100).toFixed(0)}%` : '—', cls: '' },
               { label: 'Open', value: String(openPos.length), cls: '' },
               { label: 'Closed', value: String(summary?.closedTrades ?? 0), cls: '' },
             ].map(t => (
-              <div key={t.label} className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wider">{t.label}</p>
-                <p className={`text-lg font-bold mt-0.5 ${t.cls || 'text-white'}`}>{t.value}</p>
+              <div key={t.label} className="rounded-xl border border-line-strong bg-white/5 p-3">
+                <p className="text-xs text-text-1 uppercase tracking-wider">{t.label}</p>
+                <p className={`text-lg font-bold mt-0.5 ${t.cls || 'text-white'}`}>{'trend' in t && <TrendArrow value={t.trend} />}{t.value}</p>
               </div>
             ))}
           </div>
@@ -496,11 +497,11 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
           {/* Open positions */}
           {openPos.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Paper Positions</h3>
-              <div className="rounded-xl border border-white/10 overflow-hidden">
+              <h3 className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-2">Paper Positions</h3>
+              <div className="rounded-xl border border-line-strong overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/5">
+                    <tr className="border-b border-line-strong bg-white/5">
                       <th className="text-left px-3 py-2 text-gray-500 font-medium">Strategy</th>
                       <th className="text-left px-3 py-2 text-gray-500 font-medium">Symbol</th>
                       <th className="text-left px-3 py-2 text-gray-500 font-medium">Dir</th>
@@ -513,17 +514,17 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
                   <tbody>
                     {openPos.map(p => (
                       <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="px-3 py-2 font-mono text-gray-400">{p.strategy_key}</td>
+                        <td className="px-3 py-2 font-mono text-text-1">{p.strategy_key}</td>
                         <td className="px-3 py-2 font-semibold text-white">{p.symbol}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${directionClass(p.direction)}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${directionClass(p.direction)}`}>
                             {p.direction.toUpperCase()}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-gray-300">${p.entry_price.toFixed(4)}</td>
                         <td className="px-3 py-2 text-right font-mono text-gray-300">{p.current_price != null ? `$${p.current_price.toFixed(4)}` : '—'}</td>
                         <td className={`px-3 py-2 text-right font-medium ${pnlColor(p.unrealized_pnl_usd)}`}>
-                          {fmtPct(p.unrealized_pnl_pct)} <span className="text-gray-500">({fmt(p.unrealized_pnl_usd)})</span>
+                          <TrendArrow value={p.unrealized_pnl_usd} />{fmtPct(p.unrealized_pnl_pct)} <span className="text-gray-500">({fmt(p.unrealized_pnl_usd)})</span>
                         </td>
                         <td className="px-3 py-2 text-right text-gray-500 flex items-center justify-end gap-1">
                           <Clock className="h-3 w-3" />{timeAgo(p.opened_at)}
@@ -539,11 +540,11 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
           {/* Recent closed */}
           {recentPos.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Recent Closed Trades</h3>
-              <div className="rounded-xl border border-white/10 overflow-hidden">
+              <h3 className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-2">Recent Closed Trades</h3>
+              <div className="rounded-xl border border-line-strong overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/5">
+                    <tr className="border-b border-line-strong bg-white/5">
                       <th className="text-left px-3 py-2 text-gray-500 font-medium">Strategy</th>
                       <th className="text-left px-3 py-2 text-gray-500 font-medium">Symbol</th>
                       <th className="text-left px-3 py-2 text-gray-500 font-medium">Dir</th>
@@ -556,17 +557,17 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
                   <tbody>
                     {recentPos.map(p => (
                       <tr key={p.id} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="px-3 py-2 font-mono text-gray-400">{p.strategy_key}</td>
+                        <td className="px-3 py-2 font-mono text-text-1">{p.strategy_key}</td>
                         <td className="px-3 py-2 font-semibold text-white">{p.symbol}</td>
                         <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${directionClass(p.direction)}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${directionClass(p.direction)}`}>
                             {p.direction.toUpperCase()}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-gray-300">${p.entry_price.toFixed(4)}</td>
                         <td className="px-3 py-2 text-right font-mono text-gray-300">{p.exit_price != null ? `$${p.exit_price.toFixed(4)}` : '—'}</td>
                         <td className={`px-3 py-2 text-right font-medium ${pnlColor(p.realized_pnl_usd)}`}>
-                          {fmtPct(p.realized_pnl_pct)}
+                          <TrendArrow value={p.realized_pnl_usd} />{fmtPct(p.realized_pnl_pct)}
                           {p.realized_pnl_usd != null && (
                             <span className="text-gray-500 ml-1">
                               ({p.realized_pnl_usd >= 0 ? <TrendingUp className="inline h-3 w-3 text-green-400" /> : <TrendingDown className="inline h-3 w-3 text-red-400" />}
@@ -575,7 +576,7 @@ export function AssetStrategyPanel({ assetClasses, userProfileKey }: Props) {
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 text-[10px]">{p.exit_reason ?? 'manual'}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-fill text-text-1 text-xs">{p.exit_reason ?? 'manual'}</span>
                         </td>
                       </tr>
                     ))}

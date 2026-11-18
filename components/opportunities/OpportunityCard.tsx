@@ -63,7 +63,7 @@ const TRADEABILITY_META: Record<OppTradeability, { label: string; tone: Tone }> 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] uppercase tracking-wider text-gray-600">{label}</p>
+      <p className="text-xs uppercase tracking-wider text-gray-600">{label}</p>
       <p className="truncate text-xs font-medium text-gray-200">{children}</p>
     </div>
   )
@@ -84,7 +84,7 @@ export function OpportunityCard({ opp, onReview, onPaperTrade, className }: Prop
   const edgePositive = (opp.expectedEdgePct ?? 0) >= 0
 
   return (
-    <div className={cn('rounded-xl border border-white/10 bg-white/5 p-4 transition-colors hover:border-white/20', className)}>
+    <div className={cn('rounded-xl border border-line-strong bg-white/5 p-4 transition-colors hover:border-white/20', className)}>
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
@@ -99,7 +99,7 @@ export function OpportunityCard({ opp, onReview, onPaperTrade, className }: Prop
             <p className="mt-0.5 truncate text-sm font-medium text-white">{opp.title}</p>
           </div>
         </div>
-        <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium', tradeTone.text, tradeTone.bg, tradeTone.border)}>
+        <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium', tradeTone.text, tradeTone.bg, tradeTone.border)}>
           {trade.label}
         </span>
       </div>
@@ -107,13 +107,13 @@ export function OpportunityCard({ opp, onReview, onPaperTrade, className }: Prop
       {/* Tag row */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {opp.maturity && <MaturityBadge status={opp.maturity} />}
-        {opp.assetClass && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-gray-400">{assetClassLabel(opp.assetClass)}</span>}
-        {opp.edgeType && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-gray-400">{edgeTypeLabel(opp.edgeType)} edge</span>}
-        {opp.strategyLabel && <span className="truncate rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-gray-400">{opp.strategyLabel}</span>}
+        {opp.assetClass && <span className="rounded-full bg-fill px-2 py-0.5 text-xs text-text-1">{assetClassLabel(opp.assetClass)}</span>}
+        {opp.edgeType && <span className="rounded-full bg-fill px-2 py-0.5 text-xs text-text-1">{edgeTypeLabel(opp.edgeType)} edge</span>}
+        {opp.strategyLabel && <span className="truncate rounded-full bg-fill px-2 py-0.5 text-xs text-text-1">{opp.strategyLabel}</span>}
       </div>
 
       {/* Why now */}
-      {opp.whyNow && <p className="mt-2 text-xs leading-relaxed text-gray-400"><span className="font-semibold text-gray-300">Why now: </span>{opp.whyNow}</p>}
+      {opp.whyNow && <p className="mt-2 text-xs leading-relaxed text-text-1"><span className="font-semibold text-gray-300">Why now: </span>{opp.whyNow}</p>}
 
       {/* Metric grid */}
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
@@ -142,17 +142,17 @@ export function OpportunityCard({ opp, onReview, onPaperTrade, className }: Prop
       {opp.correlation?.level === 'risk' && (
         <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
-          <p className="text-[11px] text-amber-200">High overlap with your existing positions — sizing should be reduced.</p>
+          <p className="text-xs text-amber-200">High overlap with your existing positions — sizing should be reduced.</p>
         </div>
       )}
 
       {/* Exit plan */}
-      {opp.exitPlan && <p className="mt-2 text-[11px] text-gray-500"><span className="font-semibold text-gray-400">Exit: </span>{opp.exitPlan}</p>}
+      {opp.exitPlan && <p className="mt-2 text-xs text-gray-500"><span className="font-semibold text-text-1">Exit: </span>{opp.exitPlan}</p>}
 
       {/* Footer: agents + actions */}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/5 pt-3">
         {opp.agentSummary ? (
-          <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
             <Users className="h-3 w-3" /> {opp.agentSummary}
           </span>
         ) : <span />}
@@ -160,7 +160,7 @@ export function OpportunityCard({ opp, onReview, onPaperTrade, className }: Prop
           {onReview && (
             <button
               onClick={() => onReview(opp.id)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-white/10"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-fill"
             >
               <Eye className="h-3.5 w-3.5" /> Review
             </button>

@@ -13,13 +13,13 @@ interface Props {
 const SENTIMENT_CONFIG = {
   bullish: { label: 'Bullish', icon: TrendingUp, color: 'text-green-400', bg: 'bg-green-500/10' },
   bearish: { label: 'Bearish', icon: TrendingDown, color: 'text-red-400', bg: 'bg-red-500/10' },
-  neutral: { label: 'Neutral', icon: Minus, color: 'text-gray-400', bg: 'bg-gray-500/10' },
+  neutral: { label: 'Neutral', icon: Minus, color: 'text-text-1', bg: 'bg-gray-500/10' },
 }
 
 const CONFIDENCE_COLOR = {
   high:   'bg-green-500/15 text-green-300',
   medium: 'bg-amber-500/15 text-amber-300',
-  low:    'bg-gray-500/15 text-gray-400',
+  low:    'bg-gray-500/15 text-text-1',
 }
 
 export function AnalysisPanel({ analysis, loading, onClose }: Props) {
@@ -48,7 +48,7 @@ export function AnalysisPanel({ analysis, loading, onClose }: Props) {
       {loading && (
         <div className="flex flex-col items-center justify-center gap-3 py-10">
           <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-text-1">
             Fetching market context and running analysis…
           </p>
         </div>
@@ -84,7 +84,7 @@ export function AnalysisPanel({ analysis, loading, onClose }: Props) {
                 {analysis.opportunities.map((opp, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-3"
+                    className="flex items-start gap-3 rounded-lg border border-line-strong bg-white/5 p-3"
                   >
                     <span
                       className={cn(
@@ -98,7 +98,7 @@ export function AnalysisPanel({ analysis, loading, onClose }: Props) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-white line-clamp-1">{opp.question}</p>
-                      <p className="mt-0.5 text-xs text-gray-400">{opp.rationale}</p>
+                      <p className="mt-0.5 text-xs text-text-1">{opp.rationale}</p>
                     </div>
                     <span
                       className={cn(
@@ -120,7 +120,7 @@ export function AnalysisPanel({ analysis, loading, onClose }: Props) {
               <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Portfolio
               </p>
-              <p className="text-sm text-gray-400">{analysis.portfolioAssessment}</p>
+              <p className="text-sm text-text-1">{analysis.portfolioAssessment}</p>
             </div>
           )}
 

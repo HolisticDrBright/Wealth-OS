@@ -15,6 +15,7 @@ import {
   ShieldAlert, Activity, Plus, Clock, CheckCircle2,
   XCircle, RefreshCw, AlertCircle, BarChart2,
 } from 'lucide-react'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface Props {
   initialControls: RiskControl | null
@@ -100,7 +101,7 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
     <div className="space-y-6">
       {/* Live Exposure */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Live Exposure</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Live Exposure</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { label: 'Open Notional', value: formatCurrency(summary.total_open_notional), icon: BarChart2 },
@@ -111,14 +112,15 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
               value: `${summary.today_pnl >= 0 ? '+' : ''}${formatCurrency(summary.today_pnl)}`,
               icon: summary.today_pnl >= 0 ? CheckCircle2 : AlertCircle,
               color: summary.today_pnl >= 0 ? 'text-emerald-400' : 'text-red-400',
+              trend: summary.today_pnl,
             },
-          ].map(({ label, value, icon: Icon, color }) => (
+          ].map(({ label, value, icon: Icon, color, trend }: { label: string; value: string; icon: typeof ShieldAlert; color?: string; trend?: number }) => (
             <Card key={label}>
               <div className="p-4 flex items-start gap-3">
                 <Icon className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs text-gray-500">{label}</p>
-                  <p className={`text-lg font-bold mt-0.5 ${color ?? 'text-white'}`}>{value}</p>
+                  <p className={`text-lg font-bold mt-0.5 ${color ?? 'text-white'}`}><TrendArrow value={trend} />{value}</p>
                 </div>
               </div>
             </Card>
@@ -127,14 +129,14 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
 
         {/* Risk bar */}
         {summary.total_open_notional > 0 && (
-          <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="mt-3 rounded-xl bg-white/5 border border-line-strong p-4">
             <div className="flex items-center justify-between text-xs mb-2">
-              <span className="text-gray-400">Portfolio risk utilization</span>
+              <span className="text-text-1">Portfolio risk utilization</span>
               <span className={riskPct > 80 ? 'text-red-400' : riskPct > 60 ? 'text-amber-400' : 'text-emerald-400'}>
                 {riskPct.toFixed(1)}%
               </span>
             </div>
-            <div className="h-2 rounded-full bg-white/10">
+            <div className="h-2 rounded-full bg-fill">
               <div
                 className={`h-2 rounded-full transition-all ${riskPct > 80 ? 'bg-red-500' : riskPct > 60 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                 style={{ width: `${Math.min(100, riskPct)}%` }}
@@ -146,7 +148,7 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
 
       {/* Risk Controls */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Risk Controls</h2>
+        <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Risk Controls</h2>
         <Card>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -213,7 +215,7 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
       {/* Risk Analytics */}
       {realMetrics && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Risk Analytics</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-4">Risk Analytics</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
             {[
               { label: '95% VaR (1d)', value: formatCurrency(realMetrics.var95_1d), color: 'text-amber-400' },
@@ -274,18 +276,18 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
           {realMetrics.contributions.length > 0 && (
             <Card>
               <div className="p-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Per-Position Risk Contribution</p>
+                <p className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-3">Per-Position Risk Contribution</p>
                 <div className="space-y-2">
                   {realMetrics.contributions.map(c => (
                     <div key={c.symbol} className="flex items-center gap-3 text-sm">
                       <span className="font-medium text-white w-16 shrink-0">{c.symbol}</span>
-                      <div className="flex-1 h-1.5 rounded-full bg-white/10">
+                      <div className="flex-1 h-1.5 rounded-full bg-fill">
                         <div
                           className="h-1.5 rounded-full bg-indigo-500"
                           style={{ width: `${Math.min(100, c.weight * 100)}%` }}
                         />
                       </div>
-                      <span className="text-gray-400 text-xs w-14 text-right">{(c.weight * 100).toFixed(1)}% wt</span>
+                      <span className="text-text-1 text-xs w-14 text-right">{(c.weight * 100).toFixed(1)}% wt</span>
                       <span className="text-amber-400 text-xs w-16 text-right">{(c.vol * 100).toFixed(1)}% vol</span>
                       <span className="text-gray-500 text-xs w-14 text-right">β{c.beta.toFixed(2)}</span>
                     </div>
@@ -300,7 +302,7 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
       {/* Simulations */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Scenario Simulations</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider">Scenario Simulations</h2>
           <Button size="sm" onClick={() => setShowNewSim(v => !v)}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             New Simulation
@@ -310,7 +312,7 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
         {showNewSim && (
           <Card className="mb-4">
             <div className="p-4 space-y-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">New Simulation</p>
+              <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">New Simulation</p>
               <Input
                 label="Title"
                 value={simForm.title}
@@ -356,7 +358,7 @@ export function RiskClient({ initialControls, summary, initialJobs, realMetrics 
         {jobs.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/20 p-10 text-center">
             <Activity className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">No simulations yet</p>
+            <p className="text-sm text-text-1">No simulations yet</p>
           </div>
         ) : (
           <div className="space-y-2">

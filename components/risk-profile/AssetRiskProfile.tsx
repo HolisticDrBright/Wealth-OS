@@ -19,7 +19,7 @@ type ProfileKey = typeof PROFILE_KEYS[number]
 const PROFILE_STYLES: Record<ProfileKey, { ring: string; dot: string; badge: string }> = {
   vault:        { ring: 'ring-blue-500  border-blue-600  bg-blue-950/40',  dot: 'bg-blue-400',   badge: 'text-blue-300' },
   conservative: { ring: 'ring-teal-500  border-teal-600  bg-teal-950/40',  dot: 'bg-teal-400',   badge: 'text-teal-300' },
-  balanced:     { ring: 'ring-gray-400  border-gray-500  bg-gray-800/60',  dot: 'bg-gray-300',   badge: 'text-gray-200' },
+  balanced:     { ring: 'ring-text-1  border-gray-500  bg-gray-800/60',  dot: 'bg-gray-300',   badge: 'text-gray-200' },
   growth:       { ring: 'ring-orange-500 border-orange-600 bg-orange-950/40', dot: 'bg-orange-400', badge: 'text-orange-300' },
   speculative:  { ring: 'ring-red-500   border-red-600   bg-red-950/40',   dot: 'bg-red-400',    badge: 'text-red-300' },
 }
@@ -53,7 +53,7 @@ function ConfirmModal({
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-sm w-full space-y-4">
         <p className="font-semibold text-white">{title}</p>
-        <p className="text-sm text-gray-400">{body}</p>
+        <p className="text-sm text-text-1">{body}</p>
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-white transition-colors">
             Cancel
@@ -128,7 +128,7 @@ function StrategyItem({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setExpanded(e => !e)}
-            className="text-gray-600 hover:text-gray-400 transition-colors"
+            className="text-gray-600 hover:text-text-1 transition-colors"
           >
             {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
@@ -149,7 +149,7 @@ function StrategyItem({
       </div>
 
       {expanded && (
-        <div className="px-3 pb-3 text-xs text-gray-400 leading-relaxed border-t border-gray-800 pt-2">
+        <div className="px-3 pb-3 text-xs text-text-1 leading-relaxed border-t border-gray-800 pt-2">
           {def.plain_english_description}
         </div>
       )}
@@ -347,7 +347,7 @@ export function AssetRiskProfile({ assetClass, profiles, userProfile, strategyDe
           <p className="text-xs text-gray-500 uppercase tracking-widest mb-0.5">
             Risk profile for {assetLabel}
           </p>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-text-1">
             {assetClass === 'all'
               ? `${activeCount} strategies active across all asset classes`
               : assetEnabled
@@ -378,7 +378,7 @@ export function AssetRiskProfile({ assetClass, profiles, userProfile, strategyDe
                 key={m}
                 onClick={() => handleModeClick(m)}
                 className={`px-3 py-1.5 font-medium capitalize transition-colors ${
-                  uiMode === m ? 'bg-white text-black' : 'text-gray-400 hover:text-white'
+                  uiMode === m ? 'bg-white text-black' : 'text-text-1 hover:text-white'
                 }`}
               >
                 {m}
@@ -409,7 +409,7 @@ export function AssetRiskProfile({ assetClass, profiles, userProfile, strategyDe
                   <div key={n} className={`w-1.5 h-1.5 rounded-full ${n <= dots && active ? s.dot : n <= dots ? 'bg-gray-600' : 'bg-gray-800'}`} />
                 ))}
               </div>
-              <span className={`text-xs font-semibold leading-tight ${active ? s.badge : 'text-gray-400'}`}>
+              <span className={`text-xs font-semibold leading-tight ${active ? s.badge : 'text-text-1'}`}>
                 {p.display_name}
               </span>
               {active && (
@@ -426,7 +426,7 @@ export function AssetRiskProfile({ assetClass, profiles, userProfile, strategyDe
 
       {/* Profile description */}
       {profiles.find(p => p.profile_key === profileKey) && (
-        <p className="text-xs text-gray-400 leading-relaxed">
+        <p className="text-xs text-text-1 leading-relaxed">
           {profiles.find(p => p.profile_key === profileKey)!.description}
         </p>
       )}

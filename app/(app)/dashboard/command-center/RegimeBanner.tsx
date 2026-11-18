@@ -20,8 +20,8 @@ const REGIME_META: Record<
     label: 'Neutral',
     text: 'text-gray-300',
     bg: 'bg-white/5',
-    border: 'border-white/10',
-    dot: 'bg-gray-400',
+    border: 'border-line-strong',
+    dot: 'bg-text-1',
     blurb: 'Mixed signals — no regime-wide size adjustment.',
   },
   RISK_OFF: {
@@ -59,13 +59,13 @@ export function RegimeBanner({ regime }: { regime: RegimeView }) {
     <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border p-4', meta.bg, meta.border)}>
       <div className="flex items-center gap-2">
         <Activity className={cn('h-4 w-4', meta.text)} />
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Market Regime</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-text-1">Market Regime</span>
         <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-sm font-semibold', meta.text, meta.bg, meta.border)}>
           <span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} />
           {meta.label}
         </span>
       </div>
-      <p className="min-w-0 flex-1 truncate text-xs text-gray-400">{meta.blurb}</p>
+      <p className="min-w-0 flex-1 truncate text-xs text-text-1">{meta.blurb}</p>
       <div className="flex items-center gap-3 text-xs tabular-nums">
         <span className="text-gray-500">
           VIX{' '}

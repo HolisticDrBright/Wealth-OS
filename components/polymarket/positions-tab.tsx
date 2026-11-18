@@ -7,6 +7,7 @@ import { createMetaPolyWS, metaPolyWsUrl } from '@/lib/meta-poly/ws'
 import { closePositionAction, recordPolyOutcomeAction } from '@/lib/actions/polymarket'
 import { StrategyToggles } from './strategy-toggles'
 import type { PortfolioPosition, PortfolioStats, SettingsResponse } from '@/lib/meta-poly/types'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface Props {
   initialPositions: PortfolioPosition[]
@@ -55,6 +56,7 @@ export function PositionsTab({ initialPositions, initialStats, initialSettings }
           label="Unrealized P&L"
           value={`${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`}
           valueClass={totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}
+          trend={totalPnl}
         />
         <StatTile
           label="Balance"
@@ -64,7 +66,7 @@ export function PositionsTab({ initialPositions, initialStats, initialSettings }
 
       {/* Positions list */}
       {positions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-16 text-center">
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-line-strong bg-white/5 py-16 text-center">
           <p className="text-sm font-medium text-white">No open positions</p>
           <p className="text-xs text-gray-500">
             Positions appear here when the scheduler opens trades.
@@ -105,14 +107,14 @@ function PositionCard({
   const isBull = p.side === 'YES'
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="flex flex-col gap-3 rounded-xl border border-line-strong bg-white/5 p-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <p className="line-clamp-2 text-sm font-medium text-white">{p.question}</p>
         <button
           onClick={onClose}
           disabled={closing}
-          className="shrink-0 rounded-lg border border-white/10 p-1.5 text-gray-500 hover:border-red-500/30 hover:text-red-400 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-lg border border-line-strong p-1.5 text-gray-500 hover:border-red-500/30 hover:text-red-400 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           title="Close position"
         >
           <X className="h-3.5 w-3.5" />
@@ -140,7 +142,7 @@ function PositionCard({
       </div>
 
       {/* Price row */}
-      <div className="flex gap-4 text-xs text-gray-400">
+      <div className="flex gap-4 text-xs text-text-1">
         <span>
           Entry{' '}
           <span className="font-mono text-white">{(p.entry_price * 100).toFixed(1)}¢</span>
@@ -179,15 +181,17 @@ function StatTile({
   label,
   value,
   valueClass,
+  trend,
 }: {
   label: string
   value: string
   valueClass?: string
+  trend?: number
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+    <div className="rounded-xl border border-line-strong bg-white/5 p-3">
       <p className="text-xs text-gray-500">{label}</p>
-      <p className={cn('mt-0.5 text-lg font-bold text-white', valueClass)}>{value}</p>
+      <p className={cn('mt-0.5 text-lg font-bold text-white', valueClass)}><TrendArrow value={trend} />{value}</p>
     </div>
   )
 }

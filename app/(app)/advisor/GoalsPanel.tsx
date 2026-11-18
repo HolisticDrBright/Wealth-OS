@@ -11,20 +11,20 @@ import type { GoalsSummary } from '@/lib/advisory/goals'
 
 export function GoalsPanel({ summary }: { summary: GoalsSummary & { error?: string } }) {
   return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <section className="rounded-xl border border-line-strong bg-white/5 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-1">
           <Target className="h-3.5 w-3.5" /> Household goals
         </h2>
-        <span className="text-[10px] text-gray-600">
+        <span className="text-xs text-gray-600">
           {summary.activeCount} active · {summary.onTrackCount} on track · {summary.offTrackCount} behind
         </span>
       </div>
 
-      {summary.error && <p className="mb-2 text-[11px] text-amber-400">Goals unavailable: {summary.error}</p>}
+      {summary.error && <p className="mb-2 text-xs text-amber-400">Goals unavailable: {summary.error}</p>}
 
       {summary.goals.length === 0 ? (
-        <p className="text-[11px] text-gray-600">
+        <p className="text-xs text-gray-600">
           No goals yet — add retirement, emergency-fund, home, or education goals on the Household page.
         </p>
       ) : (
@@ -32,11 +32,11 @@ export function GoalsPanel({ summary }: { summary: GoalsSummary & { error?: stri
           {summary.goals.slice(0, 8).map(g => (
             <li key={g.id} className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-[11px] font-medium text-gray-200">
+                <span className="min-w-0 truncate text-xs font-medium text-gray-200">
                   {g.name}
-                  <span className="ml-1.5 text-[9px] uppercase tracking-wide text-gray-600">{g.goalType.replace('_', ' ')}</span>
+                  <span className="ml-1.5 text-xs uppercase tracking-wide text-text-2">{g.goalType.replace('_', ' ')}</span>
                 </span>
-                <span className={cn('shrink-0 text-[10px] tabular-nums',
+                <span className={cn('shrink-0 text-xs tabular-nums',
                   g.isPlaceholder ? 'text-gray-500'
                     : g.onTrack === true ? 'text-emerald-400'
                     : g.onTrack === false ? 'text-amber-400' : 'text-sky-400')}>
@@ -51,18 +51,18 @@ export function GoalsPanel({ summary }: { summary: GoalsSummary & { error?: stri
                     style={{ width: `${Math.min(100, g.progressPct)}%` }} />
                 </div>
               )}
-              <p className="mt-1 text-[10px] text-gray-500">{g.detail}</p>
+              <p className="mt-1 text-xs text-gray-500">{g.detail}</p>
             </li>
           ))}
         </ul>
       )}
 
       {summary.missingCategories.length > 0 && (
-        <p className="mt-2 text-[10px] text-gray-600">
+        <p className="mt-2 text-xs text-gray-600">
           Not yet set up: {summary.missingCategories.join(', ')} goal{summary.missingCategories.length > 1 ? 's' : ''}.
         </p>
       )}
-      <p className="mt-1 text-[10px] text-gray-600">{summary.assumptionsNote}</p>
+      <p className="mt-1 text-xs text-gray-600">{summary.assumptionsNote}</p>
     </section>
   )
 }

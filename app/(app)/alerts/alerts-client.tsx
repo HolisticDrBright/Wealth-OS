@@ -21,11 +21,11 @@ const TYPE_CONFIG: Record<Alert['type'], { icon: React.ElementType; color: strin
   price_alert:    { icon: Activity,    color: 'text-amber-400' },
   simulation_done:{ icon: Activity,    color: 'text-indigo-400' },
   opportunity:    { icon: Lightbulb,   color: 'text-yellow-400' },
-  system:         { icon: Info,        color: 'text-gray-400' },
+  system:         { icon: Info,        color: 'text-text-1' },
 }
 
 const SEVERITY_BORDER = {
-  info:     'border-white/10',
+  info:     'border-line-strong',
   warning:  'border-amber-500/30',
   critical: 'border-red-500/30',
 }
@@ -105,7 +105,7 @@ export function AlertsClient({ initialAlerts }: Props) {
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-white/20 p-12 text-center">
           <Bell className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-          <p className="text-sm text-gray-400">No alerts</p>
+          <p className="text-sm text-text-1">No alerts</p>
           <p className="text-xs text-gray-600 mt-1">Trade events, risk breaches, and system messages will appear here</p>
         </div>
       ) : (
@@ -135,7 +135,7 @@ export function AlertsClient({ initialAlerts }: Props) {
                       {!alert.is_read && <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />}
                     </div>
                     {alert.body && (
-                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{alert.body}</p>
+                      <p className="text-xs text-text-1 mt-0.5 leading-relaxed">{alert.body}</p>
                     )}
                     <p className="text-xs text-gray-600 mt-1">
                       {alert.type.replace('_', ' ')} · {new Date(alert.created_at).toLocaleString()}
@@ -144,7 +144,7 @@ export function AlertsClient({ initialAlerts }: Props) {
                   {!alert.is_read && (
                     <button
                       onClick={() => markRead(alert.id)}
-                      className="shrink-0 text-gray-600 hover:text-gray-400 transition-colors"
+                      className="shrink-0 text-gray-600 hover:text-text-1 transition-colors"
                       title="Mark as read"
                     >
                       <X className="h-4 w-4" />

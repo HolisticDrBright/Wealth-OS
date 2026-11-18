@@ -20,6 +20,7 @@ import {
 import type { PaperValidationData } from '@/lib/actions/paper-validation'
 import type { PaperScorecard } from '@/lib/paper-trading/scorecard-core'
 import type { ChecklistItem } from '@/lib/paper-trading/runbook-checklist'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,8 +41,8 @@ const pct = (v: number | null, digits = 2) => v == null ? '—' : `${v.toFixed(d
 
 function Num({ v, digits = 2, signed = false }: { v: number | null; digits?: number; signed?: boolean }) {
   if (v == null) return <span className="text-gray-600">—</span>
-  const cls = !signed ? 'text-gray-200' : v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-gray-400'
-  return <span className={cn('tabular-nums', cls)}>{signed && v > 0 ? '+' : ''}{v.toFixed(digits)}</span>
+  const cls = !signed ? 'text-gray-200' : v > 0 ? 'text-emerald-400' : v < 0 ? 'text-red-400' : 'text-text-1'
+  return <span className={cn('tabular-nums', cls)}>{signed && <TrendArrow value={v} />}{signed && v > 0 ? '+' : ''}{v.toFixed(digits)}</span>
 }
 
 const STATUS_BADGE: Record<PaperScorecard['validationStatus'], { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' }> = {
@@ -87,16 +88,16 @@ function SafetyStrip({ data }: { data: PaperValidationData }) {
   ]
   return (
     <Panel icon={ShieldCheck} title="Safety gates" right={
-      <span className="text-[11px] text-gray-600">every broker submission requires guard token + master switch + liveReady</span>
+      <span className="text-xs text-gray-600">every broker submission requires guard token + master switch + liveReady</span>
     }>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {cells.map(c => (
-          <div key={c.label} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+          <div key={c.label} className="rounded-lg border border-line-strong bg-white/[0.02] px-3 py-2">
             <p className={cn('text-sm font-semibold',
               c.tone === 'ok' ? 'text-emerald-400' : c.tone === 'bad' ? 'text-red-400' : 'text-gray-200')}>
               {c.value}
             </p>
-            <p className="mt-0.5 text-[10px] text-gray-600">{c.label}</p>
+            <p className="mt-0.5 text-xs text-gray-600">{c.label}</p>
           </div>
         ))}
       </div>
@@ -117,12 +118,12 @@ function ScorecardsPanel({ cards }: { cards: PaperScorecard[] }) {
   }
   return (
     <Panel icon={Table2} title={`Strategy scorecards (${cards.length})`} right={
-      <span className="text-[11px] text-amber-400/80">modeled fills — not live results</span>
+      <span className="text-xs text-amber-400/80">modeled fills — not live results</span>
     }>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-[11px]">
+        <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-gray-600">
+            <tr className="border-b border-line-strong text-xs uppercase tracking-wider text-gray-600">
               <th className="py-1.5 pr-2">Strategy</th>
               <th className="px-2">Status</th>
               <th className="px-2 text-right">Closed</th>
@@ -143,9 +144,9 @@ function ScorecardsPanel({ cards }: { cards: PaperScorecard[] }) {
               <tr key={c.strategyKey} className="border-b border-white/5" title={c.maturityRecommendation}>
                 <td className="py-1.5 pr-2">
                   <span className="font-medium text-gray-200">{c.strategyKey}</span>
-                  <span className="ml-1.5 text-[10px] text-gray-600">{c.assetClass}</span>
+                  <span className="ml-1.5 text-xs text-gray-600">{c.assetClass}</span>
                   {c.materialCostImpact && (
-                    <span className="ml-1.5 text-[10px] text-amber-400" title="Modeled slippage materially changes expectancy — the edge may not survive real costs">⚠ cost</span>
+                    <span className="ml-1.5 text-xs text-amber-400" title="Modeled slippage materially changes expectancy — the edge may not survive real costs">⚠ cost</span>
                   )}
                 </td>
                 <td className="px-2">
@@ -154,14 +155,14 @@ function ScorecardsPanel({ cards }: { cards: PaperScorecard[] }) {
                   </Badge>
                 </td>
                 <td className="px-2 text-right tabular-nums text-gray-300">{c.closedTrades}</td>
-                <td className="px-2 text-right tabular-nums text-gray-400">{c.openPositions}</td>
+                <td className="px-2 text-right tabular-nums text-text-1">{c.openPositions}</td>
                 <td className="px-2 text-right"><Num v={c.winRatePct} digits={0} /></td>
                 <td className="px-2 text-right"><Num v={c.expectancyPct} signed /></td>
                 <td className="px-2 text-right"><Num v={c.grossExpectancyPct} signed /></td>
                 <td className="px-2 text-right"><Num v={c.maxDrawdownPct} digits={1} /></td>
-                <td className="px-2 text-right tabular-nums text-gray-400">{c.longestLossStreak || '—'}</td>
-                <td className="px-2 text-right tabular-nums text-gray-400">{c.blockedCount || '—'}</td>
-                <td className="px-2 text-right tabular-nums text-gray-400">{c.riskVetoCount || '—'}</td>
+                <td className="px-2 text-right tabular-nums text-text-1">{c.longestLossStreak || '—'}</td>
+                <td className="px-2 text-right tabular-nums text-text-1">{c.blockedCount || '—'}</td>
+                <td className="px-2 text-right tabular-nums text-text-1">{c.riskVetoCount || '—'}</td>
                 <td className="px-2 text-right tabular-nums text-gray-500">
                   {c.entrySlippageBps != null || c.exitSlippageBps != null
                     ? `${c.entrySlippageBps ?? '—'}/${c.exitSlippageBps ?? '—'}`
@@ -173,7 +174,7 @@ function ScorecardsPanel({ cards }: { cards: PaperScorecard[] }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[10px] text-gray-600">
+      <p className="mt-2 text-xs text-gray-600">
         Expect % is net of the modeled spread+impact; Gross % reconstructs pre-cost expectancy from recorded modeled slippage.
         Hover a row for the threshold-derived maturity recommendation. Promotion needs ≥30 closed, positive net expectancy,
         Brier &lt; 0.22, DD ≤ 15%, and a clean shadow check.
@@ -198,22 +199,22 @@ function CoveragePanel({ data }: { data: PaperValidationData }) {
     <Panel icon={Radar} title={`Strategy coverage — ${c.enabledCount} paper-enabled / ${c.totalCount} tracked`}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {buckets.map(b => (
-          <div key={b.label} className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5">
-            <p className={cn('mb-1.5 text-[10px] font-semibold uppercase tracking-wider',
+          <div key={b.label} className="rounded-lg border border-line-strong bg-white/[0.02] p-2.5">
+            <p className={cn('mb-1.5 text-xs font-semibold uppercase tracking-wider',
               b.tone === 'warn' && b.entries.length > 0 ? 'text-amber-400' : 'text-gray-500')}>
               {b.label}
             </p>
             {b.entries.length === 0 ? (
-              <p className="text-[11px] text-gray-600">none</p>
+              <p className="text-xs text-gray-600">none</p>
             ) : (
               <ul className="space-y-1">
                 {b.entries.slice(0, 8).map(e => (
-                  <li key={e.strategyKey} className="text-[11px] text-gray-300" title={e.detail}>
+                  <li key={e.strategyKey} className="text-xs text-gray-300" title={e.detail}>
                     {e.strategyKey}
                     <span className="ml-1 text-gray-600">{e.detail.length > 46 ? `${e.detail.slice(0, 46)}…` : e.detail}</span>
                   </li>
                 ))}
-                {b.entries.length > 8 && <li className="text-[10px] text-gray-600">+{b.entries.length - 8} more</li>}
+                {b.entries.length > 8 && <li className="text-xs text-gray-600">+{b.entries.length - 8} more</li>}
               </ul>
             )}
           </div>
@@ -234,14 +235,14 @@ function PositionsPanel({ data }: { data: PaperValidationData }) {
         ) : (
           <ul className="divide-y divide-white/5">
             {data.openPositions.slice(0, 12).map((p, i) => (
-              <li key={i} className="flex items-center justify-between py-1.5 text-[11px]">
+              <li key={i} className="flex items-center justify-between py-1.5 text-xs">
                 <span className="min-w-0 truncate">
                   <span className="font-medium text-gray-200">{p.symbol}</span>
-                  <span className={cn('ml-1.5', p.direction === 'long' ? 'text-emerald-400' : p.direction === 'short' ? 'text-red-400' : 'text-gray-400')}>{p.direction}</span>
+                  <span className={cn('ml-1.5', p.direction === 'long' ? 'text-emerald-400' : p.direction === 'short' ? 'text-red-400' : 'text-text-1')}>{p.direction}</span>
                   <span className="ml-1.5 text-gray-600">{p.strategyKey}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-3 tabular-nums">
-                  <span className="text-gray-400">{usd(p.notionalUsd)}</span>
+                  <span className="text-text-1">{usd(p.notionalUsd)}</span>
                   <Num v={p.unrealizedPnlUsd} signed />
                   <span className="text-gray-600">{relTime(p.openedAt)}</span>
                 </span>
@@ -256,7 +257,7 @@ function PositionsPanel({ data }: { data: PaperValidationData }) {
         ) : (
           <ul className="divide-y divide-white/5">
             {data.recentClosed.slice(0, 12).map((p, i) => (
-              <li key={i} className="flex items-center justify-between py-1.5 text-[11px]">
+              <li key={i} className="flex items-center justify-between py-1.5 text-xs">
                 <span className="min-w-0 truncate">
                   <span className="font-medium text-gray-200">{p.symbol}</span>
                   <span className="ml-1.5 text-gray-600">{p.strategyKey}</span>
@@ -280,13 +281,13 @@ function PositionsPanel({ data }: { data: PaperValidationData }) {
 function ExposureBars({ title, slices }: { title: string; slices: PaperValidationData['synergy']['byAssetClass'] }) {
   return (
     <div>
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">{title}</p>
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
       {slices.length === 0 ? (
-        <p className="text-[11px] text-gray-600">no open exposure</p>
+        <p className="text-xs text-gray-600">no open exposure</p>
       ) : (
         <ul className="space-y-1.5">
           {slices.slice(0, 6).map(s => (
-            <li key={s.key} className="text-[11px]">
+            <li key={s.key} className="text-xs">
               <div className="mb-0.5 flex justify-between">
                 <span className="text-gray-300">{s.key}</span>
                 <span className="tabular-nums text-gray-500">{usd(s.notionalUsd)} · {(s.fraction * 100).toFixed(0)}%</span>
@@ -306,7 +307,7 @@ function SynergyPanel({ data }: { data: PaperValidationData }) {
   const s = data.synergy
   return (
     <Panel icon={GitBranch} title={`Portfolio synergy — ${usd(s.totalOpenNotionalUsd)} open`} right={
-      s.regimeNote ? <span className="max-w-md truncate text-[11px] text-gray-500" title={s.regimeNote}>{s.regimeNote}</span> : undefined
+      s.regimeNote ? <span className="max-w-md truncate text-xs text-gray-500" title={s.regimeNote}>{s.regimeNote}</span> : undefined
     }>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <ExposureBars title="Exposure by asset class" slices={s.byAssetClass} />
@@ -315,8 +316,8 @@ function SynergyPanel({ data }: { data: PaperValidationData }) {
       {s.warnings.length > 0 && (
         <ul className="mt-3 space-y-1">
           {s.warnings.map((w, i) => (
-            <li key={i} className={cn('flex items-start gap-1.5 text-[11px]',
-              w.severity === 'warning' ? 'text-amber-400' : 'text-gray-400')}>
+            <li key={i} className={cn('flex items-start gap-1.5 text-xs',
+              w.severity === 'warning' ? 'text-amber-400' : 'text-text-1')}>
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
               {w.message}
             </li>
@@ -324,7 +325,7 @@ function SynergyPanel({ data }: { data: PaperValidationData }) {
         </ul>
       )}
       {s.drawdownOverlap.length > 0 && (
-        <p className="mt-2 text-[10px] text-gray-600">
+        <p className="mt-2 text-xs text-gray-600">
           Loss-day overlap pairs: {s.drawdownOverlap.slice(0, 4).map(p => `${p.a}×${p.b} ${(p.overlap * 100).toFixed(0)}%`).join(' · ')}
         </p>
       )}
@@ -337,15 +338,15 @@ function SynergyPanel({ data }: { data: PaperValidationData }) {
 function RunsPanel({ data }: { data: PaperValidationData }) {
   return (
     <Panel icon={Activity} title="Run health" right={
-      <span className="text-[11px] text-gray-600">last run {relTime(data.lastRunAt)}</span>
+      <span className="text-xs text-gray-600">last run {relTime(data.lastRunAt)}</span>
     }>
       {data.runs.length === 0 ? (
         <EmptyState icon={Activity} title="No paper runs recorded" hint="The validation clock starts with the first scheduled run." />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[11px]">
+          <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-gray-600">
+              <tr className="border-b border-line-strong text-xs uppercase tracking-wider text-gray-600">
                 <th className="py-1 pr-2">When</th>
                 <th className="px-2 text-right">Strategies</th>
                 <th className="px-2 text-right">Opportunities</th>
@@ -381,12 +382,12 @@ function BrokerReadinessPanel({ data }: { data: PaperValidationData }) {
   const rows = data.brokerReadiness
   return (
     <Panel icon={ShieldCheck} title="Broker sandbox certification" right={
-      <span className="text-[11px] text-gray-600">certification records NEVER flip liveReady — that is a reviewed code change</span>
+      <span className="text-xs text-gray-600">certification records NEVER flip liveReady — that is a reviewed code change</span>
     }>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-[11px]">
+        <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-gray-600">
+            <tr className="border-b border-line-strong text-xs uppercase tracking-wider text-gray-600">
               <th className="py-1 pr-2">Broker</th>
               <th className="px-2">Configured</th>
               <th className="px-2">Sandbox checks</th>
@@ -400,7 +401,7 @@ function BrokerReadinessPanel({ data }: { data: PaperValidationData }) {
               <tr key={r.broker} className="border-b border-white/5" title={r.notes ?? undefined}>
                 <td className="py-1 pr-2 font-medium text-gray-200">{r.displayName}</td>
                 <td className="px-2 text-gray-500">{r.configured ? 'keys present' : '—'}</td>
-                <td className="px-2 tabular-nums text-gray-400">{r.checksPassed}/{r.checksTotal}</td>
+                <td className="px-2 tabular-nums text-text-1">{r.checksPassed}/{r.checksTotal}</td>
                 <td className="px-2">
                   <Badge variant={r.status === 'certified_sandbox' ? 'info' : r.status === 'in_progress' ? 'warning' : 'default'}>
                     {r.status.replace(/_/g, ' ')}
@@ -415,7 +416,7 @@ function BrokerReadinessPanel({ data }: { data: PaperValidationData }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[10px] text-gray-600">
+      <p className="mt-2 text-xs text-gray-600">
         Pre-live sequence per broker: order placement → cancel → status → partial fill → rejection → bracket/OCO →
         reconciliation → quantity conversion, all against the broker&apos;s sandbox, then liveReady flips in a reviewed PR.
         No broker has completed any of it.
@@ -430,7 +431,7 @@ function AttributionPanel({ cards }: { cards: PaperScorecard[] }) {
   const withData = cards.filter(c => c.attribution && c.closedTrades > 0)
   return (
     <Panel icon={GitBranch} title="Strategy attribution" right={
-      <span className="text-[11px] text-gray-600">components without enough data say so — nothing is fabricated</span>
+      <span className="text-xs text-gray-600">components without enough data say so — nothing is fabricated</span>
     }>
       {withData.length === 0 ? (
         <EmptyState icon={GitBranch} title="Not enough closed trades"
@@ -444,23 +445,23 @@ function AttributionPanel({ cards }: { cards: PaperScorecard[] }) {
                 <span className="text-gray-600">{label}</span>{' '}
                 {v.valuePct == null
                   ? <span className="text-gray-600">n/a</span>
-                  : <span className={cn('tabular-nums', v.valuePct > 0 ? 'text-emerald-400' : v.valuePct < 0 ? 'text-red-400' : 'text-gray-400')}>
-                      {v.valuePct > 0 ? '+' : ''}{v.valuePct.toFixed(2)}%
+                  : <span className={cn('tabular-nums', v.valuePct > 0 ? 'text-emerald-400' : v.valuePct < 0 ? 'text-red-400' : 'text-text-1')}>
+                      <TrendArrow value={v.valuePct} />{v.valuePct > 0 ? '+' : ''}{v.valuePct.toFixed(2)}%
                     </span>}
               </span>
             )
             return (
               <details key={c.strategyKey} className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
-                <summary className="cursor-pointer text-[11px]">
+                <summary className="cursor-pointer text-xs">
                   <span className="font-medium text-gray-200">{c.strategyKey}</span>
-                  <span className="ml-2 text-[10px] text-gray-500">
+                  <span className="ml-2 text-xs text-gray-500">
                     {comp('cost', a.costDrag)}
                     {comp('sizing', a.sizingContribution)}
                     {comp('veto', a.vetoBenefit)}
                     {comp('residual', a.residual)}
                   </span>
                 </summary>
-                <div className="mt-1.5 space-y-1 text-[10px] text-gray-500">
+                <div className="mt-1.5 space-y-1 text-xs text-gray-500">
                   <p>Exit contribution: {a.exitContribution.valuePct != null ? `${a.exitContribution.valuePct}%` : 'n/a'} — {a.exitContribution.note}</p>
                   {a.exitBreakdown.length > 0 && (
                     <p>Exit mix: {a.exitBreakdown.map(x => `${x.reason} ×${x.count} (${x.avgReturnPct > 0 ? '+' : ''}${x.avgReturnPct}%)`).join(' · ')}</p>
@@ -484,12 +485,12 @@ function FillModelPanel({ data }: { data: PaperValidationData }) {
   const rows = Object.entries(data.fillModel)
   return (
     <Panel icon={FlaskConical} title="Fill model assumptions (deterministic)" right={
-      <span className="text-[11px] text-amber-400/80">paper results understate live conditions by design</span>
+      <span className="text-xs text-amber-400/80">paper results understate live conditions by design</span>
     }>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-[11px]">
+        <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-gray-600">
+            <tr className="border-b border-line-strong text-xs uppercase tracking-wider text-gray-600">
               <th className="py-1 pr-2">Asset class</th>
               <th className="px-2 text-right">Half-spread (bps)</th>
               <th className="px-2 text-right">Impact @ ref (bps)</th>
@@ -512,7 +513,7 @@ function FillModelPanel({ data }: { data: PaperValidationData }) {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[10px] text-gray-600">
+      <p className="mt-2 text-xs text-gray-600">
         Every fill pays the half-spread plus linear impact scaled by order size ÷ liquidity ref. Orders above the depth cap
         fill partially; orders whose modeled cost exceeds the reject threshold are refused. There is NO
         &ldquo;actual vs model&rdquo; slippage comparison yet — that requires broker sandbox fills, which have not run.
@@ -531,17 +532,17 @@ function ChecklistSection({ title, items }: { title: string; items: ChecklistIte
   const mark = (s: ChecklistItem['status']) =>
     s === 'pass' ? '✓' : s === 'fail' ? '✗' : s === 'pending' ? '…' : '☐'
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5">
+    <div className="rounded-lg border border-line-strong bg-white/[0.02] p-2.5">
       <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between text-left">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{title}</span>
-        <span className="text-[10px] text-gray-600">
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</span>
+        <span className="text-xs text-gray-600">
           {items.filter(i => i.status === 'pass').length}/{items.length} pass · {open ? 'hide' : 'show'}
         </span>
       </button>
       {open && (
         <ul className="mt-2 space-y-1.5">
           {items.map(item => (
-            <li key={item.id} className="text-[11px]">
+            <li key={item.id} className="text-xs">
               <span className={cn('mr-1.5 font-mono', tone(item.status))}>{mark(item.status)}</span>
               <span className="text-gray-300">{item.label}</span>
               <span className="ml-1.5 text-gray-600">— {item.detail}</span>
@@ -557,14 +558,14 @@ function RunbookPanel({ data }: { data: PaperValidationData }) {
   const c = data.checklist
   return (
     <Panel icon={BookOpenCheck} title="Validation runbook" right={
-      <span className="text-[11px] text-gray-600">docs/paper-trading-validation-runbook.md</span>
+      <span className="text-xs text-gray-600">docs/paper-trading-validation-runbook.md</span>
     }>
       {c.blockers.length > 0 && (
         <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400">Unresolved blockers</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-400">Unresolved blockers</p>
           <ul className="space-y-0.5">
             {c.blockers.map((b, i) => (
-              <li key={i} className="text-[11px] text-amber-200/90">• {b}</li>
+              <li key={i} className="text-xs text-amber-200/90">• {b}</li>
             ))}
           </ul>
         </div>
@@ -607,9 +608,9 @@ export function PaperValidationClient({ data }: { data: PaperValidationData }) {
           { label: 'Blocked (window)', value: String(totalBlocked) },
           { label: 'Risk vetoes', value: String(totalVetoes) },
         ].map(c => (
-          <div key={c.label} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+          <div key={c.label} className="rounded-lg border border-line-strong bg-white/[0.02] px-3 py-2">
             <p className="text-sm font-semibold tabular-nums text-gray-200">{c.value}</p>
-            <p className="mt-0.5 text-[10px] text-gray-600">{c.label}</p>
+            <p className="mt-0.5 text-xs text-gray-600">{c.label}</p>
           </div>
         ))}
       </div>
@@ -624,7 +625,7 @@ export function PaperValidationClient({ data }: { data: PaperValidationData }) {
       <RunsPanel data={data} />
       <FillModelPanel data={data} />
 
-      <p className="pb-2 text-center text-[10px] text-gray-600">
+      <p className="pb-2 text-center text-xs text-gray-600">
         <ListChecks className="mr-1 inline h-3 w-3" />
         All results on this page come from the deterministic paper fill model. They are modeled, conservative estimates —
         not live fills, not broker confirmations, and not a projection of live performance.

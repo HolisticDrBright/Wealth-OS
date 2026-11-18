@@ -60,7 +60,7 @@ export function AgentRadar({
                 x={lx}
                 y={ly + 3}
                 textAnchor={lx > 0 ? 'start' : 'end'}
-                style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', fill: muted, letterSpacing: 0.6 }}
+                style={{ fontSize: 12, fontFamily: 'JetBrains Mono, monospace', fill: muted, letterSpacing: 0.6 }}
               >
                 {ag.name.toUpperCase()}
               </text>

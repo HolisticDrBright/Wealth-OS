@@ -38,7 +38,7 @@ function StepDots({ current }: { current: number }) {
               ? 'h-2 w-2 bg-indigo-500'
               : i === current
               ? 'h-2 w-6 bg-indigo-500'
-              : 'h-2 w-2 bg-white/10'
+              : 'h-2 w-2 bg-fill'
           }`}
         />
       ))}
@@ -55,7 +55,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       </div>
       <div>
         <h2 className="text-2xl font-bold text-white">Welcome to Wealth OS</h2>
-        <p className="mt-2 text-sm text-gray-400 max-w-xs mx-auto leading-relaxed">
+        <p className="mt-2 text-sm text-text-1 max-w-xs mx-auto leading-relaxed">
           Let&apos;s set up your financial dashboard in just 3 quick steps. It only takes 2 minutes.
         </p>
       </div>
@@ -67,7 +67,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         ].map(({ icon: Icon, label }) => (
           <div key={label} className="rounded-xl bg-white/5 p-3 space-y-2">
             <Icon className="h-5 w-5 text-indigo-400 mx-auto" />
-            <p className="text-gray-400">{label}</p>
+            <p className="text-text-1">{label}</p>
           </div>
         ))}
       </div>
@@ -79,7 +79,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
           localStorage.setItem(STORAGE_KEY, 'true')
           window.location.reload()
         }}
-        className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+        className="text-xs text-gray-600 hover:text-text-1 transition-colors"
       >
         Skip setup — I&apos;ll add data manually
       </button>
@@ -113,7 +113,7 @@ function IncomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void
           <DollarSign className="h-6 w-6 text-emerald-400" />
         </div>
         <h2 className="text-xl font-bold text-white">Add your income</h2>
-        <p className="mt-1 text-sm text-gray-400">What&apos;s your primary source of income?</p>
+        <p className="mt-1 text-sm text-text-1">What&apos;s your primary source of income?</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -174,7 +174,7 @@ function AssetStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void 
           <TrendingUp className="h-6 w-6 text-indigo-400" />
         </div>
         <h2 className="text-xl font-bold text-white">Add your first asset</h2>
-        <p className="mt-1 text-sm text-gray-400">Savings, investments, real estate — anything you own</p>
+        <p className="mt-1 text-sm text-text-1">Savings, investments, real estate — anything you own</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -234,7 +234,7 @@ function GoalStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }
           <Target className="h-6 w-6 text-purple-400" />
         </div>
         <h2 className="text-xl font-bold text-white">Set a financial goal</h2>
-        <p className="mt-1 text-sm text-gray-400">What are you working towards?</p>
+        <p className="mt-1 text-sm text-text-1">What are you working towards?</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -285,12 +285,12 @@ function DoneStep() {
       </div>
       <div>
         <h2 className="text-2xl font-bold text-white">You&apos;re all set!</h2>
-        <p className="mt-2 text-sm text-gray-400 max-w-xs mx-auto leading-relaxed">
+        <p className="mt-2 text-sm text-text-1 max-w-xs mx-auto leading-relaxed">
           Your financial data is saved. Your dashboard will now show your real numbers.
         </p>
       </div>
-      <div className="rounded-xl bg-white/5 border border-white/10 p-4 text-left space-y-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">What to explore next</p>
+      <div className="rounded-xl bg-white/5 border border-line-strong p-4 text-left space-y-2">
+        <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">What to explore next</p>
         {[
           'Portfolio → Add more assets & track live prices',
           'Budget → Log expenses and set monthly limits',
@@ -328,7 +328,7 @@ export function OnboardingWizard() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#0f1117] shadow-2xl p-8">
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-line-strong bg-bg-2 shadow-2xl p-8">
         <StepDots current={step} />
 
         {step === 0 && <WelcomeStep onNext={() => setStep(1)} />}

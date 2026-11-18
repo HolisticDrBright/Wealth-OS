@@ -21,7 +21,7 @@ function TrustList({
 }) {
   return (
     <div className="min-w-0">
-      <p className={`mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider ${accent}`}>
+      <p className={`mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider ${accent}`}>
         <Icon className="h-3.5 w-3.5" /> {title}
       </p>
       {entries.length === 0 ? (
@@ -34,7 +34,7 @@ function TrustList({
                 <span className="min-w-0 truncate text-xs font-medium text-gray-200">{e.strategyLabel}</span>
                 <MaturityBadge status={e.maturityStatus} />
               </div>
-              <p className="mt-0.5 truncate text-[11px] text-gray-500" title={e.reason}>{e.reason}</p>
+              <p className="mt-0.5 truncate text-xs text-gray-500" title={e.reason}>{e.reason}</p>
             </li>
           ))}
         </ul>

@@ -62,11 +62,11 @@ function Section({ title, icon: Icon, children, tone = 'neutral' }: {
 }) {
   const ring = tone === 'amber' ? 'border-amber-500/20 bg-amber-500/5'
     : tone === 'red' ? 'border-red-500/20 bg-red-500/5'
-    : 'border-white/10 bg-white/5'
-  const iconColor = tone === 'amber' ? 'text-amber-400' : tone === 'red' ? 'text-red-400' : 'text-gray-400'
+    : 'border-line-strong bg-white/5'
+  const iconColor = tone === 'amber' ? 'text-amber-400' : tone === 'red' ? 'text-red-400' : 'text-text-1'
   return (
     <div className={cn('rounded-xl border p-4', ring)}>
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-1">
         <Icon className={cn('h-3.5 w-3.5', iconColor)} /> {title}
       </p>
       {children}
@@ -107,12 +107,12 @@ export function InvestmentCommitteeModal({
 
         {/* Score + recommended sizing */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col items-center justify-center rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-line-strong bg-white/5 p-4">
             <p className="mb-3 text-xs text-gray-500">Conviction Score</p>
             <MiroFishScoreBadge score={decision.miroFishScore ?? decision.finalScore} confidence={decision.confidence} size="lg" />
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">Recommended Size</p>
+          <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-1">Recommended Size</p>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
                 <p className="text-xs text-gray-500">Recommend</p>
@@ -189,7 +189,7 @@ export function InvestmentCommitteeModal({
               {auditTrail.map((a, i) => (
                 <div key={i} className="flex items-center justify-between gap-2 border-b border-white/5 py-1 last:border-0">
                   <dt className="text-xs text-gray-500">{a.label}</dt>
-                  <dd className="truncate text-right font-mono text-[11px] text-gray-300">{a.value}</dd>
+                  <dd className="truncate text-right font-mono text-xs text-gray-300">{a.value}</dd>
                 </div>
               ))}
             </dl>

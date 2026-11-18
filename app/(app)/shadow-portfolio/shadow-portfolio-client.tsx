@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils'
 import type { ShadowPortfolioSummary, ShadowPosition } from '@/lib/actions/shadow-portfolio'
 import { Ghost, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,20 +72,21 @@ function verdict(data: ShadowPortfolioSummary): { text: string; tone: 'pos' | 'n
 
 // ── stat card ─────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, tone }: {
+function StatCard({ label, value, sub, tone, trend }: {
   label: string
   value: string
   sub?: string
   tone?: 'pos' | 'neg' | 'neutral' | 'muted'
+  trend?: number | null
 }) {
   const cls = tone === 'pos' ? 'text-emerald-400'
     : tone === 'neg' ? 'text-red-400'
     : tone === 'muted' ? 'text-gray-600'
     : 'text-gray-200'
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-1">
-      <p className="text-[11px] text-gray-600 uppercase tracking-wide">{label}</p>
-      <p className={cn('text-2xl font-semibold tabular-nums', cls)}>{value}</p>
+    <div className="rounded-lg border border-line-strong bg-white/[0.02] p-4 space-y-1">
+      <p className="text-xs text-gray-600 uppercase tracking-wide">{label}</p>
+      <p className={cn('text-2xl font-semibold tabular-nums', cls)}><TrendArrow value={trend} />{value}</p>
       {sub && <p className="text-xs text-gray-600">{sub}</p>}
     </div>
   )
@@ -100,9 +102,9 @@ function PositionRow({ pos }: { pos: ShadowPosition }) {
     <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
       <td className="py-2.5 px-3">
         <p className="text-xs font-medium text-gray-200">{pos.symbol}</p>
-        <p className="text-[10px] text-gray-600">{pos.strategyLabel}</p>
+        <p className="text-xs text-gray-600">{pos.strategyLabel}</p>
       </td>
-      <td className="py-2.5 px-3 text-[10px]">
+      <td className="py-2.5 px-3 text-xs">
         <span className={cn(
           'rounded-full px-2 py-0.5 font-medium',
           pos.direction === 'long' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400',
@@ -113,27 +115,27 @@ function PositionRow({ pos }: { pos: ShadowPosition }) {
       <td className="py-2.5 px-3 text-xs text-gray-500">
         {skipLabel(pos.skipReason)}
       </td>
-      <td className="py-2.5 px-3 text-xs tabular-nums text-gray-400">
+      <td className="py-2.5 px-3 text-xs tabular-nums text-text-1">
         ${pos.wouldHavePrice.toFixed(4)}
       </td>
-      <td className="py-2.5 px-3 text-xs tabular-nums text-gray-400">
+      <td className="py-2.5 px-3 text-xs tabular-nums text-text-1">
         {pos.currentPrice != null ? `$${pos.currentPrice.toFixed(4)}` : '—'}
       </td>
       <td className={cn('py-2.5 px-3 text-xs tabular-nums font-medium', pnlClass(pnl))}>
-        {pnl != null ? fmt(pnl) : '—'}
+        {pnl != null ? <><TrendArrow value={pnl} />{fmt(pnl)}</> : '—'}
         {pnlPct != null && (
-          <span className="ml-1 text-[10px]">({pct(pnlPct)})</span>
+          <span className="ml-1 text-xs">({pct(pnlPct)})</span>
         )}
       </td>
       <td className="py-2.5 px-3">
         <span className={cn(
-          'text-[10px] rounded-full px-2 py-0.5',
+          'text-xs rounded-full px-2 py-0.5',
           pos.status === 'open' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-gray-500/10 text-gray-500',
         )}>
           {pos.status === 'open' ? 'Open' : (pos.exitReason ?? 'Closed')}
         </span>
       </td>
-      <td className="py-2.5 px-3 text-[10px] text-gray-600">{relativeTime(pos.createdAt)}</td>
+      <td className="py-2.5 px-3 text-xs text-gray-600">{relativeTime(pos.createdAt)}</td>
     </tr>
   )
 }
@@ -167,7 +169,7 @@ export function ShadowPortfolioClient({ data }: { data: ShadowPortfolioSummary }
         'flex items-start gap-3 rounded-lg border px-4 py-3',
         v.tone === 'pos' ? 'border-emerald-500/20 bg-emerald-500/5'
           : v.tone === 'neg' ? 'border-red-500/20 bg-red-500/5'
-          : 'border-white/10 bg-white/[0.02]',
+          : 'border-line-strong bg-white/[0.02]',
       )}>
         <VerdictIcon className={cn(
           'h-4 w-4 mt-0.5 shrink-0',
@@ -183,12 +185,14 @@ export function ShadowPortfolioClient({ data }: { data: ShadowPortfolioSummary }
           value={hasData ? fmt(data.totalShadowPnlUsd) : '—'}
           sub={data.shadowWinRate != null ? `${(data.shadowWinRate * 100).toFixed(0)}% win rate` : undefined}
           tone={shadowPnlTone}
+          trend={hasData ? data.totalShadowPnlUsd : null}
         />
         <StatCard
           label="Real P&L (accepted)"
           value={hasData ? fmt(data.totalRealPnlUsd) : '—'}
           sub={data.realWinRate != null ? `${(data.realWinRate * 100).toFixed(0)}% win rate` : undefined}
           tone={realPnlTone}
+          trend={hasData ? data.totalRealPnlUsd : null}
         />
         <StatCard
           label="Shadow positions"
@@ -207,25 +211,25 @@ export function ShadowPortfolioClient({ data }: { data: ShadowPortfolioSummary }
       {/* Avg return comparison */}
       {(data.shadowAvgReturnPct != null || data.realAvgReturnPct != null) && (
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-            <p className="text-[11px] text-gray-600 uppercase tracking-wide mb-2">Average return per closed position</p>
+          <div className="rounded-lg border border-line-strong bg-white/[0.02] p-4">
+            <p className="text-xs text-gray-600 uppercase tracking-wide mb-2">Average return per closed position</p>
             <div className="flex items-end gap-6">
               <div>
                 <p className="text-xs text-gray-500 mb-0.5">Shadow (rejected)</p>
                 <p className={cn('text-xl font-semibold tabular-nums', pnlClass(data.shadowAvgReturnPct))}>
-                  {pct(data.shadowAvgReturnPct)}
+                  <TrendArrow value={data.shadowAvgReturnPct} />{pct(data.shadowAvgReturnPct)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-0.5">Real (accepted)</p>
                 <p className={cn('text-xl font-semibold tabular-nums', pnlClass(data.realAvgReturnPct))}>
-                  {pct(data.realAvgReturnPct)}
+                  <TrendArrow value={data.realAvgReturnPct} />{pct(data.realAvgReturnPct)}
                 </p>
               </div>
             </div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-            <p className="text-[11px] text-gray-600 uppercase tracking-wide mb-2">How to interpret</p>
+          <div className="rounded-lg border border-line-strong bg-white/[0.02] p-4">
+            <p className="text-xs text-gray-600 uppercase tracking-wide mb-2">How to interpret</p>
             <ul className="space-y-1.5 text-xs text-gray-500">
               <li className="flex gap-2"><span className="text-emerald-400">↑</span> Real beats Shadow → gates are filtering correctly</li>
               <li className="flex gap-2"><span className="text-red-400">↓</span> Shadow beats Real → gates may be too strict</li>
@@ -237,7 +241,7 @@ export function ShadowPortfolioClient({ data }: { data: ShadowPortfolioSummary }
 
       {/* Positions table */}
       {!hasData ? (
-        <div className="rounded-lg border border-white/10 bg-white/[0.02] py-16 flex flex-col items-center gap-3">
+        <div className="rounded-lg border border-line-strong bg-white/[0.02] py-16 flex flex-col items-center gap-3">
           <Ghost className="h-8 w-8 text-gray-700" />
           <p className="text-sm text-gray-600">No shadow positions yet</p>
           <p className="text-xs text-gray-700 max-w-sm text-center">
@@ -246,17 +250,17 @@ export function ShadowPortfolioClient({ data }: { data: ShadowPortfolioSummary }
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-white/10 overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+        <div className="rounded-lg border border-line-strong overflow-hidden">
+          <div className="px-4 py-3 border-b border-line-strong flex items-center justify-between">
             <p className="text-sm font-medium text-gray-300">Shadow positions ({data.positions.length})</p>
-            <p className="text-[11px] text-gray-600">Tracking {data.openShadowPositions} live, {data.closedShadowPositions} resolved</p>
+            <p className="text-xs text-gray-600">Tracking {data.openShadowPositions} live, {data.closedShadowPositions} resolved</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/5">
                   {['Symbol / Strategy', 'Dir', 'Skip reason', 'Entry price', 'Current', 'P&L', 'Status', 'Age'].map(h => (
-                    <th key={h} className="py-2 px-3 text-left text-[10px] font-medium text-gray-600 uppercase tracking-wide">
+                    <th key={h} className="py-2 px-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wide">
                       {h}
                     </th>
                   ))}

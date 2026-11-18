@@ -13,8 +13,8 @@ export function Button({
 }: ButtonProps) {
   const variants = {
     default: 'bg-indigo-600 hover:bg-indigo-700 text-white',
-    outline: 'border border-white/20 hover:bg-white/10 text-gray-300',
-    ghost: 'hover:bg-white/10 text-gray-300',
+    outline: 'border border-white/20 hover:bg-fill text-gray-300',
+    ghost: 'hover:bg-fill text-gray-300',
     danger: 'bg-red-600 hover:bg-red-700 text-white',
   }
   const sizes = {

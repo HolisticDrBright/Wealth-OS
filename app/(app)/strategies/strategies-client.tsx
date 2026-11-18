@@ -15,7 +15,7 @@ const TYPE_COLORS: Record<string, string> = {
   momentum:   'text-orange-400 bg-orange-400/10',
   value:      'text-blue-400 bg-blue-400/10',
   copy_trade: 'text-indigo-400 bg-indigo-400/10',
-  manual:     'text-gray-400 bg-gray-400/10',
+  manual:     'text-text-1 bg-fill',
   rebalance:  'text-green-400 bg-green-400/10',
   harvest:    'text-yellow-400 bg-yellow-400/10',
 }
@@ -64,7 +64,7 @@ export function StrategiesClient({ initialStrategies }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Strategies</h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-text-1 mt-1">
             {activeCount} active · {strategies.length} total
           </p>
         </div>
@@ -85,19 +85,19 @@ export function StrategiesClient({ initialStrategies }: Props) {
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="Strategy name"
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
           />
           <input
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="Description (optional)"
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+            className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
           />
           <div className="grid grid-cols-2 gap-3">
             <select
               value={type ?? 'manual'}
               onChange={e => setType(e.target.value as Strategy['type'])}
-              className="rounded-lg border border-white/10 bg-[#0a0b0f] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              className="rounded-lg border border-line-strong bg-bg-0 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
             >
               <option value="manual">Manual</option>
               <option value="copy_trade">Copy Trade</option>
@@ -109,7 +109,7 @@ export function StrategiesClient({ initialStrategies }: Props) {
             <select
               value={assetClass}
               onChange={e => setAssetClass(e.target.value)}
-              className="rounded-lg border border-white/10 bg-[#0a0b0f] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              className="rounded-lg border border-line-strong bg-bg-0 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
             >
               <option value="">All Asset Classes</option>
               <option value="stock">Stocks</option>
@@ -128,7 +128,7 @@ export function StrategiesClient({ initialStrategies }: Props) {
             </button>
             <button
               onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-lg bg-white/5 text-sm font-medium text-gray-300 hover:bg-white/10 transition-colors"
+              className="px-4 py-2 rounded-lg bg-white/5 text-sm font-medium text-gray-300 hover:bg-fill transition-colors"
             >
               Cancel
             </button>
@@ -148,7 +148,7 @@ export function StrategiesClient({ initialStrategies }: Props) {
           {strategies.map(strategy => (
             <div
               key={strategy.id}
-              className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-center gap-4 hover:bg-white/8 transition-colors"
+              className="rounded-xl border border-line-strong bg-white/5 p-4 flex items-center gap-4 hover:bg-white/8 transition-colors"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -159,13 +159,13 @@ export function StrategiesClient({ initialStrategies }: Props) {
                     </span>
                   )}
                   {strategy.asset_class && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-gray-400 capitalize">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-fill text-text-1 capitalize">
                       {strategy.asset_class}
                     </span>
                   )}
                 </div>
                 {strategy.description && (
-                  <p className="text-sm text-gray-400 truncate">{strategy.description}</p>
+                  <p className="text-sm text-text-1 truncate">{strategy.description}</p>
                 )}
                 <p className="text-xs text-gray-600 mt-1">
                   Created {new Date(strategy.created_at).toLocaleDateString()}
@@ -175,7 +175,7 @@ export function StrategiesClient({ initialStrategies }: Props) {
               <button
                 onClick={() => handleToggle(strategy.id, strategy.is_active)}
                 disabled={pending}
-                className={cn('shrink-0 transition-colors', strategy.is_active ? 'text-indigo-400' : 'text-gray-600 hover:text-gray-400')}
+                className={cn('shrink-0 transition-colors', strategy.is_active ? 'text-indigo-400' : 'text-gray-600 hover:text-text-1')}
               >
                 {strategy.is_active
                   ? <ToggleRight className="h-6 w-6" />

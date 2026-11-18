@@ -6,6 +6,7 @@ import type { PortfolioSleeve, SleeveApprovalRequest } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { Layers, Plus, AlertTriangle, CheckCircle, XCircle, ChevronRight, Play, Pause, Clock } from 'lucide-react'
+import { TrendArrow } from '@/components/ui/trend-arrow'
 
 interface Props {
   initialSleeves: PortfolioSleeve[]
@@ -14,7 +15,7 @@ interface Props {
 
 const TYPE_COLORS: Record<string, string> = {
   autonomous:      'text-indigo-400 bg-indigo-400/10',
-  manual:          'text-gray-400 bg-gray-400/10',
+  manual:          'text-text-1 bg-fill',
   advisor_managed: 'text-blue-400 bg-blue-400/10',
   trust:           'text-yellow-400 bg-yellow-400/10',
 }
@@ -89,7 +90,7 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Portfolio Sleeves</h1>
-          <p className="text-sm text-gray-400 mt-1">Autonomous allocations with strict approval controls</p>
+          <p className="text-sm text-text-1 mt-1">Autonomous allocations with strict approval controls</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -102,20 +103,20 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Total Sleeve Value</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Total Sleeve Value</p>
           <p className="text-2xl font-bold text-white mt-1">${totalValue.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Active Sleeves</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Active Sleeves</p>
           <p className="text-2xl font-bold text-indigo-400 mt-1">{sleeves.filter(s => s.is_active && !s.halted).length}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Pending Approvals</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Pending Approvals</p>
           <p className={cn('text-2xl font-bold mt-1', approvals.length > 0 ? 'text-yellow-400' : 'text-white')}>{approvals.length}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Halted</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Halted</p>
           <p className={cn('text-2xl font-bold mt-1', haltedCount > 0 ? 'text-red-400' : 'text-white')}>{haltedCount}</p>
         </div>
       </div>
@@ -143,7 +144,7 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
                     )}
                     {req.notional_usd && <span className="text-sm text-gray-300">${req.notional_usd.toLocaleString()}</span>}
                   </div>
-                  {req.reason && <p className="text-xs text-gray-400">{req.reason}</p>}
+                  {req.reason && <p className="text-xs text-text-1">{req.reason}</p>}
                   <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Expires {new Date(req.expires_at).toLocaleString()}
@@ -161,7 +162,7 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
                   <button
                     onClick={() => handleReject(req.id)}
                     disabled={pending}
-                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-white/10 disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-fill disabled:opacity-50"
                   >
                     <XCircle className="h-3.5 w-3.5" />
                     Reject
@@ -179,19 +180,19 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
           <p className="font-semibold text-white">New Portfolio Sleeve</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="text-xs text-gray-400 block mb-1">Name</label>
+              <label className="text-xs text-text-1 block mb-1">Name</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Growth Sleeve"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-gray-400 block mb-1">Description</label>
+              <label className="text-xs text-text-1 block mb-1">Description</label>
               <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Strategy description"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Type</label>
+              <label className="text-xs text-text-1 block mb-1">Type</label>
               <select value={sleeveType} onChange={e => setSleeveType(e.target.value as PortfolioSleeve['sleeve_type'])}
-                className="w-full rounded-lg border border-white/10 bg-[#0a0b0f] px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                className="w-full rounded-lg border border-line-strong bg-bg-0 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 <option value="autonomous">Autonomous</option>
                 <option value="manual">Manual</option>
                 <option value="advisor_managed">Advisor Managed</option>
@@ -199,31 +200,31 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Target Allocation %</label>
+              <label className="text-xs text-text-1 block mb-1">Target Allocation %</label>
               <input type="number" value={targetPct} onChange={e => setTargetPct(e.target.value)} placeholder="30"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Approval Threshold ($)</label>
+              <label className="text-xs text-text-1 block mb-1">Approval Threshold ($)</label>
               <input type="number" value={approvalThreshold} onChange={e => setApprovalThreshold(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Max Position %</label>
+              <label className="text-xs text-text-1 block mb-1">Max Position %</label>
               <input type="number" value={maxPosPct} onChange={e => setMaxPosPct(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Max Drawdown % (halt trigger)</label>
+              <label className="text-xs text-text-1 block mb-1">Max Drawdown % (halt trigger)</label>
               <input type="number" value={maxDD} onChange={e => setMaxDD(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500" />
             </div>
           </div>
           <div className="flex gap-3">
             <button onClick={handleCreate} disabled={pending || !name.trim()}
               className="px-4 py-2 rounded-lg bg-indigo-600 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">Create Sleeve</button>
             <button onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-white/10">Cancel</button>
+              className="px-4 py-2 rounded-lg bg-white/5 text-sm text-gray-300 hover:bg-fill">Cancel</button>
           </div>
         </div>
       )}
@@ -242,7 +243,7 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
               'rounded-xl border p-4',
               sleeve.halted ? 'border-red-500/20 bg-red-500/5' :
               !sleeve.is_active ? 'border-white/5 bg-white/2 opacity-60' :
-              'border-white/10 bg-white/5'
+              'border-line-strong bg-white/5'
             )}>
               <div className="flex items-start gap-4">
                 <div className="flex-1 min-w-0">
@@ -263,7 +264,7 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
                       </span>
                     )}
                   </div>
-                  {sleeve.description && <p className="text-sm text-gray-400 mb-2">{sleeve.description}</p>}
+                  {sleeve.description && <p className="text-sm text-text-1 mb-2">{sleeve.description}</p>}
                   {sleeve.halted_reason && (
                     <p className="text-xs text-red-400 mb-2">{sleeve.halted_reason}</p>
                   )}
@@ -276,7 +277,7 @@ export function SleevesClient({ initialSleeves, initialPendingApprovals }: Props
                     <span>Max DD: <span className="text-red-400">{sleeve.max_drawdown_pct}%</span></span>
                     {sleeve.performance_ytd_pct != null && (
                       <span>YTD: <span className={sleeve.performance_ytd_pct >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {sleeve.performance_ytd_pct >= 0 ? '+' : ''}{sleeve.performance_ytd_pct.toFixed(2)}%
+                        <TrendArrow value={sleeve.performance_ytd_pct} />{sleeve.performance_ytd_pct >= 0 ? '+' : ''}{sleeve.performance_ytd_pct.toFixed(2)}%
                       </span></span>
                     )}
                   </div>

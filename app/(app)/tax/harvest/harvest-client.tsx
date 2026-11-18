@@ -68,7 +68,7 @@ export function HarvestClient({ initialCandidates }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Tax-Loss Harvesting</h1>
-          <p className="text-sm text-gray-400 mt-1">Identify & harvest unrealized losses for tax savings</p>
+          <p className="text-sm text-text-1 mt-1">Identify & harvest unrealized losses for tax savings</p>
         </div>
         <button
           onClick={handleScan}
@@ -91,23 +91,23 @@ export function HarvestClient({ initialCandidates }: Props) {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Candidates</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Candidates</p>
           <p className="text-2xl font-bold text-white mt-1">{candidates.length}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Total Harvestable Loss</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Total Harvestable Loss</p>
           <p className="text-2xl font-bold text-red-400 mt-1">-${Math.abs(totalLoss).toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Wash Sale Risk</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Wash Sale Risk</p>
           <p className="text-2xl font-bold text-yellow-400 mt-1">{washSaleRisks}</p>
         </div>
       </div>
 
       {/* Lot selection method */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tax Lot Selection Method</p>
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+        <p className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-2">Tax Lot Selection Method</p>
         <div className="flex flex-col gap-2">
           {(Object.entries(LOT_METHOD_LABELS) as [LotMethod, string][]).map(([method, label]) => (
             <label key={method} className="flex items-center gap-2 cursor-pointer">
@@ -119,7 +119,7 @@ export function HarvestClient({ initialCandidates }: Props) {
                 onChange={() => setLotMethod(method)}
                 className="w-4 h-4"
               />
-              <span className={`text-sm ${lotMethod === method ? 'text-white' : 'text-gray-400'}`}>{label}</span>
+              <span className={`text-sm ${lotMethod === method ? 'text-white' : 'text-text-1'}`}>{label}</span>
             </label>
           ))}
         </div>
@@ -148,14 +148,14 @@ export function HarvestClient({ initialCandidates }: Props) {
               key={c.id}
               className={cn(
                 'rounded-xl border p-4',
-                c.wash_sale_risk ? 'border-yellow-500/20 bg-yellow-500/5' : 'border-white/10 bg-white/5'
+                c.wash_sale_risk ? 'border-yellow-500/20 bg-yellow-500/5' : 'border-line-strong bg-white/5'
               )}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-white">{c.symbol}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-gray-400 capitalize">{c.asset_class}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-fill text-text-1 capitalize">{c.asset_class}</span>
                     {c.wash_sale_risk && (
                       <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 font-medium">
                         <AlertTriangle className="h-3 w-3" />
@@ -198,7 +198,7 @@ export function HarvestClient({ initialCandidates }: Props) {
                   <button
                     onClick={() => handleDismiss(c.id)}
                     disabled={pending}
-                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-white/10 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-white/5 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-fill disabled:opacity-50 transition-colors"
                   >
                     <XCircle className="h-3.5 w-3.5" />
                     Dismiss

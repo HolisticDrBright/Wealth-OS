@@ -48,13 +48,13 @@ export async function RiskStrip({ jurisdiction, className }: Props) {
 
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500">
         <ShieldCheck className="h-3.5 w-3.5 text-gray-500" /> Guardrails
       </span>
       <PositionCapBadge level={bandLevel(capPct)} value={`${capPct}%`} title={`Max single position: ${capPct}% of capital`} />
       <DrawdownBadge level={bandLevel(ddPct)} value={`${ddPct}%`} title={`Max drawdown limit: ${ddPct}%`} />
       {jurisdiction && <JurisdictionBadge level={jurisdiction.level} value={jurisdiction.value} />}
-      {isDefault && <span className="text-[11px] text-gray-600">defaults · set on Risk Room</span>}
+      {isDefault && <span className="text-xs text-gray-600">defaults · set on Risk Room</span>}
     </div>
   )
 }

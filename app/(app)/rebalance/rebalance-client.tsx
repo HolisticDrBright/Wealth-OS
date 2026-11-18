@@ -137,7 +137,7 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
       {/* Current vs Target allocation */}
       <Card>
         <div className="p-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Allocation</p>
+          <p className="text-xs font-semibold text-text-1 uppercase tracking-wider mb-4">Allocation</p>
           <div className="space-y-3">
             {Object.entries(targets).map(([cls, targetPct]) => {
               const currentValue = currentByClass[cls] ?? 0
@@ -156,7 +156,7 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
                       )}
                     </span>
                   </div>
-                  <div className="h-2 rounded-full bg-white/10 relative overflow-hidden">
+                  <div className="h-2 rounded-full bg-fill relative overflow-hidden">
                     <div
                       className="absolute inset-y-0 left-0 rounded-full opacity-40"
                       style={{ width: `${Math.min(100, currentPct)}%`, backgroundColor: CLASS_COLORS[cls] ?? '#6366f1' }}
@@ -177,7 +177,7 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
       <Card>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Target Allocation</p>
+            <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">Target Allocation</p>
             <span className={`text-xs ${Math.abs(totalTargetPct - 100) > 0.1 ? 'text-red-400' : 'text-emerald-400'}`}>
               Total: {totalTargetPct.toFixed(1)}% {Math.abs(totalTargetPct - 100) > 0.1 ? '(must equal 100%)' : '✓'}
             </span>
@@ -217,7 +217,7 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
         <div className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="h-4 w-4 text-indigo-400" />
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Portfolio Optimizer</p>
+            <p className="text-xs font-semibold text-text-1 uppercase tracking-wider">Portfolio Optimizer</p>
           </div>
           <div className="flex gap-3 items-end mb-4">
             <div className="flex-1">
@@ -261,13 +261,13 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
                   .map(([symbol, weight]) => (
                     <div key={symbol} className="flex items-center gap-3">
                       <span className="text-xs font-medium text-white w-16 shrink-0">{symbol}</span>
-                      <div className="flex-1 h-1.5 rounded-full bg-white/10">
+                      <div className="flex-1 h-1.5 rounded-full bg-fill">
                         <div
                           className="h-1.5 rounded-full bg-indigo-500"
                           style={{ width: `${Math.min(100, weight * 100)}%` }}
                         />
                       </div>
-                      <span className="text-xs text-gray-400 w-12 text-right">{(weight * 100).toFixed(1)}%</span>
+                      <span className="text-xs text-text-1 w-12 text-right">{(weight * 100).toFixed(1)}%</span>
                     </div>
                   ))}
               </div>
@@ -279,7 +279,7 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
       {/* Suggestions */}
       {pendingSuggestions.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Suggested Trades</h2>
+          <h2 className="text-sm font-semibold text-text-1 uppercase tracking-wider mb-3">Suggested Trades</h2>
           <div className="space-y-2">
             {pendingSuggestions.map(s => (
               <Card key={s.id}>
@@ -318,7 +318,7 @@ export function RebalanceClient({ assets, initialTargets, initialSuggestions }: 
                       </p>
                     </div>
                     <p className="text-sm font-bold text-white">{formatCurrency(s.suggested_notional ?? 0)}</p>
-                    <button onClick={() => dismissSuggestion(s.id)} className="text-gray-600 hover:text-gray-400">
+                    <button onClick={() => dismissSuggestion(s.id)} className="text-gray-600 hover:text-text-1">
                       <XCircle className="h-4 w-4" />
                     </button>
                   </div>

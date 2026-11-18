@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   open:             { label: 'Open',              color: 'text-indigo-400 bg-indigo-400/10',  icon: RefreshCw },
   partially_filled: { label: 'Partial',           color: 'text-orange-400 bg-orange-400/10', icon: RefreshCw },
   filled:           { label: 'Filled',            color: 'text-green-400 bg-green-400/10',   icon: CheckCircle },
-  cancelled:        { label: 'Cancelled',         color: 'text-gray-400 bg-gray-400/10',     icon: XCircle },
+  cancelled:        { label: 'Cancelled',         color: 'text-text-1 bg-fill',     icon: XCircle },
   rejected:         { label: 'Rejected',          color: 'text-red-400 bg-red-400/10',       icon: XCircle },
   expired:          { label: 'Expired',           color: 'text-gray-500 bg-gray-500/10',     icon: AlertCircle },
 }
@@ -69,21 +69,21 @@ export function OrdersClient({ initialOrders }: Props) {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Order Blotter</h1>
-        <p className="text-sm text-gray-400 mt-1">Track and manage all your orders across brokers</p>
+        <p className="text-sm text-text-1 mt-1">Track and manage all your orders across brokers</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Total Orders</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Total Orders</p>
           <p className="text-2xl font-bold text-white mt-1">{orders.length}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Open Notional</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Open Notional</p>
           <p className="text-2xl font-bold text-indigo-400 mt-1">${totalOpenNotional.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wider">Filled Today</p>
+        <div className="rounded-xl border border-line-strong bg-white/5 p-4">
+          <p className="text-xs text-text-1 uppercase tracking-wider">Filled Today</p>
           <p className="text-2xl font-bold text-green-400 mt-1">{filledToday.length}</p>
         </div>
       </div>
@@ -98,7 +98,7 @@ export function OrdersClient({ initialOrders }: Props) {
               'px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all',
               filter === s
                 ? 'bg-indigo-600 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                : 'bg-white/5 text-text-1 hover:bg-fill hover:text-white'
             )}
           >
             {s === 'all' ? 'All' : STATUS_CONFIG[s]?.label ?? s}
@@ -118,18 +118,18 @@ export function OrdersClient({ initialOrders }: Props) {
           <p>No orders found</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-white/10 overflow-hidden">
+        <div className="rounded-xl border border-line-strong overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-white/5">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Symbol</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Side</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Type</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase">Notional</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Source</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Broker</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Time</th>
+              <tr className="border-b border-line-strong bg-white/5">
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Symbol</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Side</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Type</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-text-1 uppercase">Notional</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Source</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Broker</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-1 uppercase">Time</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -166,10 +166,10 @@ export function OrdersClient({ initialOrders }: Props) {
                         {statusCfg.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">
+                    <td className="px-4 py-3 text-text-1 text-xs">
                       {SOURCE_LABELS[order.source ?? ''] ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-400 capitalize text-xs">{order.broker ?? '—'}</td>
+                    <td className="px-4 py-3 text-text-1 capitalize text-xs">{order.broker ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                       {new Date(order.created_at).toLocaleString()}
                     </td>

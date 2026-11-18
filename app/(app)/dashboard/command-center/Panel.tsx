@@ -23,9 +23,9 @@ export function Panel({
   className?: string
 }) {
   return (
-    <section className={cn('rounded-xl border border-white/10 bg-white/5 p-4', className)}>
+    <section className={cn('rounded-xl border border-line-strong bg-white/5 p-4', className)}>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <h2 className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-1">
           {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
           <span className="truncate">{title}</span>
         </h2>

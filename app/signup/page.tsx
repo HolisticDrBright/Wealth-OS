@@ -40,17 +40,17 @@ export default function SignupPage() {
 
   if (checkEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#07080c] px-4">
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="max-w-sm text-center">
           <div className="mb-4 flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-emerald-500/20">
             <span className="text-3xl">✉️</span>
           </div>
           <h2 className="text-xl font-bold text-white">Check your email</h2>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-text-1">
             We sent a confirmation link to <span className="text-white">{email}</span>.
             Open it to activate your account, then sign in — we&apos;ll set up your first goal from there.
           </p>
-          <Link href="/login" className="mt-6 inline-block text-sm text-indigo-400 hover:text-indigo-300">
+          <Link href="/login" className="mt-6 inline-block text-sm text-accent-cyan hover:underline">
             Go to sign in
           </Link>
         </div>
@@ -59,14 +59,14 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#07080c] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 mb-4">
-            <DollarSign className="h-6 w-6 text-white" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-cyan mb-4">
+            <DollarSign className="h-6 w-6 text-bg-0" />
           </div>
           <h1 className="text-2xl font-bold text-white">Create your account</h1>
-          <p className="mt-1 text-sm text-gray-400">Start your journey to financial freedom</p>
+          <p className="mt-1 text-sm text-text-1">Start your journey to financial freedom</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -76,29 +76,29 @@ export default function SignupPage() {
             </div>
           )}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-400">Full Name</label>
+            <label className="mb-1.5 block text-xs font-medium text-text-1">Full Name</label>
             <input
               type="text"
               value={fullName}
               onChange={e => setFullName(e.target.value)}
               required
               placeholder="Jane Smith"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-line-strong bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-400">Email</label>
+            <label className="mb-1.5 block text-xs font-medium text-text-1">Email</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-line-strong bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-400">Password</label>
+            <label className="mb-1.5 block text-xs font-medium text-text-1">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -107,7 +107,7 @@ export default function SignupPage() {
                 required
                 minLength={8}
                 placeholder="Min. 8 characters"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-600 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-line-strong bg-white/5 px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-600 outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan"
               />
               <button
                 type="button"
@@ -121,7 +121,7 @@ export default function SignupPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            className="w-full rounded-lg bg-accent-cyan py-2.5 text-sm font-semibold text-bg-0 hover:brightness-110 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>
@@ -129,7 +129,7 @@ export default function SignupPage() {
 
         <p className="mt-6 text-center text-sm text-gray-500">
           Already have an account?{' '}
-          <Link href="/login" className="text-indigo-400 hover:text-indigo-300">
+          <Link href="/login" className="text-accent-cyan hover:underline">
             Sign in
           </Link>
         </p>

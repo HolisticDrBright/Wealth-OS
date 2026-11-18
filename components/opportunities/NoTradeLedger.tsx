@@ -61,7 +61,7 @@ function ReasonChip({
       onClick={onClick}
       title={title}
       className={cn(
-        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors',
+        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors',
         tone.text,
         tone.bg,
         tone.border,
@@ -86,12 +86,12 @@ export function NoTradeLedger({ entries }: Props) {
   return (
     <div className="space-y-4">
       {/* Explainer */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4">
         <div className="flex items-start gap-2.5">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-white">Not trading is a decision too.</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-gray-400">
+            <p className="mt-0.5 text-xs leading-relaxed text-text-1">
               This ledger logs every signal Wealth OS reviewed and deliberately declined — with the
               risk-aware reason it was rejected. A short list here is discipline working as intended.
             </p>
@@ -100,16 +100,16 @@ export function NoTradeLedger({ entries }: Props) {
       </div>
 
       {/* Reason legend */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="rounded-xl border border-line-strong bg-white/5 p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
             Reason taxonomy
           </p>
           {activeReason && (
             <button
               type="button"
               onClick={() => setActiveReason(null)}
-              className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-white"
+              className="inline-flex items-center gap-1 text-xs text-text-1 hover:text-white"
             >
               <X className="h-3 w-3" /> Clear filter
             </button>
@@ -138,9 +138,9 @@ export function NoTradeLedger({ entries }: Props) {
           hint="When a signal is rejected — weak edge, wide spread, jurisdiction, failed Red Team, etc. — it will appear here with the reason."
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        <div className="overflow-hidden rounded-xl border border-line-strong bg-white/5">
           {/* Header row (desktop) */}
-          <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,2fr)_minmax(0,0.7fr)] gap-3 border-b border-white/10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500 sm:grid">
+          <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,2fr)_minmax(0,0.7fr)] gap-3 border-b border-line-strong px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 sm:grid">
             <span>Reason</span>
             <span>Strategy</span>
             <span>Symbol</span>
@@ -162,7 +162,7 @@ export function NoTradeLedger({ entries }: Props) {
                   <div className="min-w-0 order-1">
                     <span
                       className={cn(
-                        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
                         tone.text,
                         tone.bg,
                         tone.border,
@@ -192,7 +192,7 @@ export function NoTradeLedger({ entries }: Props) {
 
                   {/* Asset */}
                   <div className="min-w-0 order-4">
-                    <span className="block truncate text-gray-400">
+                    <span className="block truncate text-text-1">
                       {entry.assetClass ? assetClassLabel(entry.assetClass) : '—'}
                     </span>
                   </div>

@@ -38,7 +38,7 @@ export function ServiceStatusBanner({
   const wsConnecting = wsStatus === 'connecting'
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line-strong bg-white/5 px-4 py-3 text-sm">
       {/* Circuit breaker */}
       {circuitOpen ? (
         <span className="flex items-center gap-1.5 text-amber-400">
@@ -67,7 +67,7 @@ export function ServiceStatusBanner({
           Live
         </span>
       ) : wsConnecting ? (
-        <span className="flex items-center gap-1.5 text-gray-400">
+        <span className="flex items-center gap-1.5 text-text-1">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Connecting…
         </span>
@@ -98,7 +98,7 @@ export function ServiceStatusBanner({
           'rounded-full px-2 py-0.5 text-xs font-medium',
           schedulerRunning
             ? 'bg-green-500/15 text-green-300'
-            : 'bg-gray-500/15 text-gray-400'
+            : 'bg-gray-500/15 text-text-1'
         )}
       >
         Scheduler {schedulerRunning ? 'on' : 'off'}

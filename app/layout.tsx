@@ -34,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`h-full bg-[#07080c] text-gray-100 ${inter.variable} ${jetbrainsMono.variable} ${sourceSerif.variable}`}
+        className={`h-full bg-background text-gray-100 ${inter.variable} ${jetbrainsMono.variable} ${sourceSerif.variable}`}
       >
         {children}
       </body>

@@ -91,12 +91,12 @@ export function AiCostChart({
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 9, fill: '#6b7280' }}
+            tick={{ fontSize: 12, fill: '#6b7280' }}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 9, fill: '#6b7280' }}
+            tick={{ fontSize: 12, fill: '#6b7280' }}
             tickLine={false}
             tickFormatter={formatTick}
           />
@@ -110,7 +110,7 @@ export function AiCostChart({
           <Legend
             iconType="circle"
             iconSize={6}
-            wrapperStyle={{ fontSize: 10, color: '#9ca3af' }}
+            wrapperStyle={{ fontSize: 12, color: '#9ca3af' }}
             formatter={name => labels[name] ?? name}
           />
           {featureKeys.map((key, i) => (
@@ -137,12 +137,12 @@ export function AiCostChart({
       <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
         <XAxis
           dataKey="date"
-          tick={{ fontSize: 9, fill: '#6b7280' }}
+          tick={{ fontSize: 12, fill: '#6b7280' }}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fontSize: 9, fill: '#6b7280' }}
+          tick={{ fontSize: 12, fill: '#6b7280' }}
           tickLine={false}
           tickFormatter={formatTick}
         />
@@ -156,7 +156,7 @@ export function AiCostChart({
         <Legend
           iconType="circle"
           iconSize={6}
-          wrapperStyle={{ fontSize: 10, color: '#9ca3af' }}
+          wrapperStyle={{ fontSize: 12, color: '#9ca3af' }}
           formatter={name => labels[name] ?? name}
         />
         {featureKeys.map((key, i) => (

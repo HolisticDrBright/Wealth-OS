@@ -171,7 +171,7 @@ describe('sidebar navigation', () => {
   })
 
   it('collapses to a drawer below md', () => {
-    expect(src).toContain('hidden h-screen w-64 flex-col border-r border-white/10 bg-[#0a0b0f] md:flex')
+    expect(src).toMatch(/hidden h-screen w-64 flex-col[^"']*md:flex/)
     expect(src).toContain('MobileNav')
     const layout = read('app/(app)/layout.tsx')
     expect(layout).toMatch(/<MobileNav[ />]/)
