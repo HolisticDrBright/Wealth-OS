@@ -1,9 +1,5 @@
 /**
- * Simple-mode tab bar (Phase M1): Home, Goals, Activity, Explore.
- *
- * The legacy screens (feed, traders, portfolio, alerts, profile) keep their
- * files until the new screens fully replace them (Phase M6) but are hidden
- * from the tab bar with `href: null`.
+ * Simple-mode tab bar: Home, Goals, Activity, Explore.
  */
 
 import { Tabs } from 'expo-router'
@@ -19,9 +15,6 @@ const TABS: { name: string; title: string; icon: IoniconsName; activeIcon: Ionic
   { name: 'activity', title: 'Activity', icon: 'list-outline',    activeIcon: 'list' },
   { name: 'explore',  title: 'Explore',  icon: 'compass-outline', activeIcon: 'compass' },
 ]
-
-/** Old six-tab screens, hidden until Phase M6 deletes them. */
-const LEGACY_HIDDEN = ['feed', 'traders', 'portfolio', 'alerts', 'profile']
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets()
@@ -56,9 +49,6 @@ export default function TabLayout() {
             ),
           }}
         />
-      ))}
-      {LEGACY_HIDDEN.map(name => (
-        <Tabs.Screen key={name} name={name} options={{ href: null }} />
       ))}
     </Tabs>
   )

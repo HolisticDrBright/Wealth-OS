@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#0a0b0f"
+      "backgroundColor": "#0b0d12"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
@@ -19,7 +19,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0a0b0f"
+        "backgroundColor": "#0b0d12"
       },
       "package": "com.wealthos.app"
     },
@@ -31,7 +31,7 @@
       "expo-router",
       [
         "expo-splash-screen",
-        { "backgroundColor": "#0a0b0f" }
+        { "backgroundColor": "#0b0d12" }
       ]
     ],
     "experiments": {

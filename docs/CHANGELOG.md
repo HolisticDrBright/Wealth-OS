@@ -1,5 +1,40 @@
 # Wealth OS Changelog
 
+## 2026-11-18 — Mobile Simple mode (apps/mobile, Phases M1–M6)
+
+The phone app is now the four-tab beginner app from the design canvas —
+Home, Goals, Activity, Explore — plus Approve and Pause modals. It holds no
+trading logic: every screen reads the web's new `/api/mobile/*` endpoints
+with the user's Supabase JWT, and the server runs everything as that user
+under RLS (no service-role client in the mobile surface — test-enforced).
+
+- **M1** (70a77e6) NativeWind tokens, Inter + JetBrains Mono, four-tab layout,
+  shared UI kit (Card, Pill, PracticeBadge, Money, Delta, ProgressBar,
+  SplitBar, buttons, FilterPill, ScreenHeader, StateView). Fixed the
+  uninstallable `react@18.3.2` / `@types/react-native@0.76` pins.
+- **API** (22adb6a) Bearer-auth endpoints over shared cores; ONE pause
+  implementation (`lib/simple/pause-core.ts`) now used by web and phone.
+- **M2** (0cbb94c) Home + Goals with real data. **M3** (2276c0c) Activity +
+  Approve with a recorded approval. **M4** (2ae663a) Explore + Pause.
+  **M5** (b932019) accessibility: contrast script (all 31 pairs ≥ 4.5:1),
+  dynamic type, 13pt minimum. **M6** legacy six-tab screens deleted,
+  login restyled, README with run/build steps.
+
+**Endpoints added**: `GET /api/mobile/home`, `GET|POST /api/mobile/goal`,
+`GET /api/mobile/activity`, `GET|POST /api/mobile/approve`,
+`GET /api/mobile/explore`, `POST /api/mobile/follow`,
+`GET|POST /api/mobile/pause`, `POST /api/mobile/resume`.
+
+**Not sourced from existing data (shown honestly instead of invented)**:
+a trader's holding style (cards show the market only); a practice run's
+"result so far" in dollars (cards show day N of 30 and progress only — no
+per-follow paper P&L is tracked yet); "deposits still arrive" is stated as
+policy (there is no deposit-automation table).
+
+**Not verifiable here**: anything on a device or simulator (layout, fonts,
+safe areas, VoiceOver/TalkBack, dynamic type at the largest sizes), and all
+endpoint calls against the live Supabase project.
+
 ## 2026-11-18 — Safe-for-beginners program, web Phases 1–4
 
 Goal: make Wealth OS safe and usable for someone with no investing knowledge
