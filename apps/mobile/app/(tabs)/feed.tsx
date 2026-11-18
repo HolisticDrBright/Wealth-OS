@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, StyleSheet, ActivityIndicator,
   RefreshControl,
 } from 'react-native'
-import { supabase, apiFetch } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import type { TraderTrade } from '@/src/types'
 
 function timeAgo(dateStr: string) {

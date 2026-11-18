@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator,
-  RefreshControl, TouchableOpacity,
+  RefreshControl,
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
 import type { Asset } from '@/src/types'

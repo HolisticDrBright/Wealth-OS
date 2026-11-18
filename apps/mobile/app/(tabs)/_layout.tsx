@@ -1,33 +1,44 @@
+/**
+ * Simple-mode tab bar (Phase M1): Home, Goals, Activity, Explore.
+ *
+ * The legacy screens (feed, traders, portfolio, alerts, profile) keep their
+ * files until the new screens fully replace them (Phase M6) but are hidden
+ * from the tab bar with `href: null`.
+ */
+
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { colors } from '@/src/theme'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
 
 const TABS: { name: string; title: string; icon: IoniconsName; activeIcon: IoniconsName }[] = [
-  { name: 'index',     title: 'Dashboard', icon: 'grid-outline',       activeIcon: 'grid' },
-  { name: 'feed',      title: 'Feed',      icon: 'pulse-outline',      activeIcon: 'pulse' },
-  { name: 'traders',   title: 'Traders',   icon: 'people-outline',     activeIcon: 'people' },
-  { name: 'portfolio', title: 'Portfolio', icon: 'bar-chart-outline',  activeIcon: 'bar-chart' },
-  { name: 'alerts',    title: 'Alerts',    icon: 'notifications-outline', activeIcon: 'notifications' },
-  { name: 'profile',   title: 'Profile',   icon: 'person-circle-outline', activeIcon: 'person-circle' },
+  { name: 'index',    title: 'Home',     icon: 'home-outline',    activeIcon: 'home' },
+  { name: 'goals',    title: 'Goals',    icon: 'disc-outline',    activeIcon: 'disc' },
+  { name: 'activity', title: 'Activity', icon: 'list-outline',    activeIcon: 'list' },
+  { name: 'explore',  title: 'Explore',  icon: 'compass-outline', activeIcon: 'compass' },
 ]
+
+/** Old six-tab screens, hidden until Phase M6 deletes them. */
+const LEGACY_HIDDEN = ['feed', 'traders', 'portfolio', 'alerts', 'profile']
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        sceneStyle: { backgroundColor: colors.ground },
         tabBarStyle: {
-          backgroundColor: '#0a0b0f',
-          borderTopColor: 'rgba(255,255,255,0.08)',
+          backgroundColor: colors.ground,
+          borderTopColor: colors.stroke,
           borderTopWidth: 1,
           height: 88,
           paddingBottom: 24,
-          paddingTop: 10,
+          paddingTop: 8,
         },
-        tabBarActiveTintColor: '#6366f1',
-        tabBarInactiveTintColor: '#6b7280',
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.inkMuted,
+        tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
       }}
     >
       {TABS.map(tab => (
@@ -41,6 +52,9 @@ export default function TabLayout() {
             ),
           }}
         />
+      ))}
+      {LEGACY_HIDDEN.map(name => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
       ))}
     </Tabs>
   )

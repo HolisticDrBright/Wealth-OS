@@ -22,7 +22,7 @@ import {
 } from 'react-native'
 import { useState, useEffect, useCallback } from 'react'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 // ── Haptics (graceful no-op when expo-haptics not installed) ──────────────────
 let Haptics: { impactAsync: (style?: unknown) => Promise<void> } | null = null
