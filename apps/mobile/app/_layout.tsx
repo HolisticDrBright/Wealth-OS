@@ -52,6 +52,9 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
+        {/* Decision screens are modals without the tab bar */}
+        <Stack.Screen name="approve" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="pause" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   )

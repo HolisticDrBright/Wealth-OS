@@ -20,7 +20,7 @@ export async function getAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
-export const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000'
+export const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3120'
 
 /** Authenticated fetch to Next.js API routes */
 export async function apiFetch(path: string, init?: RequestInit) {
