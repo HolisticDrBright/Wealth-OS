@@ -126,6 +126,51 @@ export async function getHaltImpact(): Promise<HaltImpact | null> {
 }
 
 /**
+ * Flatten & Halt (Phase 1.3): sets the trading_halted flag FIRST (so the kill
+ * switch blocks any new order immediately), then actually closes every open
+ * PAPER position through the same exit path the runner uses, and records the
+ * whole action in audit_logs. Live positions are out of scope — there is no
+ * live trading — and the dialog says so.
+ */
+export async function flattenAndHalt(
+  reason: string
+): Promise<{ ok: boolean; closed: number; failures: string[]; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, closed: 0, failures: [], error: 'not authenticated' }
+
+  // 1. Halt first — no new orders while we flatten.
+  const halt = await setTradingHalted(true, reason || 'manual Flatten & Halt')
+  if (!halt.ok) return { ok: false, closed: 0, failures: [], error: halt.error }
+
+  // 2. Close every open paper position via the runner's exit path.
+  const { PaperBroker } = await import('@/lib/paper-trading/PaperBroker')
+  const broker = new PaperBroker()
+  let closed = 0
+  let failures: string[] = []
+  try {
+    const res = await broker.flattenAllPositions(supabase, user.id, 'manual_flatten')
+    closed = res.closed
+    failures = res.failures
+  } catch (err) {
+    failures = [err instanceof Error ? err.message : 'flatten failed']
+  }
+
+  // 3. Audit trail — the halt itself is an auditable decision.
+  await supabase.from('audit_logs').insert({
+    user_id: user.id, strategy_key: 'flatten_halt', symbol: 'ALL',
+    decision: 'halt', size_fraction: 0, mirofish_used: false, kronos_used: false,
+    decided_at: new Date().toISOString(),
+    metadata: { reason: reason || 'manual Flatten & Halt', positions_closed: closed, failures },
+  }).then(() => {}, () => {})
+
+  revalidatePath('/', 'layout')
+  // Positions that could not be closed are reported, not hidden; the halt
+  // flag is still set either way, so nothing new can open.
+  return { ok: failures.length === 0, closed, failures }
+}
+
+/**
  * Sets the user's trading_halted flag. Enforcement is the Phase 0 kill
  * switch — this only flips the flag it reads.
  */

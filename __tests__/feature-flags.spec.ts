@@ -141,7 +141,7 @@ describe('FeatureFlagService.logUsage', () => {
       tokensOut: 200,
     })
 
-    const logBuilder = (supabase.from as ReturnType<typeof vi.fn>)('ai_usage_logs')
+    const logBuilder = (supabase.from as unknown as (table: string) => { insert: ReturnType<typeof vi.fn> })('ai_usage_logs')
     expect(logBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         user_id: USER_ID,

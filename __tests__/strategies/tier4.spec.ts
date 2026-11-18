@@ -494,11 +494,14 @@ describe('T4.6 PolymarketTriangleArbStrategy', () => {
     const pos = {
       id: 'pos1', strategyKey: strat.key, symbol: 'POLY:x',
       direction: 'neutral' as const, assetClass: strat.assetClass,
-      openedAt: thirtyOneDaysAgo, sizeUsd: 1_000,
+      entryPrice: 0.5, currentPrice: 0.5, quantity: 2_000, notionalUsd: 1_000,
+      stopLossPct: 0.25, takeProfitPct: 0.45, maxHoldHours: 720,
+      openedAt: thirtyOneDaysAgo,
       metadata: { pmMarketId: 'abc' },
     }
     const action = await strat.manageOpenPosition(pos, {} as never)
     expect(action.type).toBe('close')
+    if (action.type !== 'close') throw new Error('expected close action')
     expect(action.reason).toContain('timeout')
   })
 })

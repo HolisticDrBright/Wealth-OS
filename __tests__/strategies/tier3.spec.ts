@@ -95,6 +95,9 @@ function makePosition(overrides: Partial<OpenPosition> = {}): OpenPosition {
     currentPrice: 100,
     quantity: 10,
     notionalUsd: 1000,
+    stopLossPct: 0.05,
+    takeProfitPct: 0.1,
+    maxHoldHours: 240,
     openedAt: Date.now() - 86_400_000,  // 1 day ago
     metadata: {},
     ...overrides,

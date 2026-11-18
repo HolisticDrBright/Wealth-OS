@@ -1,38 +1,19 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError } from '@/lib/api'
-import { getTickers, getOrderBook, getBalances } from '@/lib/kraken-client'
-
-const DEFAULT_SYMBOLS = ['BTC', 'ETH', 'SOL', 'AVAX', 'ADA', 'DOT', 'MATIC', 'LINK', 'XRP', 'DOGE']
+import { getOrderBook, getBalances } from '@/lib/kraken-client'
+import { syncCryptoPrices, DEFAULT_CRYPTO_SYMBOLS } from '@/lib/workers/market-data-sync'
 
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action') ?? 'prices'
-  const symbols = req.nextUrl.searchParams.get('symbols')?.split(',') ?? DEFAULT_SYMBOLS
+  const symbols = req.nextUrl.searchParams.get('symbols')?.split(',') ?? DEFAULT_CRYPTO_SYMBOLS
 
   try {
     if (action === 'prices') {
-      const tickers = await getTickers(symbols)
-
-      // Cache to crypto_prices table
-      if (tickers.length) {
-        const supabase = createAdminClient()
-        await supabase.from('crypto_prices').upsert(
-          tickers.map(t => ({
-            symbol: t.symbol,
-            pair: t.pair,
-            price_usd: t.price_usd,
-            bid: t.bid,
-            ask: t.ask,
-            volume_24h: t.volume_24h,
-            high_24h: t.high_24h,
-            low_24h: t.low_24h,
-            source: 'kraken',
-            fetched_at: new Date().toISOString(),
-          }))
-        )
-      }
-
-      return apiSuccess(tickers, { count: tickers.length, source: 'kraken' })
+      // Shared worker — same implementation the cron calls directly.
+      const result = await syncCryptoPrices(createAdminClient(), symbols)
+      if (!result.ok) return apiError(result.error ?? 'Kraken API error', 502)
+      return apiSuccess(result.tickers, { count: result.count, source: 'kraken' })
     }
 
     if (action === 'orderbook') {

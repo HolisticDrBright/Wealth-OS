@@ -293,6 +293,64 @@ export class PaperBroker {
       else if (ageHours  >= (pos.max_hold_hours  as number)) exitReason = 'timeout'
       if (!exitReason) return
 
+      await this.closeAt(supabase, userId, pos, currentPrice, exitReason)
+      closed++
+    }))
+
+    return closed
+  }
+
+  // ── Flatten & Halt: close EVERY open paper position now ────────────────────
+  // Reuses the same exit path as checkAndExitPositions (slippage, paper_trades
+  // row, close alert, decision grading). If no live price is available the
+  // last mark is used so the halt still flattens; a position with no price at
+  // all is reported, never silently skipped.
+
+  async flattenAllPositions(
+    supabase: SupabaseClient,
+    userId: string,
+    exitReason = 'manual_flatten'
+  ): Promise<{ closed: number; failures: string[] }> {
+    const { data: positions } = await supabase
+      .from('paper_positions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'open')
+
+    if (!positions?.length) return { closed: 0, failures: [] }
+
+    let closed = 0
+    const failures: string[] = []
+
+    // Sequential, not parallel — a halt should be deterministic and complete.
+    for (const pos of positions) {
+      try {
+        const live = await fetchCurrentPrice(pos.symbol as string, pos.asset_class as AssetClass)
+        const price = live ?? (pos.current_price as number | null) ?? (pos.entry_price as number | null)
+        if (price == null) {
+          failures.push(`${pos.symbol}: no price available`)
+          continue
+        }
+        await this.closeAt(supabase, userId, pos, price, exitReason)
+        closed++
+      } catch (err) {
+        failures.push(`${pos.symbol}: ${err instanceof Error ? err.message : 'close failed'}`)
+      }
+    }
+
+    return { closed, failures }
+  }
+
+  // ── Shared close path (exit fill + records + alert + grading) ──────────────
+
+  private async closeAt(
+    supabase: SupabaseClient,
+    userId: string,
+    pos: Record<string, unknown>,
+    currentPrice: number,
+    exitReason: string
+  ): Promise<void> {
+      const entryPrice = pos.entry_price as number
       // Exits also incur slippage (adverse to the position)
       const slippageBps = SLIPPAGE_BPS[pos.asset_class as AssetClass] ?? 10
       const slip = currentPrice * slippageBps / 10_000
@@ -380,9 +438,5 @@ export class PaperBroker {
         `[PaperBroker] ✓ closed ${pos.strategy_key as string} ${pos.symbol as string} ` +
         `→ ${exitReason} ${sign}${(realizedPct * 100).toFixed(2)}% (${sign}$${pnlUsd.toFixed(2)})`
       )
-      closed++
-    }))
-
-    return closed
   }
 }

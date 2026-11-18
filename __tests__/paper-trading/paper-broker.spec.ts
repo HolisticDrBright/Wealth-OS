@@ -10,7 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Opportunity, PositionSize } from '@/lib/strategies/pipeline-types'
 
 // Mock price-feed before importing PaperBroker
-const mockFetchCurrentPrice = vi.fn<() => Promise<number | null>>()
+const mockFetchCurrentPrice = vi.fn<(...args: unknown[]) => Promise<number | null>>()
 vi.mock('@/lib/paper-trading/price-feed', () => ({
   fetchCurrentPrice: (...args: unknown[]) => mockFetchCurrentPrice(...args),
 }))

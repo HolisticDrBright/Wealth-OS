@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { apiSuccess, apiError } from '@/lib/api'
-import { getPricing, getAccount, getOpenTrades } from '@/lib/oanda-client'
+import { getAccount, getOpenTrades } from '@/lib/oanda-client'
 import { MAJOR_PAIRS } from '@/lib/constants/forex'
+import { syncForexRates } from '@/lib/workers/market-data-sync'
 
 export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action') ?? 'rates'
@@ -14,24 +15,10 @@ export async function GET(req: NextRequest) {
   try {
     if (action === 'rates') {
       const instruments = req.nextUrl.searchParams.get('instruments')?.split(',') ?? MAJOR_PAIRS
-      const prices = await getPricing(instruments)
-
-      // Cache to forex_rates table
-      if (prices.length) {
-        const supabase = createAdminClient()
-        await supabase.from('forex_rates').upsert(
-          prices.map(p => ({
-            instrument: p.instrument,
-            bid: p.bid,
-            ask: p.ask,
-            spread_pips: p.spread_pips,
-            source: 'oanda',
-            fetched_at: new Date().toISOString(),
-          }))
-        )
-      }
-
-      return apiSuccess(prices, { count: prices.length, source: 'oanda' })
+      // Shared worker — same implementation the cron calls directly.
+      const result = await syncForexRates(createAdminClient(), instruments)
+      if (!result.ok) return apiError(result.error ?? 'OANDA API error', 502)
+      return apiSuccess(result.prices, { count: result.count, source: 'oanda' })
     }
 
     if (action === 'account') {

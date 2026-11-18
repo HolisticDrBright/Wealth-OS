@@ -9,7 +9,7 @@
  * - PolymarketWalletCopyStrategy.manageOpenPosition returns 'close' at -30% DD
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { OpenPosition, PriceTick } from '@/lib/strategies/pipeline-types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

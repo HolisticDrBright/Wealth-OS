@@ -85,8 +85,8 @@ describe('backtester charges transaction costs', () => {
     const cheap = await runBacktest({ job: makeJob(), bars: makeBars(), oneWayCostBps: 5 })
     const dear = await runBacktest({ job: makeJob(), bars: makeBars(), oneWayCostBps: 150 })
 
-    expect(cheap.result.final_portfolio_value_usd).toBeLessThan(free.result.final_portfolio_value_usd)
-    expect(dear.result.final_portfolio_value_usd).toBeLessThan(cheap.result.final_portfolio_value_usd)
+    expect(cheap.result.final_portfolio_value_usd!).toBeLessThan(free.result.final_portfolio_value_usd!)
+    expect(dear.result.final_portfolio_value_usd!).toBeLessThan(cheap.result.final_portfolio_value_usd!)
   })
 
   it('buy fills are above close and sell fills below close', async () => {

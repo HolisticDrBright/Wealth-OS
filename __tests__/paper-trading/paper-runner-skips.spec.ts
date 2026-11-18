@@ -11,7 +11,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Opportunity } from '@/lib/strategies/pipeline-types'
 
 // ── Strategy mock ─────────────────────────────────────────────────────────────
-const mockDetectOpportunities = vi.fn<() => Promise<Opportunity[]>>()
+const mockDetectOpportunities = vi.fn<(...args: unknown[]) => Promise<Opportunity[]>>()
 vi.mock('@/lib/strategies/all-pipeline-strategies', () => ({
   ALL_STRATEGIES: [
     {

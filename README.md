@@ -5,7 +5,7 @@ AI-powered personal investment platform. Autonomous trading layer with 39 strate
 ## Architecture
 
 ```
-app/           — Next.js 15 App Router (UI + API routes)
+app/           — Next.js 16 App Router (UI + API routes)
 lib/           — Core business logic
   agents/      — CIO Decision Engine, MiroFish, 12 committee agents
   strategies/  — 39 strategy implementations (Tier 1 paper-trading, Tier 2 pending)
@@ -24,7 +24,7 @@ cp .env.local.example .env.local  # fill in Supabase + broker keys
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3120](http://localhost:3120) — the dev server runs on port **3120** (`next dev -p 3120`).
 
 ## Environment Variables
 
@@ -136,12 +136,56 @@ See `docs/tradingview-mcp-workflow.md` for full instructions.
 
 ## Database Migrations
 
-Run in Supabase SQL editor in order:
+> The migration filenames use a `YYYYMMDD<letter>_name.sql` pattern that the
+> Supabase CLI does not accept, so `supabase db push` skips them all. Apply
+> them by pasting into the Supabase SQL editor instead, in this order:
 
 ```
-supabase/schema.sql
+supabase/schema.sql                 # base schema first
 supabase/migrations/20260425_tier1_strategies.sql
 supabase/migrations/20260425_external_integrations.sql
+supabase/migrations/20260427_order_book_imbalance.sql
+supabase/migrations/20260427_polymarket_engine.sql
+supabase/migrations/20260427_tier2_features.sql
+supabase/migrations/20260428_paper_trading.sql
+supabase/migrations/20260428_paper_trading_add_neutral.sql
+supabase/migrations/20260506_risk_profiles.sql
+supabase/migrations/20260509_learning_loop_columns.sql
+supabase/migrations/20260509_weekly_review_strategies.sql
+supabase/migrations/20260509b_odte_strangle.sql
+supabase/migrations/20260509c_user_state.sql
+supabase/migrations/20260509d_deep_scan_strategies.sql
+supabase/migrations/20260509e_risk_profile_user_state.sql
+supabase/migrations/20260510_strategy_hardening.sql
+supabase/migrations/20260529_audit_logs_missing_columns.sql
+supabase/migrations/20260529b_audit_logs_insert_policy.sql
+supabase/migrations/20260529c_paper_trade_runs.sql
+supabase/migrations/20260529d_shadow_positions.sql
+supabase/migrations/20260610a_wash_sale_blocklist.sql
+supabase/migrations/20260610b_tax_loss_ledger.sql
+supabase/migrations/20260610c_rebalance_tax_columns.sql
+supabase/migrations/20260610d_paper_run_regime.sql
+supabase/migrations/20260703a_system_flags.sql
+supabase/migrations/20260703b_order_intents.sql
+supabase/migrations/20260703c_advisory_module.sql
+supabase/migrations/20260703d_ui_prefs.sql
+supabase/migrations/20260703e_adversarial_defense.sql
+supabase/migrations/20260703f_pit_facts.sql
+supabase/migrations/20260703g_corpus_aggregates.sql
+supabase/migrations/20260703h_sleeve_floors.sql
+supabase/migrations/20260703i_r3_finishers.sql
+supabase/migrations/20260703j_regime_state.sql
+supabase/migrations/20260703k_ledger.sql
+supabase/migrations/20260703l_behavior_events.sql
+supabase/migrations/20260703m_live_trading_safety.sql
+supabase/migrations/20260704a_agent_weights.sql
+supabase/migrations/20260704b_provenance.sql
+supabase/migrations/20260704c_wealth_tiers.sql
+supabase/migrations/20260704d_orders_skipped_status.sql
+supabase/migrations/20260704f_wealth_foundation.sql
+supabase/migrations/20260704g_research_proposals.sql
+supabase/migrations/20260704h_business_context.sql
+supabase/migrations/20260704i_income_growth_params.sql
 ```
 
 ## Tests

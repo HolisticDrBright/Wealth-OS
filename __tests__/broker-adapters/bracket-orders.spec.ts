@@ -9,7 +9,7 @@
  *   adapters that don't override them
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { AlpacaAdapter } from '@/lib/broker-adapters/adapters'
 import { CoinbaseAdapter } from '@/lib/broker-adapters/adapters'
 import { OandaAdapter } from '@/lib/broker-adapters/adapters'
@@ -94,7 +94,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
         { id: 'tp-id', order_type: 'limit' },
       ],
     })
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
 
     const params: BracketParams = {
       symbol: 'AAPL',
@@ -117,7 +117,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
   })
 
   it('returns failed when API returns error', async () => {
-    global.fetch = mockFetch({ message: 'insufficient funds' }, false, 422)
+    globalThis.fetch = mockFetch({ message: 'insufficient funds' }, false, 422)
 
     const result = await bracket(adapter, {
       symbol: 'AAPL', asset_class: 'stock', side: 'buy', quantity: 10,
@@ -138,7 +138,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
 
   it('cancelBracket sends DELETE to /v2/orders/:id', async () => {
     const fetchMock = mockFetch({}, true, 204)
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
     const result = await doCancel(adapter, 'order-123')
     expect(result.status).toBe('submitted')
     expect(fetchMock.mock.calls[0][0]).toContain('/v2/orders/order-123')
@@ -147,7 +147,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
 
   it('modifyStop sends PATCH with stop_price', async () => {
     const fetchMock = mockFetch({ id: 'stop-id' }, true)
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
     const result = await doStop(adapter, 'stop-id', 185)
     expect(result.status).toBe('submitted')
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
@@ -156,7 +156,7 @@ describe('AlpacaAdapter.placeBracketOrder', () => {
 
   it('modifyTarget sends PATCH with limit_price', async () => {
     const fetchMock = mockFetch({ id: 'tp-id' }, true)
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
     const result = await doTarget(adapter, 'tp-id', 225)
     expect(result.status).toBe('submitted')
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
@@ -174,7 +174,7 @@ describe('CoinbaseAdapter.placeBracketOrder', () => {
     adapter = new CoinbaseAdapter()
     setEnv(COINBASE_ENV)
     callCount = 0
-    global.fetch = vi.fn().mockImplementation(() => {
+    globalThis.fetch = vi.fn().mockImplementation(() => {
       callCount++
       return Promise.resolve({
         ok: true,
@@ -206,7 +206,7 @@ describe('CoinbaseAdapter.placeBracketOrder', () => {
   })
 
   it('returns failed if entry order fails', async () => {
-    global.fetch = vi.fn().mockResolvedValueOnce({
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
       ok: false,
       json: () => Promise.resolve({ error_response: { message: 'bad request' } }),
     })
@@ -233,7 +233,7 @@ describe('OandaAdapter.placeBracketOrder', () => {
     const fetchMock = mockFetch({
       orderFillTransaction: { tradeOpened: { tradeID: 'trade-123' } },
     })
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
 
     const result = await bracket(adapter, {
       symbol: 'EUR_USD',
@@ -255,7 +255,7 @@ describe('OandaAdapter.placeBracketOrder', () => {
 
   it('modifyStop updates stop via trade orders PUT', async () => {
     const fetchMock = mockFetch({ relatedTransactionIDs: ['tx-1'] })
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
 
     const result = await doStop(adapter, 'trade-123', 1.075)
     expect(result.status).toBe('submitted')
