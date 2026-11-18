@@ -23,7 +23,7 @@ function money(n: number): string {
   return `$${Math.round(Math.abs(n)).toLocaleString()}`
 }
 
-function exitPhrase(exitReason: string | null): string {
+export function exitPhrase(exitReason: string | null): string {
   switch (exitReason) {
     case 'stop_loss':      return 'it hit the loss limit set when it was bought'
     case 'take_profit':    return 'it reached its profit target'
@@ -33,7 +33,7 @@ function exitPhrase(exitReason: string | null): string {
   }
 }
 
-function isCostReason(reason: string | null): boolean {
+export function isCostReason(reason: string | null): boolean {
   if (!reason) return false
   const r = reason.toLowerCase()
   return r.includes('cost') || r.includes('fee') || r.includes('edge') || r.includes('slippage')

@@ -139,35 +139,20 @@ export async function flattenAndHalt(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, closed: 0, failures: [], error: 'not authenticated' }
 
-  // 1. Halt first — no new orders while we flatten.
-  const halt = await setTradingHalted(true, reason || 'manual Flatten & Halt')
-  if (!halt.ok) return { ok: false, closed: 0, failures: [], error: halt.error }
-
-  // 2. Close every open paper position via the runner's exit path.
-  const { PaperBroker } = await import('@/lib/paper-trading/PaperBroker')
-  const broker = new PaperBroker()
-  let closed = 0
-  let failures: string[] = []
-  try {
-    const res = await broker.flattenAllPositions(supabase, user.id, 'manual_flatten')
-    closed = res.closed
-    failures = res.failures
-  } catch (err) {
-    failures = [err instanceof Error ? err.message : 'flatten failed']
-  }
-
-  // 3. Audit trail — the halt itself is an auditable decision.
-  await supabase.from('audit_logs').insert({
-    user_id: user.id, strategy_key: 'flatten_halt', symbol: 'ALL',
-    decision: 'halt', size_fraction: 0, mirofish_used: false, kronos_used: false,
-    decided_at: new Date().toISOString(),
-    metadata: { reason: reason || 'manual Flatten & Halt', positions_closed: closed, failures },
-  }).then(() => {}, () => {})
+  // ONE pause implementation for web and mobile: halt flag FIRST, pending
+  // order intents cancelled, every open paper position closed through the
+  // runner's exit path, audit_logs row written.
+  const { pauseTradingCore } = await import('@/lib/simple/pause-core')
+  const result = await pauseTradingCore(supabase, user.id, {
+    sellExplore: true,
+    reason: reason || 'manual Flatten & Halt',
+  })
+  if (result.error) return { ok: false, closed: 0, failures: [], error: result.error }
 
   revalidatePath('/', 'layout')
   // Positions that could not be closed are reported, not hidden; the halt
   // flag is still set either way, so nothing new can open.
-  return { ok: failures.length === 0, closed, failures }
+  return { ok: result.ok, closed: result.closed, failures: result.failures }
 }
 
 /**

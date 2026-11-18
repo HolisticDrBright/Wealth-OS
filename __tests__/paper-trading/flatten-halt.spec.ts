@@ -132,14 +132,19 @@ describe('PaperBroker.flattenAllPositions', () => {
 describe('flattenAndHalt wiring (source contracts)', () => {
   const read = (p: string) => readFileSync(join(process.cwd(), ...p.split('/')), 'utf8')
 
-  it('the action halts FIRST, then flattens, then writes audit_logs', () => {
-    const src = read('lib/actions/risk-strip.ts')
-    const haltIdx = src.indexOf('setTradingHalted(true')
+  it('the shared pause core halts FIRST, then flattens, then writes audit_logs', () => {
+    const src = read('lib/simple/pause-core.ts')
+    const haltIdx = src.indexOf('setHaltFlag(supabase, userId, true')
     const flattenIdx = src.indexOf('flattenAllPositions(')
     const auditIdx = src.indexOf("from('audit_logs')")
     expect(haltIdx).toBeGreaterThan(-1)
     expect(flattenIdx).toBeGreaterThan(haltIdx)
     expect(auditIdx).toBeGreaterThan(flattenIdx)
+  })
+
+  it('the web action delegates to the shared pause core (one implementation)', () => {
+    const src = read('lib/actions/risk-strip.ts')
+    expect(src).toContain('pauseTradingCore')
   })
 
   it('the risk strip calls flattenAndHalt (not just the flag setter) and surfaces errors', () => {

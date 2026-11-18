@@ -20,6 +20,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
+  // API requests that carry a bearer token (the mobile app) authenticate at
+  // the handler, which fails closed on a bad token. The proxy's job is only
+  // to stop UNauthenticated cookie-session requests.
+  if (pathname.startsWith('/api/') && request.headers.get('authorization')?.startsWith('Bearer ')) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
