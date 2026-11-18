@@ -1,5 +1,89 @@
 # Wealth OS Changelog
 
+## 2026-11-18 — Safe-for-beginners program, web Phases 1–4
+
+Goal: make Wealth OS safe and usable for someone with no investing knowledge
+without removing professional features. Four phases, one commit each
+(e3d8e38, 7ef90d9, 8bc12a9, 3ddd01c). Suite green after each phase; `npx tsc
+--noEmit` added to CI.
+
+**Phase 1 — Fix what is broken** (e3d8e38)
+- Proxy exempts bearer-auth routes (`/api/cron`, `/api/internal/*`,
+  `/api/execute-copy-trades`) from the session redirect; other
+  unauthenticated `/api/*` requests get 401 JSON, not an HTML redirect.
+- Every cron task is a direct function call (`lib/cron/tasks.ts` + extracted
+  workers in `lib/workers/`): the credential-less HTTP self-fetches that
+  always failed auth (sync, copy, simulate, rebalance, harvest-scan,
+  sync-crypto, sync-forex, daily's kraken/oanda calls, daily-ops re-fetching
+  /api/cron) are gone, and every task reports a real success or failure.
+- Flatten & Halt actually closes open paper positions
+  (`PaperBroker.flattenAllPositions` via the runner's exit path), writes
+  audit_logs, and the dialog says exactly what happens (paper only; live out
+  of scope). Halt/resume failures are surfaced; a failed risk-data load
+  renders a visible "risk data unavailable" strip that keeps the halt button.
+- Added `app/(app)/loading.tsx`, `app/(app)/error.tsx`, `app/not-found.tsx`.
+- Fixed all test type errors; README (Next 16, port 3120, full migration
+  list + the CLI filename-pattern caveat) and the cron runbook now agree
+  with vercel.json.
+
+**Phase 2 — Onboarding and navigation** (7ef90d9)
+- Signup handles email confirmation ("check your email") and routes
+  immediate sessions to onboarding, never straight to /dashboard.
+- Goal-first onboarding: what the money is for → target amount/date →
+  monthly contribution → existing risk questions. Goal stored in the
+  existing `household_goals` table; /dashboard gated on
+  `user_risk_profile.onboarded_at`.
+- Landing "View Demo" (which bounced to login) replaced with Sign In.
+- Sidebar collapses to a drawer below md; Portfolio split into Portfolio +
+  Planning; orphaned /paper-trading and /settings/ai-features linked.
+
+**Phase 3 — Simple mode** (8bc12a9)
+- `ui_mode` ('simple' | 'pro') on `user_ui_prefs`; unset = pro (existing
+  users unchanged), onboarding writes simple for new users; toggle in the
+  risk strip.
+- Simple dashboard: total value + today/since-start changes + value chart;
+  goal progress with on-track/behind verdict and expected date; up to five
+  plain-English "what happened this week" sentences from real events; the
+  Command Center's decisions list. Pro mode renders the untouched Command
+  Center.
+- Risk in dollars ("in a bad year this plan could fall about $X") and the
+  goal projection both derive from the same 20y S&P monthly series the
+  planning Monte Carlo uses (`lib/planning/market-returns.ts`,
+  `lib/planning/goal-projection.ts`) — no new risk model.
+- Simple sidebar: Home, Goals, Portfolio, Activity, Explore, Settings.
+- `GlossaryTerm` tooltip component for finance terms in simple mode.
+
+**Phase 4 — Core and Explore** (3ddd01c)
+- Two sleeves on the existing `portfolio_sleeves` table (metadata.kind
+  core/explore); Core allocation chosen from the risk profile.
+- Explore cap: default 10% (`DEFAULT_EXPLORE_CAP_FRACTION`), pro-adjustable
+  up to `EXPLORE_CAP_HARD_MAX_FRACTION` (25%). Enforced pre-trade in the
+  paper runner and the copy-trade executor; breaches blocked + logged
+  (audit_logs `blocked_by: explore_cap`, `exploreCapBlocked` skip counter).
+  NOTE: this is the one sanctioned execution-path change during the burn-in
+  (owner-approved 2026-11-18); it only ever blocks trades.
+- Approval before automation (simple mode): follow trader, auto-copy,
+  enable strategy, execute rebalance all require an approved plain-language
+  summary, recorded in `automation_approvals`.
+- Copy guardrails: headline vs copier-adjusted results (real copied-trade
+  P&L when ≥5 copies, else labeled estimate: delay haircut
+  `COPY_DELAY_HAIRCUT_FRACTION` + venue round-trip costs × turnover);
+  Lower/Bigger swings pill; auto-copy locked behind a 30-day practice run
+  (`PAPER_COPY_PERIOD_DAYS`, enforced server-side in every mode); simple
+  mode ranks by adjusted result, never raw return.
+
+**New migrations** (apply via Supabase SQL editor, in order):
+- `20260704j_ui_mode.sql` — `user_ui_prefs.ui_mode`
+- `20260704k_automation_approvals.sql` — `automation_approvals` table
+
+**New env vars**: none. (CRON_SECRET / WEALTH_OS_API_KEY unchanged;
+NEXT_PUBLIC_SITE_URL is no longer used by the cron path at all.)
+
+**Not verifiable without live Supabase/broker credentials**: the end-to-end
+cron runs against the remote DB, Supabase email-confirmation delivery, the
+sleeve bootstrap + approval writes against remote RLS, and real copier
+P&L backfill (estimates render until ≥5 real copies exist per trader).
+
 ## 2026-07-04 — Advisory / R&D layer (P1–P3), burn-in untouched
 
 Three additive advisory/R&D features. HARD CONSTRAINT honored: zero diffs in
