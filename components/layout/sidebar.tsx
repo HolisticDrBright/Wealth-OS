@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { UiMode } from '@/lib/actions/ui-prefs'
 
 // ─── Navigation model ───────────────────────────────────────────────────────
 // Phase 2.4: the old Portfolio group is split into "Portfolio" (holdings and
@@ -86,6 +87,16 @@ const NAV: NavNode[] = [
   { href: '/alerts', label: 'Alerts', icon: Bell },
 ]
 
+// Phase 3.3: simple mode shows ONLY these six destinations. Everything else
+// stays reachable in pro mode.
+const SIMPLE_NAV: NavNode[] = [
+  { href: '/dashboard',     label: 'Home',      icon: Home },
+  { href: '/advisor',       label: 'Goals',     icon: Target },
+  { href: '/portfolio',     label: 'Portfolio', icon: TrendingUp },
+  { href: '/paper-trading', label: 'Activity',  icon: Activity },
+  { href: '/traders',       label: 'Explore',   icon: Users },
+]
+
 const ACTIVE_STYLE = {
   background: 'color-mix(in oklch, var(--color-accent-cyan) 8%, transparent)',
   boxShadow: 'inset 3px 0 0 var(--color-accent-cyan), 0 0 12px color-mix(in oklch, var(--color-accent-cyan) 20%, transparent)',
@@ -96,10 +107,10 @@ function pathActive(pathname: string, href: string): boolean {
 }
 
 /** Desktop rail: hidden below md (the drawer takes over there). */
-export function Sidebar() {
+export function Sidebar({ uiMode = 'pro' }: { uiMode?: UiMode }) {
   return (
     <aside className="hidden h-screen w-64 flex-col border-r border-white/10 bg-[#0a0b0f] md:flex">
-      <SidebarContent />
+      <SidebarContent uiMode={uiMode} />
     </aside>
   )
 }
@@ -108,7 +119,7 @@ export function Sidebar() {
  * Mobile navigation (below md): a slim top bar with a menu button that opens
  * the same navigation as a slide-over drawer.
  */
-export function MobileNav() {
+export function MobileNav({ uiMode = 'pro' }: { uiMode?: UiMode }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="md:hidden">
@@ -129,7 +140,7 @@ export function MobileNav() {
       {open && (
         <div className="fixed inset-0 z-50 flex">
           <aside className="flex h-full w-72 max-w-[85vw] flex-col border-r border-white/10 bg-[#0a0b0f]">
-            <SidebarContent onNavigate={() => setOpen(false)} />
+            <SidebarContent uiMode={uiMode} onNavigate={() => setOpen(false)} />
           </aside>
           <button
             aria-label="Close navigation menu"
@@ -149,8 +160,9 @@ export function MobileNav() {
   )
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ uiMode = 'pro', onNavigate }: { uiMode?: UiMode; onNavigate?: () => void }) {
   const pathname = usePathname()
+  const nav = uiMode === 'simple' ? SIMPLE_NAV : NAV
 
   // A group starts expanded when it contains (or is) the active route.
   const groupContainsActive = (g: NavGroup) =>
@@ -159,7 +171,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
-    for (const n of NAV) if (isGroup(n)) init[n.label] = groupContainsActive(n)
+    for (const n of nav) if (isGroup(n)) init[n.label] = groupContainsActive(n)
     return init
   })
 
@@ -180,7 +192,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-        {NAV.map(node => {
+        {nav.map(node => {
           if (!isGroup(node)) {
             const active = pathActive(pathname, node.href)
             return <TopLink key={node.href} href={node.href} label={node.label} icon={node.icon} active={active} onNavigate={onNavigate} />
@@ -251,8 +263,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* Footer */}
       <div className="space-y-0.5 border-t border-white/10 px-3 py-4">
         <FooterLink href="/settings" label="Settings" icon={Settings} onNavigate={onNavigate} />
-        <FooterLink href="/settings/ai-features" label="AI Features" icon={Sparkles} onNavigate={onNavigate} />
-        <FooterLink href="/settings/integrations" label="Integrations" icon={Settings} dim onNavigate={onNavigate} />
+        {uiMode !== 'simple' && (
+          <>
+            <FooterLink href="/settings/ai-features" label="AI Features" icon={Sparkles} onNavigate={onNavigate} />
+            <FooterLink href="/settings/integrations" label="Integrations" icon={Settings} dim onNavigate={onNavigate} />
+          </>
+        )}
         <form action="/auth/signout" method="post">
           <button
             type="submit"

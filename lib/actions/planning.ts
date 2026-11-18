@@ -12,6 +12,7 @@ import { getFinancialProfile } from '@/lib/actions/advisory'
 import {
   runPlanningMonteCarlo, planningRecommendationDelta, type PlanningInput,
 } from '@/lib/planning/monte-carlo'
+import { fetchSpxMonthlyReturns } from '@/lib/planning/market-returns'
 import type { Recommendation } from '@/lib/advisory/types'
 
 export interface PlanningView {
@@ -25,30 +26,8 @@ export interface PlanningView {
   deltas: Array<{ ruleId: string; title: string; deltaPct: number }>
 }
 
-let _monthlyCache: { returns: number[]; at: number } | null = null
-
-async function fetchSpxMonthlyReturns(): Promise<number[]> {
-  if (_monthlyCache && Date.now() - _monthlyCache.at < 86_400_000) return _monthlyCache.returns
-  try {
-    const res = await fetch(
-      'https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1mo&range=20y',
-      { signal: AbortSignal.timeout(8_000) }
-    )
-    if (!res.ok) return []
-    const data: unknown = await res.json()
-    const result = ((data as Record<string, unknown>)?.chart as Record<string, unknown>)?.result as unknown[]
-    const quote = (((result?.[0] as Record<string, unknown>)?.indicators as Record<string, unknown>)
-      ?.quote as unknown[])?.[0] as Record<string, unknown>
-    const closes = (quote?.close as Array<number | null> | undefined ?? [])
-      .filter((c): c is number => typeof c === 'number' && c > 0)
-    const returns: number[] = []
-    for (let i = 1; i < closes.length; i++) returns.push(closes[i] / closes[i - 1] - 1)
-    if (returns.length >= 60) _monthlyCache = { returns, at: Date.now() }
-    return returns
-  } catch {
-    return []
-  }
-}
+// Historical market returns live in lib/planning/market-returns.ts (shared
+// with goal projection and the simple dashboard — one series everywhere).
 
 export async function getPlanningView(
   recommendations: Array<Pick<Recommendation, 'ruleId' | 'title' | 'estimatedAnnualBenefitUsd' | 'grade'>>

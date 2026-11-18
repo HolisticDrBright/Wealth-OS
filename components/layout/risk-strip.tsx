@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { AlertOctagon, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -17,6 +18,7 @@ import {
   type RiskStripData, type HaltImpact,
 } from '@/lib/actions/risk-strip'
 import { DensityToggle } from '@/components/layout/density-provider'
+import { setUiMode, type UiMode } from '@/lib/actions/ui-prefs'
 
 const POLL_MS = 30_000
 const RESUME_PHRASE = 'RESUME TRADING'
@@ -27,7 +29,28 @@ function fmtUsd(n: number): string {
   return n < 0 ? `−${s}` : s
 }
 
-export function RiskStrip() {
+/** Phase 3.1: Simple/Pro switch lives in the always-visible risk strip. */
+function ModeToggle({ uiMode }: { uiMode: UiMode }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const next: UiMode = uiMode === 'simple' ? 'pro' : 'simple'
+  return (
+    <button
+      onClick={async () => {
+        setBusy(true)
+        try { await setUiMode(next); router.refresh() } finally { setBusy(false) }
+      }}
+      disabled={busy}
+      aria-label={`Switch to ${next} mode`}
+      title={uiMode === 'simple' ? 'Show the full pro dashboard' : 'Show the simple view'}
+      className="rounded border border-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-40"
+    >
+      {uiMode === 'simple' ? 'Simple' : 'Pro'}
+    </button>
+  )
+}
+
+export function RiskStrip({ uiMode = 'pro' }: { uiMode?: UiMode }) {
   const [data, setData] = useState<RiskStripData | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -194,6 +217,7 @@ export function RiskStrip() {
       {actionError && !confirming && <span className="text-red-400">{actionError}</span>}
 
       <span className="ml-auto flex items-center gap-2">
+        <ModeToggle uiMode={uiMode} />
         <DensityToggle />
         {halted ? (
           <span className="flex items-center gap-1.5">

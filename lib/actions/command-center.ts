@@ -319,6 +319,16 @@ async function loadTrust(): Promise<TrustView> {
   }
 }
 
+/**
+ * The decisions list alone (Phase 3.2d) — the simple dashboard's "Needs your
+ * decision" block reuses the EXACT list the Command Center shows, without
+ * loading the other 14 panels.
+ */
+export async function getDecisionItems(): Promise<DecisionItem[]> {
+  const [trust, riskControls] = await Promise.all([loadTrust(), loadRiskControls()])
+  return loadDecisions(trust, riskControls)
+}
+
 async function loadDecisions(
   trust: TrustView,
   riskControls: RiskControlsView | null,

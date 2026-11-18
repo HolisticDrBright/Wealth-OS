@@ -174,6 +174,6 @@ describe('sidebar navigation', () => {
     expect(src).toContain('hidden h-screen w-64 flex-col border-r border-white/10 bg-[#0a0b0f] md:flex')
     expect(src).toContain('MobileNav')
     const layout = read('app/(app)/layout.tsx')
-    expect(layout).toContain('<MobileNav />')
+    expect(layout).toMatch(/<MobileNav[ />]/)
   })
 })

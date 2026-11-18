@@ -20,6 +20,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveOnboardedProfile, saveStateOfResidence } from '@/lib/actions/risk-profile'
 import { saveOnboardingGoal } from '@/lib/actions/onboarding'
+import { setUiMode } from '@/lib/actions/ui-prefs'
 import type { ProfileKey } from '@/lib/strategies/profile-params'
 import type { HouseholdGoal } from '@/lib/types'
 
@@ -170,6 +171,9 @@ export default function RiskProfileWizard() {
         setSaveError(profileRes.error)
         return
       }
+      // New users start in Simple mode (existing users keep Pro — their
+      // ui_mode is unset and reads as 'pro').
+      await setUiMode('simple').catch(() => ({ ok: false }))
       setConfirmed(true)
       setTimeout(() => router.push('/dashboard'), 1200)
     })

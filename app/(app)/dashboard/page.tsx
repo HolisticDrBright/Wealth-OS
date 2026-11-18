@@ -8,6 +8,8 @@ import { BriefPanel } from '@/components/wealth/BriefPanel'
 import { getCommandCenterData } from '@/lib/actions/command-center'
 import { getWealthBrief } from '@/lib/actions/wealth-brief'
 import { isOnboarded } from '@/lib/actions/onboarding'
+import { getUiMode } from '@/lib/actions/ui-prefs'
+import { SimpleDashboard } from './simple-dashboard'
 
 const REGIME_BADGE: Record<
   string,
@@ -23,6 +25,17 @@ export default async function DashboardPage() {
   // Goal-first onboarding gate: first-time users set a goal + risk profile
   // before they ever see the dashboard.
   if (!(await isOnboarded())) redirect('/onboarding/risk-profile')
+
+  // Simple mode (Phase 3.2): exactly four things. The 15-panel Command
+  // Center below is untouched and renders in pro mode.
+  if ((await getUiMode()) === 'simple') {
+    return (
+      <div>
+        <Topbar title="Home" subtitle="Your money, in plain English" />
+        <SimpleDashboard />
+      </div>
+    )
+  }
 
   const [data, brief] = await Promise.all([
     getCommandCenterData(),

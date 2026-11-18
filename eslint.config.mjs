@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // apps/mobile has its own toolchain (Expo + its own eslint config).
+    "apps/mobile/**",
   ]),
   {
     // Advisory rules must NEVER hardcode dollar limits, rates, or thresholds —
