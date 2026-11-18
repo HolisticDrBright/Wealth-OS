@@ -22,7 +22,28 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const { execute = false, threshold_pct = 5 } = body
 
-  const result = await runRebalanceScan(createAdminClient(), userId, {
+  const supabase = createAdminClient()
+
+  // Phase 4.3: in simple mode, EXECUTING a rebalance requires an explicitly
+  // approved plain-language summary, which is recorded. Suggestion-only scans
+  // (execute: false) never need approval.
+  if (execute) {
+    const approvedSummary = typeof body.approved_summary === 'string' ? body.approved_summary.trim() : ''
+    const { data: pref } = await supabase
+      .from('user_ui_prefs').select('ui_mode').eq('user_id', userId).maybeSingle()
+    const simpleMode = (pref?.ui_mode as string | undefined) === 'simple'
+    if (simpleMode && !approvedSummary) {
+      return apiError('approval_required: confirm the plain-language summary before executing a rebalance', 400)
+    }
+    if (approvedSummary) {
+      const { error: apprErr } = await supabase.from('automation_approvals').insert({
+        user_id: userId, kind: 'accept_rebalance', subject: 'rebalance', summary: approvedSummary,
+      })
+      if (apprErr && simpleMode) return apiError(`could not record approval: ${apprErr.message}`, 500)
+    }
+  }
+
+  const result = await runRebalanceScan(supabase, userId, {
     executeTrades: execute,
     thresholdPct: threshold_pct,
   })

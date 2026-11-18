@@ -79,6 +79,7 @@ export interface SkipCounts {
   profileBlocked: number
   venueBlocked: number
   positionCapBlocked: number
+  exploreCapBlocked: number
   liquidityBlocked: number
   strategyDisabled: number
   strategyImmature: number
@@ -90,6 +91,7 @@ export function emptySkipCounts(): SkipCounts {
   return {
     alreadyOpen: 0, missingPrice: 0, expiredMarket: 0, resolvedMarket: 0,
     riskBlocked: 0, profileBlocked: 0, venueBlocked: 0, positionCapBlocked: 0,
+    exploreCapBlocked: 0,
     liquidityBlocked: 0, strategyDisabled: 0, strategyImmature: 0, noSize: 0, other: 0,
   }
 }

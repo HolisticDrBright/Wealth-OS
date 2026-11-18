@@ -22,6 +22,12 @@ vi.mock('@/lib/strategies/all-pipeline-strategies', () => ({
   strategyRegistry: new Map(),
 }))
 
+// ── Explore cap mock (cap behavior has its own suite in __tests__/explore) ───
+vi.mock('@/lib/explore/cap', () => ({
+  exploreCapAllows: async () => ({ allowed: true, usage: {} }),
+  logExploreCapBlock: async () => {},
+}))
+
 // ── CIO engine mock ───────────────────────────────────────────────────────────
 const mockDecide = vi.fn()
 vi.mock('@/lib/agents/cio-decision-engine', () => ({

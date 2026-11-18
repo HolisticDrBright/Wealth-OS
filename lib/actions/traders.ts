@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { Trader, UserCopiedPosition } from '@/lib/types'
+import { recordAutomationApproval, approvalRequired } from '@/lib/actions/automation-approvals'
+import { practiceRunProgress, PAPER_COPY_PERIOD_DAYS } from '@/lib/explore/copier-results'
 
 export async function getTraders(assetClass?: string): Promise<Trader[]> {
   const supabase = await createClient()
@@ -61,10 +63,27 @@ export async function getTraderWithTrades(traderId: string) {
   return { ...trader, follow_settings: follow ?? null, trades: trades ?? [] }
 }
 
-export async function followTrader(traderId: string) {
+export async function followTrader(
+  traderId: string,
+  approval?: { summary: string }
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  // Phase 4.3: in simple mode nothing new starts trading automatically —
+  // following requires an explicitly approved plain-language summary.
+  if (await approvalRequired()) {
+    if (!approval?.summary?.trim()) {
+      return { error: 'approval_required: confirm the plain-language summary before following' }
+    }
+    const rec = await recordAutomationApproval({
+      kind: 'follow_trader', subject: traderId, summary: approval.summary,
+    })
+    if (!rec.ok) return { error: rec.error ?? 'could not record approval' }
+  } else if (approval?.summary?.trim()) {
+    await recordAutomationApproval({ kind: 'follow_trader', subject: traderId, summary: approval.summary })
+  }
 
   const { error } = await supabase.from('user_followed_traders').insert({
     user_id: user.id,
@@ -107,11 +126,43 @@ export async function updateCopySettings(
     risk_level?: string
     max_daily_copy_usd?: number | null
     copy_asset_classes?: string[]
-  }
+  },
+  approval?: { summary: string }
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  // Phase 4.4: auto-copy is locked behind the paper-copy practice run —
+  // PAPER_COPY_PERIOD_DAYS days of following before real auto-copy, in
+  // EVERY mode. Phase 4.3: simple mode also needs an approved summary.
+  if (settings.auto_copy_enabled === true) {
+    const { data: follow } = await supabase
+      .from('user_followed_traders')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .eq('trader_id', traderId)
+      .maybeSingle()
+    if (!follow) return { error: 'follow this trader first' }
+    const run = practiceRunProgress(follow.created_at as string | null)
+    if (!run || !run.complete) {
+      return {
+        error: `practice_run_incomplete: day ${run?.dayN ?? 1} of ${PAPER_COPY_PERIOD_DAYS} — ` +
+          `auto-copy unlocks when the practice run finishes`,
+      }
+    }
+    if (await approvalRequired()) {
+      if (!approval?.summary?.trim()) {
+        return { error: 'approval_required: confirm the plain-language summary before turning on auto-copy' }
+      }
+      const rec = await recordAutomationApproval({
+        kind: 'auto_copy', subject: traderId, summary: approval.summary,
+      })
+      if (!rec.ok) return { error: rec.error ?? 'could not record approval' }
+    } else if (approval?.summary?.trim()) {
+      await recordAutomationApproval({ kind: 'auto_copy', subject: traderId, summary: approval.summary })
+    }
+  }
 
   const { error } = await supabase
     .from('user_followed_traders')

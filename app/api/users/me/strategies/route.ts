@@ -72,6 +72,8 @@ export async function PUT(req: NextRequest) {
     is_enabled?: boolean
     allocation_pct?: number
     paper_enabled?: boolean
+    /** Phase 4.3: the plain-language summary the user explicitly approved. */
+    approved_summary?: string
   }
 
   if (!body.strategy_key || !isStrategyKey(body.strategy_key)) {
@@ -83,6 +85,31 @@ export async function PUT(req: NextRequest) {
 
   if (typeof body.is_enabled !== 'boolean' && typeof body.paper_enabled !== 'boolean') {
     return NextResponse.json({ error: 'is_enabled or paper_enabled (boolean) is required' }, { status: 400 })
+  }
+
+  // Phase 4.3: in simple mode, ENABLING a strategy requires an explicitly
+  // approved plain-language summary, which is recorded. Disabling is always
+  // allowed. Pro mode records an approval when one is supplied.
+  const enabling = body.is_enabled === true || body.paper_enabled === true
+  if (enabling) {
+    const { data: pref } = await supabase
+      .from('user_ui_prefs').select('ui_mode').eq('user_id', userId).maybeSingle()
+    const simpleMode = (pref?.ui_mode as string | undefined) === 'simple'
+    if (simpleMode && !body.approved_summary?.trim()) {
+      return NextResponse.json(
+        { error: 'approval_required: confirm the plain-language summary before enabling this strategy' },
+        { status: 400 }
+      )
+    }
+    if (body.approved_summary?.trim()) {
+      const { error: apprErr } = await supabase.from('automation_approvals').insert({
+        user_id: userId, kind: 'enable_strategy', subject: body.strategy_key,
+        summary: body.approved_summary,
+      })
+      if (apprErr && simpleMode) {
+        return NextResponse.json({ error: `could not record approval: ${apprErr.message}` }, { status: 500 })
+      }
+    }
   }
 
 

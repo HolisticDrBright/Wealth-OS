@@ -22,6 +22,7 @@ import {
 } from '@/lib/brokers/asset-broker-routing'
 import { getBroker, type BrokerCache } from '@/lib/brokers/BrokerFactory'
 import { preExecutionGuard, DEFAULT_MANUAL_EDGE } from '@/lib/broker-adapters/execution-guard'
+import { exploreCapAllows, logExploreCapBlock } from '@/lib/explore/cap'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -301,6 +302,22 @@ export async function runCopyTradeExecution(supabase: AdminClient): Promise<Copy
         errors.push(`${trade.symbol}: blocked — ${guard.reason}`)
         await supabase.from('user_copied_positions')
           .update({ status: 'failed', error_message: `blocked: ${guard.reason}` })
+          .eq('id', pos.id)
+        continue
+      }
+
+      // Explore cap (Phase 4.2): copy trades are Explore-sleeve activity.
+      // A copy that would push Explore usage over the cap is blocked and
+      // logged like every other pre-trade block.
+      const exploreGate = await exploreCapAllows(supabase, userId, approvedNotional)
+      if (!exploreGate.allowed) {
+        errors.push(`${trade.symbol}: blocked — ${exploreGate.reason}`)
+        await logExploreCapBlock(supabase, userId, {
+          strategyKey: 'copy_trade', symbol: trade.symbol,
+          reason: exploreGate.reason ?? 'explore_cap', route: 'copy-trade-executor',
+        })
+        await supabase.from('user_copied_positions')
+          .update({ status: 'failed', error_message: `blocked: ${exploreGate.reason}` })
           .eq('id', pos.id)
         continue
       }

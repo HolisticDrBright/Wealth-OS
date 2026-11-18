@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { exploreCapAllows, logExploreCapBlock } from '@/lib/explore/cap'
 import { ALL_STRATEGIES } from '@/lib/strategies/all-pipeline-strategies'
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
 import { PaperBroker } from './PaperBroker'
@@ -199,6 +200,25 @@ export async function runPaperTradingPass(
           const gatedSize = bookGate.multiplier < 1
             ? { ...decision.size, notionalUsd: sizedNotional, rationale: `${decision.size.rationale} | ${bookGate.reason}` }
             : decision.size
+
+          // Explore cap (Phase 4.2): ALL strategy activity lives in the
+          // Explore sleeve. An order that would push Explore usage over the
+          // cap is blocked and logged like every other pre-trade block.
+          const exploreGate = await exploreCapAllows(supabase, userId, gatedSize.notionalUsd)
+          if (!exploreGate.allowed) {
+            skipped.exploreCapBlocked++
+            skippedDetails.push(skipDetail(
+              key, opp.symbol, opp.assetClass, 'exploreCapBlocked',
+              exploreGate.reason ?? 'Explore limit reached.',
+              opp.direction, opp.id,
+            ))
+            logExploreCapBlock(supabase, userId, {
+              strategyKey: key, symbol: opp.symbol,
+              reason: exploreGate.reason ?? 'explore_cap', route: 'paper-runner',
+            }).catch(() => {})
+            shadow.track(opp, 'positionCapBlocked', exploreGate.reason ?? null, userId, supabase).catch(() => {})
+            continue
+          }
 
           const fill = await broker.fill(opp, gatedSize, userId, supabase)
 

@@ -27,6 +27,7 @@ function makeChain(table: string) {
     chain[m] = () => chain
   }
   chain.single = async () => ({ data: rows[0] ?? null, error: null })
+  chain.maybeSingle = async () => ({ data: rows[0] ?? null, error: null })
   chain.insert = (row: Record<string, unknown> | Array<Record<string, unknown>>) => {
     const first = Array.isArray(row) ? row[0] : row
     dbState.writes.push({ table, op: 'insert', row: first })
