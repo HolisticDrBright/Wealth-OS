@@ -58,7 +58,7 @@ export function Pill({ tone = 'neutral', children }: { tone?: PillTone; children
   const t = PILL_TONES[tone]
   return (
     <View className={`rounded-pill px-2 py-0.5 ${t.bg}`}>
-      <Text className={`font-inter-semibold text-[12px] ${t.text}`}>{children}</Text>
+      <Text className={`font-inter-semibold text-[13px] ${t.text}`}>{children}</Text>
     </View>
   )
 }
@@ -67,7 +67,7 @@ export function Pill({ tone = 'neutral', children }: { tone?: PillTone; children
 export function PracticeBadge() {
   return (
     <View className="rounded-[5px] bg-practice-bg px-[7px] py-[3px]">
-      <Text className="font-inter-bold text-[11px] tracking-wider text-practice">PRACTICE MONEY</Text>
+      <Text className="font-inter-bold text-[13px] tracking-wider text-practice">PRACTICE MONEY</Text>
     </View>
   )
 }

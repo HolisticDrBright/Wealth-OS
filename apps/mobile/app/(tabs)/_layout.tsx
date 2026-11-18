@@ -8,6 +8,7 @@
 
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '@/src/theme'
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name']
@@ -23,6 +24,7 @@ const TABS: { name: string; title: string; icon: IoniconsName; activeIcon: Ionic
 const LEGACY_HIDDEN = ['feed', 'traders', 'portfolio', 'alerts', 'profile']
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets()
   return (
     <Tabs
       screenOptions={{
@@ -32,10 +34,12 @@ export default function TabLayout() {
           backgroundColor: colors.ground,
           borderTopColor: colors.stroke,
           borderTopWidth: 1,
-          height: 88,
-          paddingBottom: 24,
-          paddingTop: 8,
+          // Safe-area driven, not a fixed height: min 56pt row + the inset.
+          minHeight: 56 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingTop: 6,
         },
+        tabBarAllowFontScaling: true,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.inkMuted,
         tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },

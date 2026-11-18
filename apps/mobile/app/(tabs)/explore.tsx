@@ -44,7 +44,7 @@ function TraderCard({ t, onTry, onStop }: { t: ExploreTrader; onTry: () => void;
     <Card className="gap-3">
       <View className="flex-row items-center justify-between gap-3">
         <View className="flex-1 gap-0.5">
-          <Text className="font-inter-semibold text-[15px] text-ink" numberOfLines={1}>{t.name}</Text>
+          <Text className="font-inter-semibold text-[15px] text-ink">{t.name}</Text>
           <Text className="font-inter text-[13px] text-ink-secondary">{MARKET_LABEL[t.assetClass] ?? t.assetClass}</Text>
         </View>
         <Pill tone={t.swing === 'bigger' ? 'loss' : 'neutral'}>

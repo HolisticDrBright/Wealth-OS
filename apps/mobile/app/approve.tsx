@@ -68,7 +68,7 @@ export default function ApproveScreen() {
         >
           <Ionicons name="close" size={22} color={colors.ink} />
         </Pressable>
-        <Text className="font-inter-semibold text-[12px] tracking-wider text-accent-text">NEEDS YOUR DECISION</Text>
+        <Text className="font-inter-semibold text-[13px] tracking-wider text-accent-text">NEEDS YOUR DECISION</Text>
       </View>
 
       {loading && !data ? (

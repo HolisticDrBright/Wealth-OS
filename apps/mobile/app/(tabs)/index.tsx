@@ -73,8 +73,8 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-ground" edges={['top']}>
       {/* Header: never hides the practice badge while in paper mode */}
       <View className="flex-row items-center justify-between px-screen pb-3 pt-2">
-        <View className="flex-row items-center gap-2.5">
-          <Text className="font-inter-bold text-[17px] text-ink">Wealth OS</Text>
+        <View className="flex-1 flex-row flex-wrap items-center gap-2.5 pr-3">
+          <Text accessibilityRole="header" className="font-inter-bold text-[17px] text-ink">Wealth OS</Text>
           {(data?.practiceMode ?? true) && <PracticeBadge />}
         </View>
         <Pressable
@@ -119,7 +119,7 @@ export default function HomeScreen() {
             >
               <Card className="gap-2.5">
                 <View className="flex-row items-center justify-between">
-                  <Text className="flex-1 font-inter-semibold text-[15px] text-ink" numberOfLines={2}>{data.goal.name}</Text>
+                  <Text className="flex-1 font-inter-semibold text-[15px] text-ink">{data.goal.name}</Text>
                   <GoalPill status={data.goal.status} />
                 </View>
                 <ProgressBar fraction={data.goal.fraction} label={`${Math.round(data.goal.fraction * 100)}% of your goal saved`} />
@@ -150,7 +150,7 @@ export default function HomeScreen() {
             >
               <Card tint="accent" className="flex-row items-center gap-3">
                 <View className="flex-1 gap-1">
-                  <Text className="font-inter-semibold text-[12px] tracking-wider text-accent-text">NEEDS YOUR DECISION</Text>
+                  <Text className="font-inter-semibold text-[13px] tracking-wider text-accent-text">NEEDS YOUR DECISION</Text>
                   <Text className="font-inter-semibold text-[15px] text-ink">{data.decision.title}</Text>
                   <Text className="font-inter text-[13px] text-ink-secondary">{data.decision.subtitle}</Text>
                 </View>
