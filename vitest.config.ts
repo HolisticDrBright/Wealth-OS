@@ -6,7 +6,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['**/*.spec.ts', '**/*.test.ts'],
-    exclude: ['node_modules', '.next'],
+    // Glob patterns — bare names only match top-level, which let vitest crawl
+    // into apps/mobile/node_modules. apps/mobile has its own toolchain.
+    exclude: ['**/node_modules/**', '**/.next/**', '**/.expo/**', 'apps/mobile/**'],
     coverage: { provider: 'v8', reporter: ['text', 'lcov'] },
   },
   resolve: {

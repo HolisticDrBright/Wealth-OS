@@ -13,7 +13,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [checkEmail, setCheckEmail] = useState(false)
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -21,29 +21,38 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
     })
     if (error) {
       setError(error.message)
+    } else if (!data.session) {
+      // Email confirmation is on: no session yet — tell them to check their inbox.
+      setCheckEmail(true)
     } else {
-      setSuccess(true)
-      setTimeout(() => router.push('/dashboard'), 2000)
+      // Signed in immediately: first-time users go to onboarding, not the dashboard.
+      router.push('/onboarding/risk-profile')
     }
     setLoading(false)
   }
 
-  if (success) {
+  if (checkEmail) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#07080c] px-4">
-        <div className="text-center">
+        <div className="max-w-sm text-center">
           <div className="mb-4 flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-emerald-500/20">
-            <span className="text-3xl">🎉</span>
+            <span className="text-3xl">✉️</span>
           </div>
-          <h2 className="text-xl font-bold text-white">Account Created!</h2>
-          <p className="mt-2 text-sm text-gray-400">Redirecting to your dashboard...</p>
+          <h2 className="text-xl font-bold text-white">Check your email</h2>
+          <p className="mt-2 text-sm text-gray-400">
+            We sent a confirmation link to <span className="text-white">{email}</span>.
+            Open it to activate your account, then sign in — we&apos;ll set up your first goal from there.
+          </p>
+          <Link href="/login" className="mt-6 inline-block text-sm text-indigo-400 hover:text-indigo-300">
+            Go to sign in
+          </Link>
         </div>
       </div>
     )

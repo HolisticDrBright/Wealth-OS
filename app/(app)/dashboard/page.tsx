@@ -1,11 +1,13 @@
 export const dynamic = 'force-dynamic'
 
+import { redirect } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { Badge } from '@/components/ui/badge'
 import { DashboardClient } from './dashboard-client'
 import { BriefPanel } from '@/components/wealth/BriefPanel'
 import { getCommandCenterData } from '@/lib/actions/command-center'
 import { getWealthBrief } from '@/lib/actions/wealth-brief'
+import { isOnboarded } from '@/lib/actions/onboarding'
 
 const REGIME_BADGE: Record<
   string,
@@ -18,6 +20,10 @@ const REGIME_BADGE: Record<
 }
 
 export default async function DashboardPage() {
+  // Goal-first onboarding gate: first-time users set a goal + risk profile
+  // before they ever see the dashboard.
+  if (!(await isOnboarded())) redirect('/onboarding/risk-profile')
+
   const [data, brief] = await Promise.all([
     getCommandCenterData(),
     getWealthBrief().catch(() => null),

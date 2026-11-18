@@ -49,10 +49,10 @@ export default function LandingPage() {
             Start for Free <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            href="/dashboard"
+            href="/login"
             className="flex items-center gap-2 rounded-xl border border-white/20 px-6 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 transition-colors"
           >
-            View Demo
+            Sign In
           </Link>
         </div>
       </section>

@@ -8,15 +8,16 @@ import {
   DollarSign, Users, Zap, Activity, Lightbulb, ShieldAlert, Bell, RefreshCw,
   PiggyBank, ShoppingCart, BarChart2, Bitcoin, Globe, Scale, ListChecks, Leaf,
   Store, FlaskConical, Home, Briefcase, Layers, Sigma, Brain, Wallet, Target,
-  FileText, CandlestickChart, Crosshair, Ghost, type LucideIcon,
+  FileText, CandlestickChart, Crosshair, Ghost, Menu, X, Sparkles, NotebookPen,
+  type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Navigation model ───────────────────────────────────────────────────────
-// Seven top-level areas (Command Center, Portfolio, Opportunities, Strategies,
-// Risk Room, Learning, Settings) plus a Markets group. Secondary routes are
-// nested under collapsible sections so the rail stays uncluttered — every
-// existing route remains reachable.
+// Phase 2.4: the old Portfolio group is split into "Portfolio" (holdings and
+// trading) and "Planning" (budget, planning, retirement, tax, household), the
+// orphaned /paper-trading and /settings/ai-features pages are linked, and the
+// whole rail collapses to a drawer below the md breakpoint.
 
 interface NavLeaf { href: string; label: string; icon: LucideIcon }
 interface NavGroup { label: string; icon: LucideIcon; href?: string; children: NavLeaf[] }
@@ -31,15 +32,20 @@ const NAV: NavNode[] = [
   {
     label: 'Portfolio', icon: TrendingUp, href: '/portfolio',
     children: [
-      { href: '/budget', label: 'Budget', icon: Wallet },
-      { href: '/planning', label: 'Wealth Planning', icon: Target },
       { href: '/rebalance', label: 'Rebalance', icon: RefreshCw },
+      { href: '/sleeves', label: 'Sleeves', icon: Layers },
+      { href: '/paper-trading', label: 'Paper Trading', icon: NotebookPen },
+      { href: '/advisor', label: 'Advisor', icon: Briefcase },
+    ],
+  },
+  {
+    label: 'Planning', icon: Target, href: '/planning',
+    children: [
+      { href: '/budget', label: 'Budget', icon: Wallet },
       { href: '/retirement', label: 'Retirement', icon: PiggyBank },
       { href: '/tax', label: 'Tax Advisor', icon: FileText },
       { href: '/tax/harvest', label: 'Tax Harvest', icon: Leaf },
       { href: '/household', label: 'Family Office', icon: Home },
-      { href: '/advisor', label: 'Advisor', icon: Briefcase },
-      { href: '/sleeves', label: 'Sleeves', icon: Layers },
     ],
   },
   {
@@ -89,7 +95,61 @@ function pathActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/')
 }
 
+/** Desktop rail: hidden below md (the drawer takes over there). */
 export function Sidebar() {
+  return (
+    <aside className="hidden h-screen w-64 flex-col border-r border-white/10 bg-[#0a0b0f] md:flex">
+      <SidebarContent />
+    </aside>
+  )
+}
+
+/**
+ * Mobile navigation (below md): a slim top bar with a menu button that opens
+ * the same navigation as a slide-over drawer.
+ */
+export function MobileNav() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="md:hidden">
+      <div className="flex items-center gap-3 border-b border-white/10 bg-[#0a0b0f] px-4 py-2.5">
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Open navigation menu"
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 text-gray-300 hover:bg-white/5"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
+          <DollarSign className="h-4 w-4 text-white" />
+        </div>
+        <span className="text-sm font-bold text-white">Wealth OS</span>
+      </div>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex">
+          <aside className="flex h-full w-72 max-w-[85vw] flex-col border-r border-white/10 bg-[#0a0b0f]">
+            <SidebarContent onNavigate={() => setOpen(false)} />
+          </aside>
+          <button
+            aria-label="Close navigation menu"
+            onClick={() => setOpen(false)}
+            className="flex-1 bg-black/60"
+          />
+          <button
+            aria-label="Close navigation menu"
+            onClick={() => setOpen(false)}
+            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-lg bg-white/10 text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
 
   // A group starts expanded when it contains (or is) the active route.
@@ -106,7 +166,7 @@ export function Sidebar() {
   const toggle = (label: string) => setOpen(o => ({ ...o, [label]: !o[label] }))
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-white/10 bg-[#0a0b0f]">
+    <>
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600">
@@ -123,7 +183,7 @@ export function Sidebar() {
         {NAV.map(node => {
           if (!isGroup(node)) {
             const active = pathActive(pathname, node.href)
-            return <TopLink key={node.href} href={node.href} label={node.label} icon={node.icon} active={active} />
+            return <TopLink key={node.href} href={node.href} label={node.label} icon={node.icon} active={active} onNavigate={onNavigate} />
           }
 
           const expanded = open[node.label] ?? false
@@ -141,7 +201,7 @@ export function Sidebar() {
                 style={selfActive ? ACTIVE_STYLE : undefined}
               >
                 {node.href ? (
-                  <Link href={node.href} className="flex flex-1 items-center gap-3 px-3 py-2.5">
+                  <Link href={node.href} onClick={onNavigate} className="flex flex-1 items-center gap-3 px-3 py-2.5">
                     <Icon className={cn('h-4 w-4 shrink-0', selfActive ? 'text-accent-cyan' : 'text-gray-500 group-hover:text-white')} />
                     <span className="truncate">{node.label}</span>
                   </Link>
@@ -170,6 +230,7 @@ export function Sidebar() {
                       <Link
                         key={child.href}
                         href={child.href}
+                        onClick={onNavigate}
                         className={cn(
                           'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors',
                           active ? 'text-accent-cyan' : 'text-gray-500 hover:bg-white/5 hover:text-white',
@@ -189,8 +250,9 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="space-y-0.5 border-t border-white/10 px-3 py-4">
-        <FooterLink href="/settings" label="Settings" icon={Settings} />
-        <FooterLink href="/settings/integrations" label="Integrations" icon={Settings} dim />
+        <FooterLink href="/settings" label="Settings" icon={Settings} onNavigate={onNavigate} />
+        <FooterLink href="/settings/ai-features" label="AI Features" icon={Sparkles} onNavigate={onNavigate} />
+        <FooterLink href="/settings/integrations" label="Integrations" icon={Settings} dim onNavigate={onNavigate} />
         <form action="/auth/signout" method="post">
           <button
             type="submit"
@@ -201,14 +263,17 @@ export function Sidebar() {
           </button>
         </form>
       </div>
-    </aside>
+    </>
   )
 }
 
-function TopLink({ href, label, icon: Icon, active }: { href: string; label: string; icon: LucideIcon; active: boolean }) {
+function TopLink({ href, label, icon: Icon, active, onNavigate }: {
+  href: string; label: string; icon: LucideIcon; active: boolean; onNavigate?: () => void
+}) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={cn(
         'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
         active ? 'text-accent-cyan' : 'text-gray-400 hover:bg-white/5 hover:text-white',
@@ -222,10 +287,13 @@ function TopLink({ href, label, icon: Icon, active }: { href: string; label: str
   )
 }
 
-function FooterLink({ href, label, icon: Icon, dim }: { href: string; label: string; icon: LucideIcon; dim?: boolean }) {
+function FooterLink({ href, label, icon: Icon, dim, onNavigate }: {
+  href: string; label: string; icon: LucideIcon; dim?: boolean; onNavigate?: () => void
+}) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-400 transition-all hover:bg-white/5 hover:text-white"
     >
       <Icon className={cn('h-4 w-4 text-gray-500', dim && 'opacity-50')} />
