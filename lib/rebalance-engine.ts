@@ -1,4 +1,4 @@
-import type { Asset, PortfolioTarget, RebalanceSuggestion } from './types'
+import type { Asset, PortfolioTarget } from './types'
 
 export interface RebalanceTrade {
   asset_class: string
@@ -12,15 +12,19 @@ export interface RebalanceTrade {
 /**
  * Computes rebalancing trades needed to move from current allocation to targets.
  * Only includes asset classes that have drifted beyond the threshold.
+ *
+ * Shares are measured over the asset classes the targets cover. Holdings with
+ * no target (e.g. crypto, which lives in Explore, or real estate) are outside
+ * the rebalance — counting them in the denominator made targets that sum to
+ * 100% unreachable and produced buys with no matching sells.
+ *
+ * Default targets come from lib/allocation/policy.ts (defaultRebalanceTargets).
  */
 export function computeRebalanceTrades(
   assets: Asset[],
-  targets: PortfolioTarget[],
+  targets: Array<Pick<PortfolioTarget, 'asset_class' | 'target_pct'>>,
   thresholdPct = 5
 ): RebalanceTrade[] {
-  const totalValue = assets.reduce((s, a) => s + a.current_value, 0)
-  if (totalValue === 0) return []
-
   // Compute current allocation by asset_class (mapped from category)
   const currentByClass: Record<string, number> = {}
   for (const asset of assets) {
@@ -32,6 +36,12 @@ export function computeRebalanceTrades(
       : 'other'
     currentByClass[cls] = (currentByClass[cls] ?? 0) + asset.current_value
   }
+
+  const targeted = new Set(targets.map(t => t.asset_class))
+  const totalValue = Object.entries(currentByClass)
+    .filter(([cls]) => targeted.has(cls))
+    .reduce((s, [, v]) => s + v, 0)
+  if (totalValue === 0) return []
 
   const trades: RebalanceTrade[] = []
 
@@ -58,12 +68,3 @@ export function computeRebalanceTrades(
   // Sort by largest drift first
   return trades.sort((a, b) => Math.abs(b.drift_pct) - Math.abs(a.drift_pct))
 }
-
-/** Default target allocations for a moderate risk profile */
-export const DEFAULT_TARGETS: Omit<PortfolioTarget, 'id' | 'user_id' | 'created_at' | 'updated_at'>[] = [
-  { asset_class: 'stock',    target_pct: 50 },
-  { asset_class: 'crypto',   target_pct: 20 },
-  { asset_class: 'bond',     target_pct: 15 },
-  { asset_class: 'cash',     target_pct: 10 },
-  { asset_class: 'other',    target_pct:  5 },
-]

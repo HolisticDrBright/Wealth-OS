@@ -5,7 +5,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 import { upsertTarget, updateSuggestionStatus } from '@/lib/actions/rebalance'
-import { computeRebalanceTrades, DEFAULT_TARGETS } from '@/lib/rebalance-engine'
+import { computeRebalanceTrades } from '@/lib/rebalance-engine'
+import type { RebalanceTargetDefault } from '@/lib/allocation/policy'
 import { cn, formatCurrency } from '@/lib/utils'
 import type { Asset, PortfolioTarget, RebalanceSuggestion } from '@/lib/types'
 import { RefreshCw, TrendingUp, TrendingDown, CheckCircle2, XCircle, Play, Sparkles, AlertTriangle, Ban } from 'lucide-react'
@@ -29,6 +30,8 @@ interface OptimizeResult {
 interface Props {
   assets: Asset[]
   initialTargets: PortfolioTarget[]
+  /** Policy defaults for the user's risk profile (lib/allocation/policy.ts). */
+  defaultTargets: RebalanceTargetDefault[]
   initialSuggestions: RebalanceSuggestion[]
 }
 
@@ -37,10 +40,10 @@ const CLASS_COLORS: Record<string, string> = {
   cash: '#6b7280', real_estate: '#ec4899', other: '#8b5cf6',
 }
 
-export function RebalanceClient({ assets, initialTargets, initialSuggestions }: Props) {
+export function RebalanceClient({ assets, initialTargets, defaultTargets, initialSuggestions }: Props) {
   const [targets, setTargets] = useState<Record<string, number>>(
     Object.fromEntries(
-      (initialTargets.length ? initialTargets : DEFAULT_TARGETS).map(t => [t.asset_class, t.target_pct])
+      (initialTargets.length ? initialTargets : defaultTargets).map(t => [t.asset_class, t.target_pct])
     )
   )
   const [suggestions, setSuggestions] = useState<TaxAwareSuggestion[]>(initialSuggestions)

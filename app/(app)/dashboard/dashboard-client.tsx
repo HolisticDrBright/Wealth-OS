@@ -63,7 +63,7 @@ export function DashboardClient({ data }: { data: CommandCenterData }) {
 
       {/* 6 + 8 — Capital allocation + required decisions */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AllocationPanel profile={data.allocationProfile} risk={data.risk} />
+        <AllocationPanel profileKey={data.allocationProfileKey ?? null} />
         <DecisionsPanel decisions={data.decisions} />
       </div>
 

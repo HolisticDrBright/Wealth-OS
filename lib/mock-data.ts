@@ -169,10 +169,3 @@ export const spendingByCategory = [
   { name: 'Utilities', value: 120, fill: '#14b8a6' },
 ]
 
-export const portfolioAllocation = [
-  { name: 'Stocks', value: 36800, percentage: 8.0, fill: '#6366f1' },
-  { name: 'Crypto', value: 57500, percentage: 12.5, fill: '#f59e0b' },
-  { name: 'Real Estate', value: 320000, percentage: 69.9, fill: '#10b981' },
-  { name: 'Cash', value: 40000, percentage: 8.7, fill: '#3b82f6' },
-  { name: 'Bonds', value: 10000, percentage: 2.2, fill: '#ec4899' },
-]

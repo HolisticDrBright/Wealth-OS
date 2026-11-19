@@ -6,7 +6,8 @@
  */
 
 import type { createAdminClient } from '@/lib/supabase/admin'
-import { computeRebalanceTrades, DEFAULT_TARGETS } from '@/lib/rebalance-engine'
+import { computeRebalanceTrades } from '@/lib/rebalance-engine'
+import { defaultRebalanceTargets, fundForAssetClass } from '@/lib/allocation/policy'
 import { submitOrder } from '@/lib/broker-adapters/router'
 import { preExecutionGuard, DEFAULT_MANUAL_EDGE, costVenueOf } from '@/lib/broker-adapters/execution-guard'
 import { checkWashSaleBlocklist } from '@/lib/tax/wash-sale-guard'
@@ -17,7 +18,9 @@ type AdminClient = ReturnType<typeof createAdminClient>
 
 /** Representative symbol per asset class (mirrors the execution mapping below). */
 function representativeSymbol(assetClass: string): string {
-  return assetClass === 'stock' ? 'SPY' : assetClass === 'crypto' ? 'BTC' : assetClass
+  // Core classes trade through the configured funds (allocation policy);
+  // crypto only appears when a user's OWN saved targets include it.
+  return fundForAssetClass(assetClass) ?? (assetClass === 'crypto' ? 'BTC' : assetClass)
 }
 
 export interface RebalanceScanResult {
@@ -38,17 +41,19 @@ export async function runRebalanceScan(
   const thresholdPct = opts.thresholdPct ?? 5
 
   // Fetch user assets and targets
-  const [assetsRes, targetsRes] = await Promise.all([
+  const [assetsRes, targetsRes, profileRes] = await Promise.all([
     supabase.from('assets').select('*').eq('user_id', userId),
     supabase.from('portfolio_targets').select('*').eq('user_id', userId),
+    supabase.from('user_risk_profile').select('profile_key').eq('user_id', userId).maybeSingle(),
   ])
 
   const assets = (assetsRes.data ?? []) as Asset[]
   let targets = (targetsRes.data ?? []) as PortfolioTarget[]
 
-  // Use defaults if user hasn't set targets
+  // Use the allocation policy's defaults if the user hasn't set targets.
   if (!targets.length) {
-    targets = DEFAULT_TARGETS.map(t => ({
+    const profileKey = (profileRes.data?.profile_key as string | undefined) ?? null
+    targets = defaultRebalanceTargets(profileKey).map(t => ({
       ...t, id: '', user_id: userId, created_at: '', updated_at: '',
     }))
   }
@@ -128,7 +133,7 @@ export async function runRebalanceScan(
         continue
       }
       const result = await submitOrder({
-        symbol: trade.asset_class === 'stock' ? 'SPY' : trade.asset_class === 'crypto' ? 'BTC' : trade.asset_class,
+        symbol: representativeSymbol(trade.asset_class),
         asset_class: trade.asset_class,
         side: trade.action,
         order_type: 'market',

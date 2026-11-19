@@ -1,5 +1,54 @@
 # Wealth OS Changelog
 
+## 2026-11-19 — Wealth-manager allocation, Phase 1: one source of truth for the mix
+
+Owner inputs recorded in `lib/config/product-defaults.ts`: Core funds VTI /
+VXUS / BND / SGOV, 70/30 US/international stock split. (Emergency months = 6,
+the strict Tier 1 gate with a one-tap setup decision, risk-ceiling vs Explore
+risk budget, dual-book counting for moved strategies and speculative RISK_ON
+0.5 are decided and land in Phases 2–5.)
+
+- **`lib/config/product-defaults.ts`** — the one config module. Each constant
+  is commented as a changeable product default: `CORE_FUNDS`,
+  `US_SHARE_OF_STOCKS` (0.70), `PROFILE_MIX` (per-profile stocks/bonds/cash,
+  carried over unchanged), `DEFAULT_PROFILE_KEY` ('balanced'),
+  `DEFAULT_EXPLORE_CAP_FRACTION` (0.10), `EXPLORE_CAP_HARD_MAX_FRACTION` (0.25).
+- **`lib/allocation/policy.ts`** — the single source of target allocations:
+  profile mix, Core fund targets (four funds), default rebalance targets,
+  the recommended whole-portfolio mix (Core × (1 − Explore) + Explore), and the
+  planning Monte Carlo's Explore/Core buckets. Core never holds crypto.
+- **Conflicting defaults removed and routed through the policy**:
+  1. `coreAllocationFor()` in `lib/explore/cap.ts` (Core sleeve bootstrap now
+     also stores the fund weights in sleeve metadata);
+  2. `DEFAULT_TARGETS` in `lib/rebalance-engine.ts` (50 stock / 20 crypto /
+     15 bond / 10 cash / 5 other) → `defaultRebalanceTargets(profile)` in
+     `lib/workers/rebalance-scan.ts` and the rebalance page;
+  3. `risk_profiles.alloc_*` seed (balanced = 45% stocks, 15% options, 20%
+     crypto, 10% forex, 5% prediction markets, 5% multi) shown as the
+     "recommended" allocation on `/portfolio` and the Command Center
+     AllocationPanel → policy whole-portfolio mix. (DB columns untouched;
+     nothing reads them any more. The Command Center panel shows targets only
+     until Core holds real positions in Phase 3.)
+  4. Planning Monte Carlo's hardcoded `investable * 0.1` Explore bucket →
+     `planningBuckets()`;
+  5. Rebalance trade symbols (stock → SPY, bond → "bond", cash → "cash") →
+     the configured funds (VTI / BND / SGOV; BTC kept only for user-saved
+     crypto targets);
+  6. Unused `portfolioAllocation` in `lib/mock-data.ts` deleted.
+- **Bug fixed along the way**: `computeRebalanceTrades` measured shares over
+  ALL holdings but traded only targeted classes, so targets summing to 100%
+  with untargeted holdings (crypto, real estate) produced buys with no
+  matching sells. Shares are now measured over the targeted classes.
+- **Left as-is, flagged for the owner**: `lib/advisory/sweep-engine.ts`
+  `tierCapForInvestable()` caps the strategy sleeve by wealth tier from
+  `kb_parameters` (5% under $100k investable, 10% $100k–$5M, 15%, 20%) —
+  a second answer to "how much may go to strategies" that disagrees with the
+  10% Explore cap below $100k. It drives sweep alerts only, not trades.
+- Test-only: the income-vs-allocation Monte Carlo test block got a 30s
+  timeout (it already exceeded the 5s default on the previous commit).
+
+No migrations, no execution-path changes in this phase.
+
 ## 2026-11-18 — Web polish (Phase 7)
 
 1. **Cyan accent** replaces indigo on the logo (sidebar + mobile drawer),

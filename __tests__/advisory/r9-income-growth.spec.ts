@@ -77,7 +77,9 @@ describe('incomeGrowthTriggered — both directions', () => {
   })
 })
 
-describe('compareIncomeVsAllocation — real Monte Carlo deltas', () => {
+// Each case runs paired 2,000-path Monte Carlo simulations — slower than
+// vitest's 5s default on loaded CI machines, so give the block real headroom.
+describe('compareIncomeVsAllocation — real Monte Carlo deltas', { timeout: 30_000 }, () => {
   // The MC is same-seeded for base and scenario, so it is MONOTONIC: routing
   // more dollars to savings never lowers goal probability. That makes the
   // direction deterministic without depending on absolute saturation.

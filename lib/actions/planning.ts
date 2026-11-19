@@ -13,6 +13,7 @@ import {
   runPlanningMonteCarlo, planningRecommendationDelta, type PlanningInput,
 } from '@/lib/planning/monte-carlo'
 import { fetchSpxMonthlyReturns } from '@/lib/planning/market-returns'
+import { planningBuckets } from '@/lib/allocation/policy'
 import type { Recommendation } from '@/lib/advisory/types'
 
 export interface PlanningView {
@@ -59,13 +60,13 @@ export async function getPlanningView(
     .map(r => r.realized_pnl_pct)
     .filter((r): r is number => r != null)
 
-  // Sleeve share approximated by tier cap until per-bucket tagging exists.
-  const sleeveUsd = Math.min(investable * 0.1, investable)
+  // Explore (sleeve) vs Core (market) buckets from the allocation policy.
+  const { marketBucketUsd, sleeveUsd } = planningBuckets(investable)
   const input: PlanningInput = {
     currentAge: profile.age_self,
     retireAge: Math.max(profile.age_self + 1, 65),
     horizonAge: 90,
-    marketBucketUsd: investable - sleeveUsd,
+    marketBucketUsd,
     sleeveUsd,
     annualSavingsUsd: Math.max(0, ((profile.w2_wages_usd ?? 0) + (profile.net_business_profit_usd ?? 0)) * 0.2),
     incomeStability: profile.income_stability ?? 'stable_w2',

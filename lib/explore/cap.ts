@@ -3,7 +3,7 @@
  *
  * The portfolio is modeled as two sleeves on the EXISTING portfolio_sleeves
  * table (metadata.kind = 'core' | 'explore'):
- *  - Core: a diversified low-cost allocation chosen from the risk profile,
+ *  - Core: a diversified low-cost allocation from lib/allocation/policy.ts,
  *  - Explore: ALL strategy and copy-trading activity.
  *
  * The Explore cap is the Explore sleeve's target_allocation_pct. Default 10%
@@ -14,26 +14,15 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { DEFAULT_EXPLORE_CAP_FRACTION, EXPLORE_CAP_HARD_MAX_FRACTION } from '@/lib/config/product-defaults'
+import { corePercentages, coreFundTargets } from '@/lib/allocation/policy'
 
-export const DEFAULT_EXPLORE_CAP_FRACTION = 0.10
-/** HARD maximum — no user setting may exceed this. */
-export const EXPLORE_CAP_HARD_MAX_FRACTION = 0.25
+// Thresholds live in lib/config/product-defaults.ts; re-exported for callers.
+export { DEFAULT_EXPLORE_CAP_FRACTION, EXPLORE_CAP_HARD_MAX_FRACTION }
 
 export function clampExploreCapFraction(f: number | null | undefined): number {
   if (f == null || !Number.isFinite(f) || f < 0) return DEFAULT_EXPLORE_CAP_FRACTION
   return Math.min(EXPLORE_CAP_HARD_MAX_FRACTION, f)
-}
-
-/** Display allocation for the Core sleeve, chosen from the risk profile. */
-export function coreAllocationFor(profileKey: string): { stocksPct: number; bondsPct: number; cashPct: number } {
-  switch (profileKey) {
-    case 'vault':        return { stocksPct: 20, bondsPct: 60, cashPct: 20 }
-    case 'conservative': return { stocksPct: 40, bondsPct: 50, cashPct: 10 }
-    case 'growth':       return { stocksPct: 80, bondsPct: 18, cashPct: 2 }
-    case 'speculative':  return { stocksPct: 90, bondsPct: 8,  cashPct: 2 }
-    case 'balanced':
-    default:             return { stocksPct: 60, bondsPct: 35, cashPct: 5 }
-  }
 }
 
 export interface CoreExploreSleeves {
@@ -62,7 +51,10 @@ export async function ensureCoreExploreSleeves(
   if (!core) {
     const { data: profileRow } = await supabase
       .from('user_risk_profile').select('profile_key').eq('user_id', userId).maybeSingle()
-    const allocation = coreAllocationFor((profileRow?.profile_key as string | undefined) ?? 'balanced')
+    // Target mix comes from the single allocation policy (lib/allocation/policy.ts).
+    const profileKey = profileRow?.profile_key as string | undefined
+    const allocation = corePercentages(profileKey)
+    const funds = coreFundTargets(profileKey).map(f => ({ symbol: f.symbol, weight: f.weight }))
     const { data } = await supabase
       .from('portfolio_sleeves')
       .insert({
@@ -73,7 +65,7 @@ export async function ensureCoreExploreSleeves(
         target_allocation_pct: Math.round((1 - DEFAULT_EXPLORE_CAP_FRACTION) * 100),
         benchmark_symbol: 'SPY',
         approval_required: true,
-        metadata: { kind: 'core', allocation },
+        metadata: { kind: 'core', allocation, funds },
       })
       .select('id, target_allocation_pct, metadata')
       .single()

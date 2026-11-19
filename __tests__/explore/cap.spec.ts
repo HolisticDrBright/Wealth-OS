@@ -7,7 +7,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import {
   DEFAULT_EXPLORE_CAP_FRACTION, EXPLORE_CAP_HARD_MAX_FRACTION,
-  clampExploreCapFraction, coreAllocationFor, exploreCapVerdict,
+  clampExploreCapFraction, exploreCapVerdict,
   type ExploreUsage,
 } from '@/lib/explore/cap'
 
@@ -32,15 +32,6 @@ describe('clampExploreCapFraction', () => {
 
   it('the hard max is a real ceiling, not a suggestion', () => {
     expect(EXPLORE_CAP_HARD_MAX_FRACTION).toBeLessThanOrEqual(0.25)
-  })
-})
-
-describe('coreAllocationFor', () => {
-  it('every profile sums to 100%', () => {
-    for (const p of ['vault', 'conservative', 'balanced', 'growth', 'speculative', 'unknown']) {
-      const a = coreAllocationFor(p)
-      expect(a.stocksPct + a.bondsPct + a.cashPct).toBe(100)
-    }
   })
 })
 
