@@ -8,10 +8,11 @@ import { View, Text, ScrollView, RefreshControl, TextInput, Pressable, Modal } f
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api, useApi, monthYear, type GoalView } from '@/src/api'
 import {
-  Card, Pill, Money, ProgressBar, SplitBar, StateView, ScreenHeader,
+  Card, Pill, Money, ProgressBar, StateView, ScreenHeader,
   PrimaryButton, SecondaryButton, formatUsd,
 } from '@/src/ui'
 import { colors } from '@/src/theme'
+import { LadderCard } from '@/src/ui/LadderCard'
 
 function StatusPill({ status }: { status: GoalView['status'] }) {
   if (status === 'on_track') return <Pill tone="gain">On track</Pill>
@@ -101,7 +102,6 @@ export default function GoalsScreen() {
 
   const goals = data?.goals ?? []
   const goal = goals.find(g => g.id === selectedId) ?? goals[0] ?? null
-  const totalSplit = (data?.split.coreUsd ?? 0) + (data?.split.exploreUsd ?? 0)
 
   return (
     <SafeAreaView className="flex-1 bg-ground" edges={['top']}>
@@ -110,10 +110,19 @@ export default function GoalsScreen() {
       ) : error && !data ? (
         <StateView kind="error" detail={error} onRetry={reload} />
       ) : !goal ? (
-        <View className="flex-1 px-screen">
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 14 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={colors.accent} />}
+        >
           <ScreenHeader title="Goals" />
-          <StateView kind="empty" title="No goal yet" detail="Set up your first goal on the web app — everything here works toward it." />
-        </View>
+          <Card>
+            <Text className="font-inter-semibold text-[15px] text-ink">No goal yet</Text>
+            <Text className="mt-1 font-inter text-[13px] leading-5 text-ink-secondary">
+              Set up your first goal on the web app — everything here works toward it.
+            </Text>
+          </Card>
+          {data && <LadderCard ladder={data.ladder} setupUsd={data.ladderSetupUsd} onChanged={reload} />}
+        </ScrollView>
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 14 }}
@@ -176,30 +185,8 @@ export default function GoalsScreen() {
             )}
           </Card>
 
-          {/* Where the money is */}
-          {data && (
-            <Card className="gap-3 p-[18px]">
-              <Text accessibilityRole="header" className="font-inter-semibold text-[15px] text-ink">Where the money is</Text>
-              <SplitBar
-                aFraction={totalSplit > 0 ? data.split.coreUsd / totalSplit : 1}
-                label={`Core ${formatUsd(data.split.coreUsd)}, Explore ${formatUsd(data.split.exploreUsd)}`}
-              />
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
-                  <View className="h-2 w-2 rounded-sm bg-accent" />
-                  <Text className="font-inter text-[14px] text-ink-body">Core: broad, low-cost funds</Text>
-                </View>
-                <Money value={data.split.coreUsd} size={14} semibold={false} />
-              </View>
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
-                  <View className="h-2 w-2 rounded-sm bg-explore" />
-                  <Text className="font-inter text-[14px] text-ink-body">Explore: strategies and copying</Text>
-                </View>
-                <Money value={data.split.exploreUsd} size={14} semibold={false} />
-              </View>
-            </Card>
-          )}
+          {/* Where the money is — the three-tier ladder */}
+          {data && <LadderCard ladder={data.ladder} setupUsd={data.ladderSetupUsd} onChanged={reload} />}
 
           <SecondaryButton title="Change monthly deposit" onPress={() => setEditing(true)} />
         </ScrollView>

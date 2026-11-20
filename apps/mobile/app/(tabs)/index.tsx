@@ -146,7 +146,7 @@ export default function HomeScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Needs your decision: ${data.decision.title}. Opens the details.`}
-              onPress={() => router.push('/approve')}
+              onPress={() => router.push(data.decision?.kind === 'ladder_expenses' ? '/goals' : '/approve')}
             >
               <Card tint="accent" className="flex-row items-center gap-3">
                 <View className="flex-1 gap-1">

@@ -83,7 +83,11 @@ beforeEach(() => {
     traders: [{ id: 't1', name: 'T', handle: 't', total_return_pct: 10, win_rate_pct: 60 }],
     user_settings: [],
     user_strategy_broker_overrides: [],
-    assets: [{ current_value: 10_000 }],
+    // Funded three-tier ladder: $100/mo essentials → $600 Tier 1 target, held
+    // in cash; Explore cap = 10% of the $10,400 outside Safety = $1,040, so the
+    // $500 copy reaches the adapter path this suite is about.
+    assets: [{ category: 'stock', current_value: 10_000 }, { category: 'cash', current_value: 1_000 }],
+    financial_profile: [{ monthly_essential_expenses_usd: 100 }],
   }
   vi.stubEnv('CRON_SECRET', 'cron-secret')
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-key')
@@ -135,5 +139,20 @@ describe('POST /api/execute-copy-trades', () => {
   it('denies without the cron secret', async () => {
     const res = await POST(new NextRequest('http://localhost/api/execute-copy-trades', { method: 'POST' }))
     expect(res.status).toBe(401)
+  })
+
+  it('Tier 1 not funded: the copy is blocked before any broker call, with the plain reason', async () => {
+    dbState.tables.assets = [{ category: 'stock', current_value: 10_000 }]   // no cash
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { POST } = await import('@/app/api/execute-copy-trades/route')
+    const res = await POST(new NextRequest('http://localhost/api/execute-copy-trades', {
+      method: 'POST', headers: { authorization: 'Bearer cron-secret' },
+    }))
+    const body = await res.json()
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(body.executed).toBe(0)
+    expect(String(body.errors?.[0])).toContain('tier1_unfunded')
+    const audit = dbState.writes.find(w => w.table === 'audit_logs')
+    expect((audit?.row.metadata as { blocked_by?: string })?.blocked_by).toBe('tier1_gate')
   })
 })

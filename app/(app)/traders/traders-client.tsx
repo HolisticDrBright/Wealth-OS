@@ -13,6 +13,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { followTrader, unfollowTrader } from '@/lib/actions/traders'
@@ -76,7 +77,7 @@ function ExploreLimitCard({ view }: { view: ExploreView }) {
     <Card>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <p className="text-sm font-semibold text-white">Explore limit</p>
-        <p className="text-xs text-text-1">{Math.round(usage.capFraction * 100)}% of your money</p>
+        <p className="text-xs text-text-1">{Math.round(usage.capFraction * 100)}% of money outside Safety</p>
       </div>
       <div
         role="progressbar"
@@ -90,11 +91,15 @@ function ExploreLimitCard({ view }: { view: ExploreView }) {
         <span><span className="font-mono text-white">{usd(usage.usedUsd)}</span> in use</span>
         <span><span className="font-mono text-white">{usd(usage.leftUsd)}</span> left</span>
       </div>
-      {usage.totalValueUsd <= 0 && (
+      {usage.totalValueUsd <= 0 ? (
         <p className="mt-2 text-xs text-orange-300">
           No recorded portfolio value yet — the Explore limit is $0 until your assets are recorded.
         </p>
-      )}
+      ) : !usage.tier1Funded && usage.closedReason ? (
+        <p role="alert" className="mt-2 text-xs text-orange-300">
+          {usage.closedReason} <Link href="/advisor" className="underline">Open your money ladder</Link>
+        </p>
+      ) : null}
       {view.uiMode === 'pro' && (
         <div className="mt-3 border-t border-line-strong pt-3">
           {editing ? (

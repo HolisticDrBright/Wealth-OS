@@ -36,16 +36,40 @@ export interface HomeData {
   valueSeries: Array<{ date: string; valueUsd: number }>
   goal: GoalView | null
   goalCount: number
-  decision: { title: string; subtitle: string; count: number } | null
+  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
 }
 
 export interface ExploreUsage {
   capFraction: number
   totalValueUsd: number
+  /** Money the cap is measured against: investable minus Tier 1 Safety. */
+  baseUsd: number
   capUsd: number
   usedUsd: number
   leftUsd: number
+  /** Explore is $0 until Tier 1 Safety is fully funded. */
+  tier1Funded: boolean
+  closedReason: string | null
+}
+
+/** The three-tier ladder (mirrors lib/allocation/ladder.ts on the server). */
+export interface Ladder {
+  investableUsd: number
+  tier1: {
+    status: 'funded' | 'short' | 'needs_expenses'
+    funded: boolean
+    targetUsd: number | null
+    emergencyUsd: number | null
+    shortGoalsUsd: number
+    shortGoals: Array<{ name: string; targetAmountUsd: number; targetDate: string | null }>
+    heldUsd: number
+    amountUsd: number
+    shortfallUsd: number
+    reason: string | null
+  }
+  core: { amountUsd: number; stockShare: number; bondShare: number }
+  explore: { capFraction: number; baseUsd: number; capUsd: number; inUseUsd: number; leftUsd: number; open: boolean; reason: string | null }
 }
 
 export interface GoalData {
@@ -53,6 +77,8 @@ export interface GoalData {
   yearRange: { goodYearUsd: number; typicalYearUsd: number; badYearUsd: number } | null
   split: { coreUsd: number; exploreUsd: number }
   exploreUsage: ExploreUsage
+  ladder: Ladder
+  ladderSetupUsd: number
 }
 
 export interface ActivityItem {
@@ -66,15 +92,20 @@ export interface ActivityItem {
 }
 
 export interface ApproveDecision {
+  kind: 'ladder_setup' | 'rebalance'
   title: string
   explanation: string
-  trades: Array<{ assetClass: string; action: string; currentPct: number; targetPct: number; suggestedNotionalUsd: number }>
+  /** Before/after bar, e.g. { label: 'cash', beforePct: 4, afterPct: 18 }. */
+  change: { label: string; beforePct: number; afterPct: number } | null
   amountMovedUsd: number
   estimatedCostUsd: number
   estimatedTaxUsd: number
+  taxNote: string | null
   badYearBeforeUsd: number | null
   badYearAfterUsd: number | null
   doNothing: string
+  /** The exact text the user approves (recorded server-side). */
+  summary: string
 }
 
 export interface ExploreTrader {
@@ -130,9 +161,11 @@ export const api = {
     postJson<{ ok: boolean }>('/api/mobile/goal', { goal_id: goalId, monthly_contribution_usd: amount }),
   activity: () => getJson<{ items: ActivityItem[] }>('/api/mobile/activity'),
   approval: () => getJson<{ decision: ApproveDecision | null }>('/api/mobile/approve'),
-  approve: (summary: string) =>
-    postJson<{ ok: boolean; executed: number; skippedOrders: string[]; errors: string[] }>(
-      '/api/mobile/approve', { approved_summary: summary }),
+  approve: (kind: ApproveDecision['kind'], summary: string) =>
+    postJson<{ ok: boolean; kind: string; executed: number; skippedOrders: string[]; errors: string[]; designatedUsd?: number }>(
+      '/api/mobile/approve', { kind, approved_summary: summary }),
+  setMonthlyExpenses: (amount: number) =>
+    postJson<{ ok: boolean }>('/api/mobile/goal', { monthly_expenses_usd: amount }),
   explore: () => getJson<ExploreData>('/api/mobile/explore'),
   follow: (traderId: string, summary: string) =>
     postJson<{ ok: boolean }>('/api/mobile/follow', { trader_id: traderId, approved_summary: summary }),

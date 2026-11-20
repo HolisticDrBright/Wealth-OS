@@ -88,7 +88,7 @@ export interface TrustView {
   insufficient: boolean
 }
 
-export type DecisionKind = 'review_candidate' | 'missing_env' | 'risk_controls'
+export type DecisionKind = 'ladder_setup' | 'ladder_expenses' | 'review_candidate' | 'missing_env' | 'risk_controls'
 
 export interface DecisionItem {
   id: string
@@ -325,8 +325,32 @@ async function loadTrust(): Promise<TrustView> {
  * loading the other 14 panels.
  */
 export async function getDecisionItems(): Promise<DecisionItem[]> {
-  const [trust, riskControls] = await Promise.all([loadTrust(), loadRiskControls()])
-  return loadDecisions(trust, riskControls)
+  const [trust, riskControls, ladder] = await Promise.all([loadTrust(), loadRiskControls(), loadLadderDecisions()])
+  return [...ladder, ...(await loadDecisions(trust, riskControls))]
+}
+
+/**
+ * Ladder decisions come FIRST: until Tier 1 Safety is funded, Explore is $0,
+ * so these block everything else the user might want to do.
+ */
+async function loadLadderDecisions(): Promise<DecisionItem[]> {
+  try {
+    const { getLadderView } = await import('@/lib/actions/ladder')
+    const view = await getLadderView()
+    if (!view) return []
+    if (view.ladder.tier1.status === 'needs_expenses') {
+      return [{
+        id: 'ladder-expenses', kind: 'ladder_expenses', href: '/advisor',
+        text: 'Add your monthly expenses so we can size your safety cushion. Explore stays at $0 until it is full.',
+      }]
+    }
+    if (view.setup) {
+      return [{ id: 'ladder-setup', kind: 'ladder_setup', href: '/advisor', text: view.setup.summary }]
+    }
+    return []
+  } catch {
+    return []
+  }
 }
 
 async function loadDecisions(
@@ -443,7 +467,7 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
     ])
 
   const [decisions, aiUsage] = await Promise.all([
-    loadDecisions(trust, riskControls),
+    Promise.all([loadLadderDecisions(), loadDecisions(trust, riskControls)]).then(([l, d]) => [...l, ...d]),
     loadAiUsage(),
   ])
 

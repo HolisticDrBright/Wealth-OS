@@ -14,12 +14,14 @@ import { getIncomeGrowthView } from '@/lib/actions/income-growth'
 import { getWealthBrief } from '@/lib/actions/wealth-brief'
 import { getPlanningView } from '@/lib/actions/planning'
 import { PlanningCard } from './PlanningCard'
+import { LadderPanel } from './LadderPanel'
+import { getLadderView } from '@/lib/actions/ladder'
 
 // Per-user data via cookies — render per-request, never statically.
 export const dynamic = 'force-dynamic'
 
 export default async function AdvisorPage() {
-  const [clients, totalAUM, advisoryView, checkup, calendar, goals, income, brief] = await Promise.all([
+  const [clients, totalAUM, advisoryView, checkup, calendar, goals, income, brief, ladder] = await Promise.all([
     getAdvisorClients(),
     getTotalAUM(),
     getAdvisoryView(),
@@ -28,6 +30,7 @@ export default async function AdvisorPage() {
     getGoalsSummary(),
     getIncomeGrowthView().catch(() => null),
     getWealthBrief().catch(() => null),
+    getLadderView(),
   ])
   const planningView = advisoryView
     ? await getPlanningView(advisoryView.recommendations).catch(() => null)
@@ -35,6 +38,7 @@ export default async function AdvisorPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-4 px-6 pt-6">
+        {ladder && <LadderPanel view={ladder} />}
         {brief && <BriefPanel brief={brief} />}
         <WealthCheckupPanel checkup={checkup} />
         {income && <IncomeGrowthPanel view={income} />}

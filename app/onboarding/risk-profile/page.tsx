@@ -7,19 +7,20 @@
  *   step 1: what the money is for   (goal_type + default name)
  *   step 2: goal name, target amount and date
  *   step 3: monthly contribution
- *   step 4: investment goal   (A-E maps to base profile index 0-4)
- *   step 5: drawdown reaction (-1 / 0 / +1 adjustment)
- *   step 6: time horizon      (may cap profile)
- *   step 7: asset preferences (optional exclusions)
- *   step 8: time commitment   (optional)
- *   step 9: state of residence
+ *   step 4: essential monthly expenses (sizes the Tier 1 safety cushion)
+ *   step 5: investment goal   (A-E maps to base profile index 0-4)
+ *   step 6: drawdown reaction (-1 / 0 / +1 adjustment)
+ *   step 7: time horizon      (may cap profile)
+ *   step 8: asset preferences (optional exclusions)
+ *   step 9: time commitment   (optional)
+ *   step 10: state of residence
  *   final:  recommendation + confirm (saves goal + profile, gates /dashboard)
  */
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveOnboardedProfile, saveStateOfResidence } from '@/lib/actions/risk-profile'
-import { saveOnboardingGoal } from '@/lib/actions/onboarding'
+import { saveOnboardingGoal, saveOnboardingExpenses } from '@/lib/actions/onboarding'
 import { setUiMode } from '@/lib/actions/ui-prefs'
 import type { ProfileKey } from '@/lib/strategies/profile-params'
 import type { HouseholdGoal } from '@/lib/types'
@@ -60,6 +61,7 @@ interface WizardState {
   targetAmountUsd: string     // text inputs keep strings; parsed on save
   targetDate: string          // yyyy-mm-dd or ''
   monthlyContributionUsd: string
+  monthlyExpensesUsd: string
   // Risk (steps 4-9)
   baseIndex: number          // 0=vault … 4=speculative
   adjustment: number
@@ -81,7 +83,7 @@ const ASSET_OPTIONS: Array<{ key: AssetClass; label: string }> = [
   { key: 'polymarket', label: 'Prediction Markets' },
 ]
 
-const TOTAL_SEGMENTS = 9
+const TOTAL_SEGMENTS = 10
 
 export default function RiskProfileWizard() {
   const router = useRouter()
@@ -93,6 +95,7 @@ export default function RiskProfileWizard() {
     targetAmountUsd: '',
     targetDate: '',
     monthlyContributionUsd: '',
+    monthlyExpensesUsd: '',
     baseIndex: 2,
     adjustment: 0,
     excludedAssets: new Set(),
@@ -114,6 +117,7 @@ export default function RiskProfileWizard() {
 
   const amountValid = Number(state.targetAmountUsd) > 0
   const contributionValid = state.monthlyContributionUsd !== '' && Number(state.monthlyContributionUsd) >= 0
+  const expensesValid = state.monthlyExpensesUsd !== '' && Number(state.monthlyExpensesUsd) >= 0
 
   function setBase(index: number) {
     setState(s => ({ ...s, baseIndex: index }))
@@ -160,6 +164,12 @@ export default function RiskProfileWizard() {
       })
       if (!goal.ok) {
         setSaveError(goal.error ?? 'Could not save your goal')
+        return
+      }
+
+      const expenses = await saveOnboardingExpenses(Number(state.monthlyExpensesUsd))
+      if (!expenses.ok) {
+        setSaveError(expenses.error ?? 'Could not save your monthly expenses')
         return
       }
 
@@ -308,8 +318,39 @@ export default function RiskProfileWizard() {
           </div>
         )}
 
-        {/* Step 4: Investment goal (risk) */}
+        {/* Step 4: Essential monthly expenses (Tier 1 safety cushion) */}
         {state.step === 4 && (
+          <div className="space-y-6">
+            <h1 className="text-2xl font-bold">What do you spend each month on the essentials?</h1>
+            <p className="text-text-1 text-sm">
+              Rent or mortgage, food, utilities, insurance, minimum debt payments. We keep
+              6 months of this as a safety cushion in cash-like funds before anything else is invested.
+            </p>
+            <div>
+              <label htmlFor="monthly-expenses" className="mb-1.5 block text-sm text-text-1">Essential monthly expenses (USD)</label>
+              <input
+                id="monthly-expenses"
+                type="number"
+                min="0"
+                inputMode="numeric"
+                placeholder="3000"
+                value={state.monthlyExpensesUsd}
+                onChange={e => setState(s => ({ ...s, monthlyExpensesUsd: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white focus:border-white outline-none"
+              />
+            </div>
+            <button
+              onClick={next}
+              disabled={!expensesValid}
+              className="w-full py-3 rounded-xl bg-white text-black font-semibold hover:bg-gray-100 disabled:opacity-40 transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {/* Step 5: Investment goal (risk) */}
+        {state.step === 5 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">What is your primary goal?</h1>
             <div className="space-y-3">
@@ -332,8 +373,8 @@ export default function RiskProfileWizard() {
           </div>
         )}
 
-        {/* Step 5: Drawdown reaction */}
-        {state.step === 5 && (
+        {/* Step 6: Drawdown reaction */}
+        {state.step === 6 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">
               Your portfolio drops 20% in a month. You&#8230;
@@ -356,8 +397,8 @@ export default function RiskProfileWizard() {
           </div>
         )}
 
-        {/* Step 6: Time horizon */}
-        {state.step === 6 && (
+        {/* Step 7: Time horizon */}
+        {state.step === 7 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">When do you need access to this money?</h1>
             <div className="space-y-3">
@@ -379,8 +420,8 @@ export default function RiskProfileWizard() {
           </div>
         )}
 
-        {/* Step 7: Asset preferences */}
-        {state.step === 7 && (
+        {/* Step 8: Asset preferences */}
+        {state.step === 8 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">Any asset classes you want to exclude?</h1>
             <p className="text-text-1 text-sm">Optional. You can change this later.</p>
@@ -411,8 +452,8 @@ export default function RiskProfileWizard() {
           </div>
         )}
 
-        {/* Step 8: Time commitment */}
-        {state.step === 8 && (
+        {/* Step 9: Time commitment */}
+        {state.step === 9 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">Auto-execute trades under a threshold?</h1>
             <p className="text-text-1 text-sm">
@@ -429,7 +470,7 @@ export default function RiskProfileWizard() {
                 <button
                   key={opt.value}
                   onClick={() => {
-                    setState(s => ({ ...s, autoExecuteUsd: opt.value || null, step: 9 }))
+                    setState(s => ({ ...s, autoExecuteUsd: opt.value || null, step: 10 }))
                   }}
                   className="w-full text-left px-5 py-4 rounded-xl border border-gray-700 hover:border-white hover:bg-gray-900 transition-colors"
                 >
@@ -440,8 +481,8 @@ export default function RiskProfileWizard() {
           </div>
         )}
 
-        {/* Step 9: State of residence */}
-        {state.step === 9 && (
+        {/* Step 10: State of residence */}
+        {state.step === 10 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">What US state do you live in?</h1>
             <p className="text-text-1 text-sm">
@@ -473,7 +514,7 @@ export default function RiskProfileWizard() {
               ))}
             </select>
             <button
-              onClick={() => setState(s => ({ ...s, step: 10 }))}
+              onClick={() => setState(s => ({ ...s, step: 11 }))}
               className="w-full py-3 rounded-xl bg-white text-black font-semibold hover:bg-gray-100 transition-colors"
             >
               Continue
@@ -482,7 +523,7 @@ export default function RiskProfileWizard() {
         )}
 
         {/* Final: Recommendation */}
-        {state.step >= 10 && (
+        {state.step >= 11 && (
           <div className="space-y-6">
             <h1 className="text-2xl font-bold">Your recommended profile</h1>
             <div className="rounded-2xl border border-white/20 bg-gray-900 p-6 space-y-3">

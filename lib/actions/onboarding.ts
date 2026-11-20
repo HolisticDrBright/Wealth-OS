@@ -28,6 +28,22 @@ export async function isOnboarded(): Promise<boolean> {
   return !!data?.onboarded_at
 }
 
+/**
+ * Save essential monthly expenses (sizes the Tier 1 safety cushion). Stored in
+ * the existing financial_profile.monthly_essential_expenses_usd column.
+ */
+export async function saveOnboardingExpenses(
+  monthlyExpensesUsd: number
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'not authenticated' }
+  const { saveMonthlyExpenses } = await import('@/lib/allocation/ladder-data')
+  const res = await saveMonthlyExpenses(supabase, user.id, monthlyExpensesUsd)
+  if (res.ok) revalidatePath('/advisor')
+  return res
+}
+
 export interface OnboardingGoalInput {
   name: string
   goalType: HouseholdGoal['goal_type']

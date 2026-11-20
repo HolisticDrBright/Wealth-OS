@@ -38,6 +38,45 @@ export const PROFILE_MIX: Record<string, { stocks: number; bonds: number; cash: 
 /** Product default: profile used when a user has none recorded. */
 export const DEFAULT_PROFILE_KEY = 'balanced'
 
+// ─── Tier 1 Safety ───────────────────────────────────────────────────────────
+
+/** Product default: emergency fund size, in months of essential expenses. */
+export const EMERGENCY_FUND_MONTHS = 6
+
+/**
+ * Product default: a goal due within this many years is held in full in
+ * Tier 1 (cash-like), not invested in Core.
+ */
+export const SHORT_HORIZON_YEARS = 2
+
+/** Product default: recorded-asset categories that count as Tier 1 cash-like money. */
+export const CASH_LIKE_CATEGORIES = ['cash']
+
+/** Product default: recorded-asset categories that are not investable money (excluded from the ladder). */
+export const LADDER_EXCLUDED_CATEGORIES = ['real_estate']
+
+// ─── Tier 2 Core glide path ──────────────────────────────────────────────────
+
+/** Product default: at or beyond this horizon a goal holds its full long-horizon stock share. */
+export const GLIDE_FULL_HORIZON_YEARS = 10
+
+/**
+ * Product default: at SHORT_HORIZON_YEARS the stock share has glided down to
+ * this fraction of its long-horizon value (0.25 → balanced 60% → 15%).
+ * Below SHORT_HORIZON_YEARS the goal's money moves to Tier 1 entirely.
+ */
+export const GLIDE_SHORT_FRACTION = 0.25
+
+/**
+ * Product default: a risk profile's long-horizon stock share may sit at most
+ * this far ABOVE the reference profile's (owner decision: the tilt caps the
+ * upside only; conservative profiles keep their lower share).
+ */
+export const PROFILE_TILT_MAX = 0.15
+
+/** Product default: the profile the tilt is measured from. */
+export const GLIDE_REFERENCE_PROFILE = 'balanced'
+
 // ─── Explore (Tier 3) ────────────────────────────────────────────────────────
 
 /** Product default: Explore's share of portfolio value for new users. */

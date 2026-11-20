@@ -16,7 +16,11 @@ function usage(over: Partial<ExploreUsage> = {}): ExploreUsage {
   const capFraction = over.capFraction ?? DEFAULT_EXPLORE_CAP_FRACTION
   const capUsd = over.capUsd ?? capFraction * totalValueUsd
   const usedUsd = over.usedUsd ?? 0
-  return { capFraction, totalValueUsd, capUsd, usedUsd, leftUsd: Math.max(0, capUsd - usedUsd), ...over }
+  return {
+    capFraction, totalValueUsd, baseUsd: totalValueUsd, capUsd, usedUsd,
+    leftUsd: Math.max(0, capUsd - usedUsd), tier1Funded: true, closedReason: null,
+    ...over,
+  }
 }
 
 describe('clampExploreCapFraction', () => {
@@ -88,6 +92,8 @@ describe('explore cap is enforced in the pre-trade path and logged', () => {
     const src = read('lib/explore/cap.ts')
     expect(src).toContain("from('audit_logs')")
     expect(src).toContain("decision: 'block'")
-    expect(src).toContain("blocked_by: 'explore_cap'")
+    expect(src).toContain("'explore_cap'")
+    expect(src).toContain("'tier1_gate'")
+    expect(src).toContain('blocked_by:')
   })
 })

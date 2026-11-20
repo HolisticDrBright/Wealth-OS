@@ -33,6 +33,11 @@ export function exitPhrase(exitReason: string | null): string {
   }
 }
 
+/** Blocked because Tier 1 Safety isn't full yet (Explore is $0 until it is). */
+export function isTier1Reason(reason: string | null): boolean {
+  return !!reason && reason.startsWith('tier1_unfunded')
+}
+
 export function isCostReason(reason: string | null): boolean {
   if (!reason) return false
   const r = reason.toLowerCase()
@@ -57,8 +62,12 @@ export function generateWeeklySummary(i: WeeklyInputs): string[] {
     out.push(`Closed ${extraCloses} more position${extraCloses === 1 ? '' : 's'} for a combined ${total >= 0 ? 'gain' : 'loss'} of ${money(total)} as their exit rules triggered.`)
   }
 
-  const costBlocked = i.blocked.filter(b => isCostReason(b.reason)).length
-  const otherBlocked = i.blocked.length - costBlocked
+  const tier1Blocked = i.blocked.filter(b => isTier1Reason(b.reason)).length
+  const costBlocked = i.blocked.filter(b => !isTier1Reason(b.reason) && isCostReason(b.reason)).length
+  const otherBlocked = i.blocked.length - costBlocked - tier1Blocked
+  if (tier1Blocked > 0) {
+    out.push(`Held back ${tier1Blocked} Explore trade idea${tier1Blocked === 1 ? '' : 's'} because your safety cushion isn't full yet — Explore stays at $0 until it is.`)
+  }
   if (costBlocked > 0) {
     out.push(`Skipped ${costBlocked} trade idea${costBlocked === 1 ? '' : 's'} that would have cost more to place than ${costBlocked === 1 ? 'it was' : 'they were'} likely to earn.`)
   }

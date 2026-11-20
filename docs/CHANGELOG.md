@@ -1,5 +1,59 @@
 # Wealth OS Changelog
 
+## 2026-11-20 — Wealth-manager allocation, Phase 2: the three-tier ladder
+
+A person's money is filled in order — **Tier 1 Safety** (cash-like),
+**Tier 2 Core** (the fund mix), **Tier 3 Explore** (strategies + copying).
+
+- **Pure model** `lib/allocation/ladder.ts` (`computeLadder`): Tier 1 target =
+  `EMERGENCY_FUND_MONTHS` × essential monthly expenses + the FULL target of
+  every goal due within `SHORT_HORIZON_YEARS`. Funding is holdings-level
+  (owner decision: strict): recorded cash assets + Tier 1 money designated by
+  an approved setup decision must reach the target. Real estate is not
+  investable money. Explore's cap is measured on money NOT in Tier 1 and is
+  **$0 until Tier 1 is funded**.
+- **Glide path** in `lib/allocation/policy.ts` (owner decision:
+  profile-anchored, tilt caps the upside): a goal ≥ 10 years away holds the
+  profile's own stock share capped at balanced + `PROFILE_TILT_MAX`
+  (vault 20%, conservative 40%, balanced 60%, growth 75%, speculative 75%);
+  between 10 and 2 years it steps down linearly to `GLIDE_SHORT_FRACTION`
+  (25%) of that; under 2 years the goal's money is Tier 1. Several goals →
+  dollar-weighted blend. Core holds no cash (cash is Tier 1).
+- **Strict gate** in the pre-trade path: `exploreCapVerdict` blocks every
+  Explore trade while Tier 1 is short (`tier1_unfunded: …`), logged to
+  audit_logs with `blocked_by: 'tier1_gate'`. Applies to the paper runner and
+  the copy-trade executor. Only ever reduces: property-tested that the new
+  cap is never above the old one.
+- **One-tap setup**: "Set up your safety cushion" decision (web /advisor
+  ladder panel, web + mobile "Needs your decision" — ladder decisions come
+  first; mobile Approve modal). Approving records a `setup_ladder` approval,
+  THEN designates the shortfall (bounded by available money) as Tier 1 paper
+  money in `ladder_state`. Phase 3 turns it into real paper SGOV.
+- **Monthly expenses**: new onboarding step 4 (saved before the profile is
+  marked onboarded), plus inputs on the web ladder panel and the mobile Goals
+  screen. Stored in the existing `financial_profile.monthly_essential_expenses_usd`.
+- **Display**: web /advisor "Your money ladder" panel; mobile Goals "Where the
+  money is" is now the three-tier ladder (shown even with no goal). Both
+  Explore screens and the weekly/activity sentences explain a Tier 1 hold in
+  plain English.
+- Mobile endpoints: `POST /api/mobile/goal` accepts `{ monthly_expenses_usd }`;
+  `GET/POST /api/mobile/approve` serve and approve the ladder setup ahead of
+  rebalances (server supplies the exact summary the user approves).
+
+**New constants** (`lib/config/product-defaults.ts`): `EMERGENCY_FUND_MONTHS` 6,
+`SHORT_HORIZON_YEARS` 2, `CASH_LIKE_CATEGORIES` ['cash'],
+`LADDER_EXCLUDED_CATEGORIES` ['real_estate'], `GLIDE_FULL_HORIZON_YEARS` 10,
+`GLIDE_SHORT_FRACTION` 0.25, `PROFILE_TILT_MAX` 0.15,
+`GLIDE_REFERENCE_PROFILE` 'balanced'.
+
+**New migration**: `20260704l_ladder.sql` — `ladder_state` (RLS: owner) and
+`setup_ladder` added to the `automation_approvals.kind` check.
+
+**Burn-in impact (owner-approved)**: from deploy, every paper strategy and
+copy trade blocks until the user enters monthly expenses and approves the
+setup decision. Requires `financial_profile` (migration 20260703c) and
+migrations j/k/l applied remotely.
+
 ## 2026-11-19 — Wealth-manager allocation, Phase 1: one source of truth for the mix
 
 Owner inputs recorded in `lib/config/product-defaults.ts`: Core funds VTI /

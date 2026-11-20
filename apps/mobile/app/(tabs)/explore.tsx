@@ -153,7 +153,7 @@ export default function ExploreScreen() {
           <Card className="gap-2.5">
             <View className="flex-row items-baseline justify-between">
               <Text className="font-inter-semibold text-[15px] text-ink">Explore limit</Text>
-              <Text className="font-inter text-[13px] text-ink-secondary">{Math.round(usage.capFraction * 100)}% of your money</Text>
+              <Text className="font-inter text-[13px] text-ink-secondary">{Math.round(usage.capFraction * 100)}% of money outside Safety</Text>
             </View>
             <ProgressBar
               fraction={usedFraction}
@@ -171,11 +171,15 @@ export default function ExploreScreen() {
                 <Text className="font-inter text-[13px] text-ink-secondary">left</Text>
               </View>
             </View>
-            {usage.totalValueUsd <= 0 && (
+            {usage.totalValueUsd <= 0 ? (
               <Text className="font-inter text-[13px] leading-5 text-loss">
                 No recorded portfolio value yet, so the Explore limit is $0 — nothing can be copied until your money is recorded on the web app.
               </Text>
-            )}
+            ) : !usage.tier1Funded && usage.closedReason ? (
+              <Text accessibilityRole="alert" className="font-inter text-[13px] leading-5 text-loss">
+                {usage.closedReason}
+              </Text>
+            ) : null}
           </Card>
 
           <Text accessibilityRole="header" className="mt-1.5 font-inter-semibold text-[15px] text-ink">Traders you can copy</Text>

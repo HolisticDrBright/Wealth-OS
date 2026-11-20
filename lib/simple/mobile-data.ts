@@ -14,8 +14,10 @@ import {
   medianOf, projectGoalMonths, addMonths, goalStatusOf, yearRangeUsd,
   badYearSetbackMonths, type GoalStatus, type YearRangeUsd,
 } from '@/lib/planning/goal-projection'
-import { generateWeeklySummary, exitPhrase, isCostReason } from '@/lib/simple/weekly-summary'
+import { generateWeeklySummary, exitPhrase, isCostReason, isTier1Reason } from '@/lib/simple/weekly-summary'
 import { getExploreUsage, type ExploreUsage } from '@/lib/explore/cap'
+import { loadLadder } from '@/lib/allocation/ladder-data'
+import { ladderSetupAmount, type Ladder } from '@/lib/allocation/ladder'
 import { roundTripCostUsd } from '@/lib/costs/transaction-costs'
 import { liveTradingEnabled } from '@/lib/broker-adapters/execution-guard'
 
@@ -116,7 +118,8 @@ export interface MobileHome {
   valueSeries: Array<{ date: string; valueUsd: number }>
   goal: MobileGoalView | null
   goalCount: number
-  decision: { title: string; subtitle: string; count: number } | null
+  /** Ladder decisions come first: Explore is $0 until Tier 1 Safety is funded. */
+  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
 }
 
@@ -169,13 +172,31 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
   })
 
   const suggestions = (suggestionsRes.data ?? []) as Array<{ id: string }>
-  const decision = suggestions.length > 0
-    ? {
-        title: 'Rebalance your core portfolio',
-        subtitle: 'Your mix has drifted from your plan. Takes one tap.',
-        count: suggestions.length,
-      }
-    : null
+  const ladder = await loadLadder(supabase, userId).catch(() => null)
+  const setupUsd = ladder ? ladderSetupAmount(ladder) : 0
+  let decision: MobileHome['decision'] = null
+  if (ladder?.tier1.status === 'needs_expenses') {
+    decision = {
+      kind: 'ladder_expenses',
+      title: 'Add your monthly expenses',
+      subtitle: 'We size your safety cushion from them. Explore stays at $0 until it is full.',
+      count: 1,
+    }
+  } else if (setupUsd > 0) {
+    decision = {
+      kind: 'ladder_setup',
+      title: 'Set up your safety cushion',
+      subtitle: `Move $${Math.round(setupUsd).toLocaleString('en-US')} of practice money into cash first. Takes one tap.`,
+      count: 1,
+    }
+  } else if (suggestions.length > 0) {
+    decision = {
+      kind: 'rebalance',
+      title: 'Rebalance your core portfolio',
+      subtitle: 'Your mix has drifted from your plan. Takes one tap.',
+      count: suggestions.length,
+    }
+  }
 
   return {
     practiceMode: !liveTradingEnabled(),
@@ -198,14 +219,19 @@ export interface MobileGoalDetail {
   yearRange: YearRangeUsd | null
   split: { coreUsd: number; exploreUsd: number }
   exploreUsage: ExploreUsage
+  /** The three-tier ladder (Safety / Core / Explore). */
+  ladder: Ladder
+  /** Present when the "Set up your ladder" decision is waiting. */
+  ladderSetupUsd: number
 }
 
 export async function buildMobileGoal(supabase: SupabaseClient, userId: string): Promise<MobileGoalDetail> {
-  const [{ closed, open, baseAssetsUsd }, goals, returns, usage] = await Promise.all([
+  const [{ closed, open, baseAssetsUsd }, goals, returns, usage, ladder] = await Promise.all([
     loadPositions(supabase, userId),
     loadGoals(supabase, userId),
     fetchSpxMonthlyReturns(),
     getExploreUsage(supabase, userId),
+    loadLadder(supabase, userId),
   ])
   const totalRealized = closed.reduce((s, r) => s + (r.realized_pnl_usd ?? 0), 0)
   const totalUnrealized = open.reduce((s, r) => s + (r.unrealized_pnl_usd ?? 0), 0)
@@ -220,6 +246,8 @@ export async function buildMobileGoal(supabase: SupabaseClient, userId: string):
     yearRange: yearRangeUsd(Math.max(1, totalValueUsd), returns),
     split: { coreUsd: Math.round(coreUsd), exploreUsd: Math.round(exploreUsd) },
     exploreUsage: usage,
+    ladder,
+    ladderSetupUsd: ladderSetupAmount(ladder),
   }
 }
 
@@ -242,6 +270,7 @@ function money(n: number): string {
 
 function plainBlockReason(reason: string | null): string {
   if (!reason) return "it didn't pass your safety rules."
+  if (isTier1Reason(reason)) return "your safety cushion isn't full yet — Explore stays at $0 until it is."
   const r = reason.toLowerCase()
   if (isCostReason(reason)) return 'after fees and price movement, it was expected to earn less than it cost.'
   if (r.includes('explore_cap')) return 'it would have pushed Explore past the limit you set.'

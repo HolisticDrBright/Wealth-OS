@@ -7,23 +7,24 @@
  *  - Explore: ALL strategy and copy-trading activity.
  *
  * The Explore cap is the Explore sleeve's target_allocation_pct. Default 10%
- * of total portfolio value; pro users may raise it, but never beyond
- * EXPLORE_CAP_HARD_MAX_FRACTION. Enforcement happens in the pre-trade path:
- * a strategy or copy trade that would push Explore usage over the cap is
- * blocked and logged like every other block.
+ * of money NOT in Tier 1 Safety (the three-tier ladder, lib/allocation/
+ * ladder.ts), and $0 until Tier 1 is fully funded; pro users may raise it,
+ * but never beyond EXPLORE_CAP_HARD_MAX_FRACTION. Enforcement happens in the
+ * pre-trade path: a strategy or copy trade that would push Explore usage over
+ * the cap — or any Explore trade while Tier 1 is short — is blocked and
+ * logged like every other block.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_EXPLORE_CAP_FRACTION, EXPLORE_CAP_HARD_MAX_FRACTION } from '@/lib/config/product-defaults'
-import { corePercentages, coreFundTargets } from '@/lib/allocation/policy'
+import { corePercentages, coreFundTargets, clampExploreCapFraction } from '@/lib/allocation/policy'
+import { loadLadder } from '@/lib/allocation/ladder-data'
 
 // Thresholds live in lib/config/product-defaults.ts; re-exported for callers.
 export { DEFAULT_EXPLORE_CAP_FRACTION, EXPLORE_CAP_HARD_MAX_FRACTION }
 
-export function clampExploreCapFraction(f: number | null | undefined): number {
-  if (f == null || !Number.isFinite(f) || f < 0) return DEFAULT_EXPLORE_CAP_FRACTION
-  return Math.min(EXPLORE_CAP_HARD_MAX_FRACTION, f)
-}
+// Pure clamp lives in the policy module (the ladder uses it too).
+export { clampExploreCapFraction }
 
 export interface CoreExploreSleeves {
   coreId: string
@@ -101,45 +102,38 @@ export async function ensureCoreExploreSleeves(
 
 export interface ExploreUsage {
   capFraction: number
+  /** Investable money (recorded assets minus non-investable categories). */
   totalValueUsd: number
+  /** Money the cap is measured against: investable minus Tier 1 Safety. */
+  baseUsd: number
   capUsd: number
   usedUsd: number
   leftUsd: number
+  /** Explore is $0 until Tier 1 Safety is fully funded. */
+  tier1Funded: boolean
+  /** Plain-English reason when Explore is closed (Simple mode shows it). */
+  closedReason: string | null
 }
 
 /**
- * Current Explore usage: open paper positions + open copied positions,
- * against the cap fraction of total portfolio value (recorded assets).
+ * Current Explore usage from the three-tier ladder: open strategy + copied
+ * notional, against the cap fraction of money NOT in Tier 1 — and zero until
+ * Tier 1 is fully funded.
  */
 export async function getExploreUsage(
   supabase: SupabaseClient,
   userId: string
 ): Promise<ExploreUsage> {
-  const [sleevesRes, assetsRes, paperRes, copiedRes] = await Promise.all([
-    supabase.from('portfolio_sleeves').select('target_allocation_pct, metadata').eq('user_id', userId),
-    supabase.from('assets').select('current_value').eq('user_id', userId),
-    supabase.from('paper_positions').select('notional_usd').eq('user_id', userId).eq('status', 'open'),
-    supabase.from('user_copied_positions').select('notional_value').eq('user_id', userId).eq('status', 'open'),
-  ])
-
-  const explore = ((sleevesRes.data ?? []) as Array<{ target_allocation_pct: number | null; metadata: Record<string, unknown> | null }>)
-    .find(s => s.metadata?.kind === 'explore')
-  const capFraction = clampExploreCapFraction(
-    explore?.target_allocation_pct != null ? Number(explore.target_allocation_pct) / 100 : null)
-
-  const totalValueUsd = ((assetsRes.data ?? []) as Array<{ current_value: number | null }>)
-    .reduce((s, r) => s + (r.current_value ?? 0), 0)
-  const usedUsd =
-    ((paperRes.data ?? []) as Array<{ notional_usd: number | null }>).reduce((s, r) => s + (r.notional_usd ?? 0), 0) +
-    ((copiedRes.data ?? []) as Array<{ notional_value: number | null }>).reduce((s, r) => s + (r.notional_value ?? 0), 0)
-
-  const capUsd = capFraction * totalValueUsd
+  const ladder = await loadLadder(supabase, userId)
   return {
-    capFraction,
-    totalValueUsd,
-    capUsd: Math.round(capUsd * 100) / 100,
-    usedUsd: Math.round(usedUsd * 100) / 100,
-    leftUsd: Math.round(Math.max(0, capUsd - usedUsd) * 100) / 100,
+    capFraction: ladder.explore.capFraction,
+    totalValueUsd: ladder.investableUsd,
+    baseUsd: ladder.explore.baseUsd,
+    capUsd: ladder.explore.capUsd,
+    usedUsd: ladder.explore.inUseUsd,
+    leftUsd: ladder.explore.leftUsd,
+    tier1Funded: ladder.tier1.funded,
+    closedReason: ladder.explore.reason,
   }
 }
 
@@ -149,12 +143,19 @@ export function exploreCapVerdict(usage: ExploreUsage, orderNotionalUsd: number)
   if (usage.totalValueUsd <= 0) {
     return { allowed: false, reason: 'explore_cap: no recorded portfolio value — cap is $0' }
   }
+  // Safest money first: no Explore trade until Tier 1 Safety is full.
+  if (!usage.tier1Funded) {
+    return {
+      allowed: false,
+      reason: `tier1_unfunded: ${usage.closedReason ?? 'safety cushion not yet full — Explore is $0'}`,
+    }
+  }
   if (usage.usedUsd + orderNotionalUsd > usage.capUsd) {
     return {
       allowed: false,
       reason: `explore_cap: $${Math.round(usage.usedUsd + orderNotionalUsd).toLocaleString()} would exceed the ` +
         `${Math.round(usage.capFraction * 100)}% Explore limit ($${Math.round(usage.capUsd).toLocaleString()} ` +
-        `of $${Math.round(usage.totalValueUsd).toLocaleString()}); $${Math.round(usage.leftUsd).toLocaleString()} left`,
+        `of $${Math.round(usage.baseUsd).toLocaleString()} outside Safety); $${Math.round(usage.leftUsd).toLocaleString()} left`,
     }
   }
   return { allowed: true }
@@ -179,6 +180,9 @@ export async function logExploreCapBlock(
     user_id: userId, strategy_key: args.strategyKey, symbol: args.symbol,
     decision: 'block', size_fraction: 0, mirofish_used: false, kronos_used: false,
     decided_at: new Date().toISOString(),
-    metadata: { blocked_by: 'explore_cap', reason: args.reason, route: args.route },
+    metadata: {
+      blocked_by: args.reason.startsWith('tier1_unfunded') ? 'tier1_gate' : 'explore_cap',
+      reason: args.reason, route: args.route,
+    },
   }).then(() => {}, () => {})
 }

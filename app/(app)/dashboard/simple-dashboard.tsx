@@ -138,7 +138,7 @@ export async function SimpleDashboard() {
       {/* d. Needs your decision */}
       {data.decisions.length > 0 ? (
         <Link
-          href="/strategies"
+          href={data.decisions[0].href}
           className="block rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5 transition-colors hover:border-cyan-400/40"
         >
           <p className="text-xs font-semibold tracking-wide text-cyan-300">NEEDS YOUR DECISION</p>

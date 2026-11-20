@@ -1,8 +1,8 @@
 /**
- * Approve a change (modal). GET /api/mobile/approve describes the pending
- * rebalance; POST records the approval THEN executes through the web's own
- * rebalance path (pre-execution guard per order). Nothing happens until the
- * user taps Approve.
+ * Approve a change (modal). GET /api/mobile/approve describes the top pending
+ * decision — the ladder setup first (Explore is $0 until Safety is funded),
+ * otherwise a Core rebalance. POST sends back the server's exact summary; the
+ * server records the approval THEN acts. Nothing happens until Approve.
  */
 
 import { useState } from 'react'
@@ -14,21 +14,15 @@ import { api, useApi, type ApproveDecision } from '@/src/api'
 import { Card, Money, PrimaryButton, SecondaryButton, StateView, SplitBar, formatUsd } from '@/src/ui'
 import { colors } from '@/src/theme'
 
-function stockShare(d: ApproveDecision, which: 'current' | 'target'): number | null {
-  const t = d.trades.find(x => x.assetClass === 'stock')
-  if (!t) return null
-  return which === 'current' ? t.currentPct : t.targetPct
-}
-
-function MixBar({ label, stocksPct }: { label: string; stocksPct: number }) {
-  const s = Math.round(stocksPct)
+function MixBar({ label, pct, what }: { label: string; pct: number; what: string }) {
+  const s = Math.round(pct)
   return (
     <View className="gap-1.5">
       <View className="flex-row justify-between">
         <Text className="font-inter text-[13px] text-ink-secondary">{label}</Text>
-        <Text className="font-inter text-[13px] text-ink-secondary">{s}% stocks · {100 - s}% other</Text>
+        <Text className="font-inter text-[13px] text-ink-secondary">{s}% {what} · {100 - s}% other</Text>
       </View>
-      <SplitBar aFraction={s / 100} bColor="#5b6275" label={`${label}: ${s}% stocks, ${100 - s}% other`} />
+      <SplitBar aFraction={s / 100} bColor="#5b6275" label={`${label}: ${s}% ${what}, ${100 - s}% other`} />
     </View>
   )
 }
@@ -42,9 +36,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-function summaryFor(d: ApproveDecision): string {
-  return `Rebalance my core portfolio: move about ${formatUsd(d.amountMovedUsd)} back to my plan, ` +
-    `estimated cost about ${formatUsd(d.estimatedCostUsd)}, estimated tax effect ${d.estimatedTaxUsd > 0 ? `about ${formatUsd(d.estimatedTaxUsd)}` : 'none'}.`
+function taxText(d: ApproveDecision): string {
+  if (d.taxNote) return d.taxNote
+  return d.estimatedTaxUsd > 0 ? `about ${formatUsd(d.estimatedTaxUsd)}` : 'none'
 }
 
 export default function ApproveScreen() {
@@ -54,8 +48,6 @@ export default function ApproveScreen() {
   const [done, setDone] = useState<string | null>(null)
 
   const d = data?.decision ?? null
-  const before = d ? stockShare(d, 'current') : null
-  const after = d ? stockShare(d, 'target') : null
 
   return (
     <SafeAreaView className="flex-1 bg-ground">
@@ -91,11 +83,11 @@ export default function ApproveScreen() {
               <Text className="font-inter text-[15px] leading-6 text-ink-body">{d.explanation}</Text>
             </View>
 
-            {before != null && after != null && (
+            {d.change && (
               <Card className="gap-3.5 p-[18px]">
                 <Text accessibilityRole="header" className="font-inter-semibold text-[15px] text-ink">What changes</Text>
-                <MixBar label="Now" stocksPct={before} />
-                <MixBar label="After" stocksPct={after} />
+                <MixBar label="Now" pct={d.change.beforePct} what={d.change.label} />
+                <MixBar label="After" pct={d.change.afterPct} what={d.change.label} />
               </Card>
             )}
 
@@ -108,7 +100,7 @@ export default function ApproveScreen() {
               </Row>
               <Row label="Estimated tax effect">
                 <Text style={{ fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 14, color: colors.ink }}>
-                  {d.estimatedTaxUsd > 0 ? `about ${formatUsd(d.estimatedTaxUsd)}` : 'none'}
+                  {taxText(d)}
                 </Text>
               </Row>
               {d.badYearBeforeUsd != null && d.badYearAfterUsd != null && (
@@ -133,10 +125,12 @@ export default function ApproveScreen() {
               onPress={async () => {
                 setBusy(true); setSubmitError(null)
                 try {
-                  const res = await api.approve(summaryFor(d))
+                  const res = await api.approve(d.kind, d.summary)
                   const skipped = res.skippedOrders.length
                   setDone(
-                    res.executed > 0
+                    d.kind === 'ladder_setup'
+                      ? `Your safety cushion is set up with ${formatUsd(res.designatedUsd ?? 0)} of practice money. Explore can start once Safety is full.`
+                      : res.executed > 0
                       ? `Done — ${res.executed} change${res.executed === 1 ? '' : 's'} placed. You can see them in Activity.`
                       : skipped > 0
                         ? 'Your approval is recorded. No orders were placed because Wealth OS is in practice mode — nothing real moved.'
