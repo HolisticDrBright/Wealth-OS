@@ -139,3 +139,23 @@ export const EXPLORE_RISK_REFERENCE_VOL = 0.20
  * risk budget (owner decision: measured against the Explore risk budget).
  */
 export const MAX_POSITION_RISK_SHARE = 0.20
+
+// ─── Strategy books (Phase 5) ────────────────────────────────────────────────
+
+/**
+ * Product default: the most of open strategy notional (and, Phase 4, of open
+ * risk units) the 'speculative' book may hold. Lottery-ticket strategies
+ * (memecoins, airdrop farming, 5-minute crypto binaries) live here.
+ */
+export const SPECULATIVE_BOOK_CAP = 0.10
+
+/**
+ * Product default: regime multipliers for the speculative book (owner
+ * decision: half size even in RISK_ON; closed in RISK_OFF and CRISIS).
+ */
+export const SPECULATIVE_REGIME_MULTIPLIER = {
+  RISK_ON: 0.5,
+  NEUTRAL: 0.5,
+  RISK_OFF: 0,
+  CRISIS: 0,
+} as const

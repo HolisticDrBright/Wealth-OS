@@ -16,16 +16,24 @@
  *              lowest capacity, most cost-sensitive.
  *   info       Information edges in prediction markets — genuinely
  *              uncorrelated to financial markets, capped by venue risk.
+ *   speculative  Lottery tickets (Phase 5): memecoins, airdrop farming,
+ *              5-minute crypto binaries. Small cap, half size in good
+ *              regimes, closed in bad ones.
  *
  * The map below is exhaustive over StrategyKey (compile-time enforced), so a
  * new strategy cannot be registered without declaring its book.
+ *
+ * Phase 5 relabels (owner decision: a MOVED strategy counts against BOTH its
+ * new book and its old one — see ALSO_COUNTS_AGAINST — so moving it can only
+ * tighten its limits, never loosen them).
  */
 
 import type { StrategyKey } from './strategy-registry'
+import { SPECULATIVE_BOOK_CAP, SPECULATIVE_REGIME_MULTIPLIER } from '@/lib/config/product-defaults'
 
-export type StrategyBook = 'carry' | 'convexity' | 'trend' | 'event' | 'arb' | 'info'
+export type StrategyBook = 'carry' | 'convexity' | 'trend' | 'event' | 'arb' | 'info' | 'speculative'
 
-export const ALL_BOOKS: StrategyBook[] = ['carry', 'convexity', 'trend', 'event', 'arb', 'info']
+export const ALL_BOOKS: StrategyBook[] = ['carry', 'convexity', 'trend', 'event', 'arb', 'info', 'speculative']
 
 export const STRATEGY_BOOK: Record<StrategyKey, StrategyBook> = {
   // ── Trend / momentum ────────────────────────────────────────────────────────
@@ -39,7 +47,6 @@ export const STRATEGY_BOOK: Record<StrategyKey, StrategyBook> = {
   dca_halving:              'trend',     // phase-aware accumulation rides the cycle
   narrative_rotation:       'trend',
   onchain_signal:           'trend',
-  memecoin_bondingcurve:    'trend',
   cot_positioning:          'trend',
   cb_divergence:            'trend',     // macro divergence rides policy trends
 
@@ -54,18 +61,15 @@ export const STRATEGY_BOOK: Record<StrategyKey, StrategyBook> = {
   pendle_pt_fixed_yield:    'carry',
   polymarket_theta_decay:   'carry',
   swap_point_arbitrage:     'carry',
-  airdrop_farming:          'carry',     // farm-and-harvest income profile
   polymarket_market_maker:  'carry',     // bid-ask income, short-tail profile
   odte_strangle_hedged:     'carry',     // stub — never executes, classified for completeness
   ibit_vol_skew:            'carry',     // stub — never executes
 
   // ── Convexity / tail ────────────────────────────────────────────────────────
+  // Real long-vol protection only (Phase 5).
   tail_risk_hedging:        'convexity',
   vix_term_structure:       'convexity',
-  jpy_intervention_fade:    'convexity',
-  gamma_exposure:           'convexity', // vol-regime structure trades
-  liquidation_hunting:      'convexity', // profits from forced-seller cascades
-  factor_crowded_trade_fade:'convexity', // stub — never executes
+  factor_crowded_trade_fade:'convexity', // stub — never executes; left in place (brief: move nothing else)
 
   // ── Event-driven ────────────────────────────────────────────────────────────
   pead:                     'event',
@@ -77,6 +81,10 @@ export const STRATEGY_BOOK: Record<StrategyKey, StrategyBook> = {
   autopilot_congressional:  'event',
   macro_news_event:         'event',
   polymarket_event_compression:  'event',
+  // Phase 5: event / catalyst trades, not insurance — moved from convexity.
+  liquidation_hunting:      'event',     // forced-seller cascades are a catalyst, not a hedge
+  gamma_exposure:           'event',     // dealer-positioning catalysts
+  jpy_intervention_fade:    'event',     // a policy-event fade
 
   // ── Structural arbitrage ────────────────────────────────────────────────────
   triangular_arb:           'arb',
@@ -99,8 +107,27 @@ export const STRATEGY_BOOK: Record<StrategyKey, StrategyBook> = {
   polymarket_liquidity_pocket: 'info',
   polymarket_no_trade:      'info',
   polymarket_wallet_copy:   'info',
-  polymarket_crypto_binary_5min: 'info',
   polymarket_kalshi_weather:'info',
+
+  // ── Speculative (Phase 5) ───────────────────────────────────────────────────
+  memecoin_bondingcurve:    'speculative', // was trend
+  airdrop_farming:          'speculative', // was carry
+  polymarket_crypto_binary_5min: 'speculative', // was info
+}
+
+/**
+ * Owner decision (Phase 5): strategies moved to a new book ALSO count against
+ * the book they came from. Their exposure is added to both books and a new
+ * position must fit both books' caps (dollars and risk) and both books'
+ * regime multipliers — the smaller allowed size wins.
+ */
+export const ALSO_COUNTS_AGAINST: Partial<Record<StrategyKey, StrategyBook>> = {
+  memecoin_bondingcurve:         'trend',
+  airdrop_farming:               'carry',
+  polymarket_crypto_binary_5min: 'info',
+  liquidation_hunting:           'convexity',
+  gamma_exposure:                'convexity',
+  jpy_intervention_fade:         'convexity',
 }
 
 export interface BookMeta {
@@ -133,6 +160,10 @@ export const BOOK_META: Record<StrategyBook, BookMeta> = {
     label: 'Information Edge',
     blurb: 'Prediction-market edges, uncorrelated to financial markets. Venue-capped.',
   },
+  speculative: {
+    label: 'Speculative',
+    blurb: 'Lottery tickets — memecoins, airdrops, 5-minute binaries. Small cap; half size even in good regimes, closed in bad ones.',
+  },
 }
 
 /**
@@ -148,6 +179,7 @@ export const BOOK_NOTIONAL_CAP: Record<StrategyBook, number> = {
   info:      0.25,
   arb:       0.20,
   convexity: 0.20,
+  speculative: SPECULATIVE_BOOK_CAP,
 }
 
 /**
@@ -160,17 +192,25 @@ export const BOOK_NOTIONAL_CAP: Record<StrategyBook, number> = {
 export type RegimeName = 'RISK_ON' | 'NEUTRAL' | 'RISK_OFF' | 'CRISIS'
 
 export const REGIME_BOOK_MULTIPLIER: Record<RegimeName, Record<StrategyBook, number>> = {
-  RISK_ON:  { carry: 1.0, trend: 1.0, event: 1.0, arb: 1.0, info: 1.0, convexity: 1.0 },
-  NEUTRAL:  { carry: 1.0, trend: 1.0, event: 1.0, arb: 1.0, info: 1.0, convexity: 1.0 },
+  RISK_ON:  { carry: 1.0, trend: 1.0, event: 1.0, arb: 1.0, info: 1.0, convexity: 1.0, speculative: SPECULATIVE_REGIME_MULTIPLIER.RISK_ON },
+  NEUTRAL:  { carry: 1.0, trend: 1.0, event: 1.0, arb: 1.0, info: 1.0, convexity: 1.0, speculative: SPECULATIVE_REGIME_MULTIPLIER.NEUTRAL },
   // Risk-off: carry premia unwind together — cut hardest. Trend and convexity
   // are the books that historically earn here, so they keep full (already
   // regime-haircut) size. Event carries deal-break risk in stress — trimmed.
-  RISK_OFF: { carry: 0.5, trend: 1.0, event: 0.7, arb: 0.9, info: 0.9, convexity: 1.0 },
-  CRISIS:   { carry: 0,   trend: 0,   event: 0,   arb: 0,   info: 0,   convexity: 1.0 },
+  RISK_OFF: { carry: 0.5, trend: 1.0, event: 0.7, arb: 0.9, info: 0.9, convexity: 1.0, speculative: SPECULATIVE_REGIME_MULTIPLIER.RISK_OFF },
+  CRISIS:   { carry: 0,   trend: 0,   event: 0,   arb: 0,   info: 0,   convexity: 1.0, speculative: SPECULATIVE_REGIME_MULTIPLIER.CRISIS },
 }
 
+/** The strategy's label book (where it is shown and primarily budgeted). */
 export function bookFor(strategyKey: string): StrategyBook {
   return STRATEGY_BOOK[strategyKey as StrategyKey] ?? 'event'
+}
+
+/** Every book a strategy's exposure counts against: its label book, plus its old one if moved. */
+export function booksFor(strategyKey: string): StrategyBook[] {
+  const primary = bookFor(strategyKey)
+  const also = ALSO_COUNTS_AGAINST[strategyKey as StrategyKey]
+  return also && also !== primary ? [primary, also] : [primary]
 }
 
 export function regimeBookMultiplier(regime: string, book: StrategyBook): number {

@@ -14,7 +14,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
-  bookFor, regimeBookMultiplier, BOOK_NOTIONAL_CAP, ALL_BOOKS,
+  booksFor, regimeBookMultiplier, BOOK_NOTIONAL_CAP, ALL_BOOKS,
   type StrategyBook,
 } from '@/lib/strategies/strategy-books'
 import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
@@ -82,11 +82,14 @@ export async function computeBookExposures(
   for (const row of rows) {
     const notional = Math.abs(row.notional_usd ?? 0)
     const ru = riskUnits(notional, vols.get(`${row.asset_class ?? ''}|${row.symbol ?? ''}`) ?? 1)
-    const book = bookFor(row.strategy_key)
+    // A moved strategy counts against its old book too (Phase 5) — added to
+    // each book it belongs to, but only once to the totals.
     total += notional
     totalRisk += ru
-    byBook[book] += notional
-    riskByBook[book] += ru
+    for (const book of booksFor(row.strategy_key)) {
+      byBook[book] += notional
+      riskByBook[book] += ru
+    }
   }
 
   return { totalNotionalUsd: total, byBook, totalRiskUnits: totalRisk, riskByBook }
@@ -125,11 +128,12 @@ function roomFor(cap: number, total: number, open: number, weight: number): numb
  *    exceed the cap, scale the proposal down to fit; block when the room left
  *    is negligible (< 10% of the proposal).
  */
-export function gateThroughBook(opts: {
+interface GateOpts {
   strategyKey: string
   proposedNotionalUsd: number
   regime: string
   totalNotionalUsd: number
+  /** Open notional in the strategy's LABEL book. */
   bookNotionalUsd: number
   /**
    * Phase 4 risk-unit gate (ADDITIONAL). Omitted → dollar gate only.
@@ -138,9 +142,41 @@ export function gateThroughBook(opts: {
   proposedVol?: number
   totalRiskUnits?: number
   bookRiskUnits?: number
-}): BookGateResult {
-  const { strategyKey, proposedNotionalUsd, regime, totalNotionalUsd, bookNotionalUsd } = opts
-  const book = bookFor(strategyKey)
+  /**
+   * Phase 5: exposure of the OTHER books a moved strategy also counts
+   * against (ALSO_COUNTS_AGAINST). Missing → treated as empty.
+   */
+  otherBooks?: Partial<Record<StrategyBook, { notionalUsd: number; riskUnits: number }>>
+}
+
+/**
+ * Gate a proposed position through EVERY book its strategy counts against
+ * (Phase 5: a moved strategy counts against its old book too). It must fit
+ * each book's regime multiplier and cap; the smallest allowed size wins.
+ */
+export function gateThroughBook(opts: GateOpts): BookGateResult {
+  const books = booksFor(opts.strategyKey)
+  const primary = books[0]
+  const results = books.map(b => b === primary
+    ? gateOneBook(b, opts)
+    : gateOneBook(b, {
+        ...opts,
+        bookNotionalUsd: opts.otherBooks?.[b]?.notionalUsd ?? 0,
+        bookRiskUnits: opts.bookRiskUnits == null ? undefined : (opts.otherBooks?.[b]?.riskUnits ?? 0),
+      }))
+  const blocked = results.find(r => !r.allowed)
+  if (blocked) {
+    return {
+      ...blocked, book: primary,
+      reason: blocked.book !== primary ? `${blocked.reason} (${opts.strategyKey} still counts against its old ${blocked.book} book)` : blocked.reason,
+    }
+  }
+  const binding = results.reduce((a, r) => (r.multiplier < a.multiplier ? r : a))
+  return { allowed: true, multiplier: binding.multiplier, book: primary, reason: binding.reason }
+}
+
+function gateOneBook(book: StrategyBook, opts: GateOpts): BookGateResult {
+  const { proposedNotionalUsd, regime, totalNotionalUsd, bookNotionalUsd } = opts
 
   // Regime rotation first
   const regimeMult = regimeBookMultiplier(regime, book)

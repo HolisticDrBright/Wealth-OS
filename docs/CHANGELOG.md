@@ -1,5 +1,38 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Wealth-manager allocation, Phase 5: book labels
+
+- **New `speculative` book** (`lib/strategies/strategy-books.ts`): cap
+  `SPECULATIVE_BOOK_CAP` (0.10) on both dollar and risk-unit share; regime
+  multipliers `SPECULATIVE_REGIME_MULTIPLIER` (owner decision: RISK_ON 0.5,
+  NEUTRAL 0.5, RISK_OFF 0, CRISIS 0). Added to `BOOK_META`, every regime
+  table, `ALL_BOOKS`, the Risk Room and Strategy Health Board panels.
+- **Moves (exactly six)**: `memecoin_bondingcurve` (trend), `airdrop_farming`
+  (carry) and `polymarket_crypto_binary_5min` (info) to **speculative**;
+  `liquidation_hunting`, `gamma_exposure` and `jpy_intervention_fade`
+  (convexity) to **event**. Nothing else moved (tested against the full
+  pre-Phase-5 map). No maturity status changed.
+- **Dual counting** (owner decision): a moved strategy counts against BOTH its
+  new and its old book (`ALSO_COUNTS_AGAINST`, `booksFor`). Its exposure is
+  added to both books, counted once in totals, and a new position must fit
+  both books' caps (dollars and risk) and regime multipliers. The smaller
+  allowed size wins, so moving can only tighten limits (property-tested).
+  Example: the three ex-convexity strategies are now closed in CRISIS.
+- **Convexity** now holds only `tail_risk_hedging` and `vix_term_structure`
+  among strategies that can trade. **Conflict flagged:** the stub
+  `factor_crowded_trade_fade` is also in convexity; the brief says both
+  "convexity keeps only…" and "don't move anything else". Left in place (it
+  never executes) for the owner to decide.
+- **Questionable strategies table**: `docs/strategy-book-review.md` (14 rows,
+  nothing moved). Top item: `vix_term_structure` *sells* SPX put spreads (short
+  vol, i.e. carry), yet sits in convexity, the one book open in CRISIS. It's
+  `backtest_ready`, so it can't trade today.
+
+**New constants**: `SPECULATIVE_BOOK_CAP` 0.10, `SPECULATIVE_REGIME_MULTIPLIER`
+{RISK_ON 0.5, NEUTRAL 0.5, RISK_OFF 0, CRISIS 0}.
+
+**No new migration.**
+
 ## 2026-11-24 — Wealth-manager allocation, Phase 4: risk units
 
 The strategy slice is now budgeted by RISK as well as dollars. Every new rule

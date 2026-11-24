@@ -11,7 +11,7 @@ import { getUserStateOfResidence, isVenueAllowedInState } from '@/lib/risk-profi
 import { STRATEGY_REGISTRY_CONFIG, type StrategyKey } from '@/lib/strategies/strategy-registry'
 import { checkPolymarketValidity } from './polymarket-validity'
 import { computeBookExposures, gateThroughBook } from '@/lib/risk/book-allocation'
-import { bookFor } from '@/lib/strategies/strategy-books'
+import { bookFor, booksFor } from '@/lib/strategies/strategy-books'
 import { detectRegime } from '@/lib/regime/cross-asset-regime'
 import { alertRegimeChange, alertRunErrors } from '@/lib/alerts/auto-alerts'
 
@@ -196,6 +196,10 @@ export async function runPaperTradingPass(
             proposedVol: vol.vol,
             totalRiskUnits: bookState.totalRiskUnits,
             bookRiskUnits: bookState.riskByBook[book] ?? 0,
+            // Phase 5: a moved strategy must also fit its old book.
+            otherBooks: Object.fromEntries(booksFor(key).filter(b => b !== book).map(b => [b, {
+              notionalUsd: bookState.byBook[b] ?? 0, riskUnits: bookState.riskByBook[b] ?? 0,
+            }])),
           })
 
           if (!bookGate.allowed) {
@@ -266,9 +270,11 @@ export async function runPaperTradingPass(
             const added = gatedSize.notionalUsd
             const addedRisk = riskUnits(added, vol.vol)
             bookState.totalNotionalUsd += added
-            bookState.byBook[book] = (bookState.byBook[book] ?? 0) + added
             bookState.totalRiskUnits += addedRisk
-            bookState.riskByBook[book] = (bookState.riskByBook[book] ?? 0) + addedRisk
+            for (const b of booksFor(key)) {
+              bookState.byBook[b] = (bookState.byBook[b] ?? 0) + added
+              bookState.riskByBook[b] = (bookState.riskByBook[b] ?? 0) + addedRisk
+            }
           } else {
             // Map broker result status to skip counter
             const { status, reason } = fill

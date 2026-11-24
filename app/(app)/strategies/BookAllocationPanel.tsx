@@ -39,7 +39,7 @@ export function BookAllocationPanel({ data }: { data: BookAllocationView }) {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
         {data.books.map(b => {
           const overCap = b.utilization >= 1
           const nearCap = b.utilization >= 0.8 && !overCap
