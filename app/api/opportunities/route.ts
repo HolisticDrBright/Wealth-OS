@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-      const msg = await anthropic.messages.create({
+      const { meteredCreate } = await import('@/lib/ai/usage')
+      const msg = await meteredCreate(anthropic, {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 512,
         messages: [{
@@ -63,7 +64,7 @@ Return JSON only:
   "score": 0-100
 }`,
         }],
-      })
+      }, { caller: 'opportunity_screener', agentName: 'OpportunityScreener', userId, symbol })
 
       const text = (msg.content[0] as { text: string }).text
       const match = text.match(/\{[\s\S]*\}/)

@@ -62,6 +62,7 @@ const NAV: NavNode[] = [
     label: 'Strategies', icon: BarChart2, href: '/strategies',
     children: [
       { href: '/strategies/readiness', label: 'Readiness', icon: ListChecks },
+      { href: '/strategies/committee', label: 'AI committee', icon: Brain },
       { href: '/backtests', label: 'Backtests', icon: FlaskConical },
       { href: '/shadow-portfolio', label: 'Shadow Portfolio', icon: Ghost },
       { href: '/autopilot', label: 'Autopilot', icon: Zap },

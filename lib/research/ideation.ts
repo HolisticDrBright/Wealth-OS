@@ -19,12 +19,13 @@ export type LlmComplete = (args: { system: string; prompt: string }) => Promise<
 export const defaultComplete: LlmComplete = async ({ system, prompt }) => {
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const client = new Anthropic()
-  const msg = await client.messages.create({
+  const { meteredCreate } = await import('@/lib/ai/usage')
+  const msg = await meteredCreate(client, {
     model: 'claude-sonnet-5',
     max_tokens: 1500,
     system,
     messages: [{ role: 'user', content: prompt }],
-  })
+  }, { caller: 'ideation', agentName: 'ResearchIdeation' })
   return msg.content.find(b => b.type === 'text')?.text ?? '{}'
 }
 

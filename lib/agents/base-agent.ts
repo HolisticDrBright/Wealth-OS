@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { TradeContext, AgentOutput, AgentRecommendation, ConfidenceLevel } from './types'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { VAULT_TOOLS, dispatchVaultTool, isVaultToolName } from './tools/vault-tools'
+import { meteredCreate, type UsageMeta } from '@/lib/ai/usage'
+import { PROTECTED_COMMITTEE_AGENTS } from '@/lib/config/product-defaults'
 
 const anthropic = new Anthropic()
 
@@ -25,6 +27,20 @@ export abstract class BaseAgent {
   async run(context: TradeContext): Promise<AgentOutput> {
     const start = Date.now()
 
+    // Roadmap #7: an agent the person turned off makes no call and casts no
+    // vote (an abstention — excluded from the weighted mean like a defer).
+    if (context.disabledAgents?.includes(this.name) && !PROTECTED_COMMITTEE_AGENTS.includes(this.name)) {
+      return {
+        agent: this.name,
+        recommendation: 'defer',
+        confidence: 'low',
+        score: 50,
+        reasoning: `${this.name} is turned off for this account.`,
+        keyPoints: [],
+        metadata: { disabled: true },
+      }
+    }
+
     if (!this.shouldRun(context)) {
       return {
         agent: this.name,
@@ -37,6 +53,10 @@ export abstract class BaseAgent {
     }
 
     const userPrompt = this.buildUserPrompt(context)
+    const meta: UsageMeta = {
+      caller: 'committee', agentName: this.name, userId: context.user.id,
+      runId: context.runId ?? null, symbol: context.trade.symbol,
+    }
 
     try {
       const baseParams = {
@@ -50,7 +70,7 @@ export abstract class BaseAgent {
 
       if (this.shouldUseVault()) {
         const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userPrompt }]
-        msg = await anthropic.messages.create({ ...baseParams, tools: VAULT_TOOLS, messages })
+        msg = await meteredCreate(anthropic, { ...baseParams, tools: VAULT_TOOLS, messages }, meta)
 
         let rounds = 0
         while (msg.stop_reason === 'tool_use' && rounds < MAX_TOOL_ROUNDS) {
@@ -70,13 +90,13 @@ export abstract class BaseAgent {
           )
 
           messages.push({ role: 'user', content: toolResults })
-          msg = await anthropic.messages.create({ ...baseParams, tools: VAULT_TOOLS, messages })
+          msg = await meteredCreate(anthropic, { ...baseParams, tools: VAULT_TOOLS, messages }, meta)
         }
       } else {
-        msg = await anthropic.messages.create({
+        msg = await meteredCreate(anthropic, {
           ...baseParams,
           messages: [{ role: 'user', content: userPrompt }],
-        })
+        }, meta)
       }
 
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'

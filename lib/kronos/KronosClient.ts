@@ -155,11 +155,12 @@ The distribution should have 10-20 points summing to probability 1.0.
 Base the forecast on realistic market dynamics for this symbol.`
 
     try {
-      const msg = await client.messages.create({
+      const { meteredCreate } = await import('@/lib/ai/usage')
+      const msg = await meteredCreate(client, {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }],
-      })
+      }, { caller: 'kronos', agentName: 'Kronos', symbol: params.symbol })
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'
       const match = text.match(/\{[\s\S]*\}/)
       const parsed = JSON.parse(match?.[0] ?? '{}')

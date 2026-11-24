@@ -21,6 +21,10 @@ export interface TradeContext {
     risk_profile?: 'conservative' | 'moderate' | 'aggressive'
     max_allocation_pct?: number
   }
+  /** Roadmap #7: one committee run — every model call in it shares this id. */
+  runId?: string
+  /** Roadmap #7: agents this person turned off (skipped: no call, no vote). */
+  disabledAgents?: string[]
 }
 
 export type AgentRecommendation = 'approve' | 'reduce' | 'reject' | 'defer'

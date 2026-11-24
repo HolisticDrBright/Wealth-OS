@@ -41,7 +41,24 @@ const tier3Agents = [
 ]
 
 export class CIODecisionEngine {
+  /**
+   * Roadmap #7: every run gets an id (its model calls are metered under it),
+   * skips the agents this person turned off, and is recorded so its vetoes can
+   * be graded later. Recording is fire-and-forget — never changes the decision.
+   */
   async analyze(context: TradeContext): Promise<CIODecision> {
+    const { loadDisabledAgents, recordCommitteeRun } = await import('./committee-runs')
+    const ctx: TradeContext = {
+      ...context,
+      runId: context.runId ?? crypto.randomUUID(),
+      disabledAgents: context.disabledAgents ?? await loadDisabledAgents(context.user.id).catch(() => []),
+    }
+    const decision = await this.analyzeRun(ctx)
+    void recordCommitteeRun(ctx, decision).catch(() => {})
+    return decision
+  }
+
+  private async analyzeRun(context: TradeContext): Promise<CIODecision> {
     console.log(`[CIO] Analyzing trade: ${context.trade.action} ${context.trade.symbol}`)
 
     // ── Tier 1: Orchestrator ──────────────────────────────────────────────
@@ -176,13 +193,14 @@ Write a CIO synthesis as JSON:
     let synthesis: Partial<CIODecision> = {}
     const synthStart = Date.now()
     try {
-      const msg = await anthropic.messages.create({
+      const { meteredCreate } = await import('@/lib/ai/usage')
+      const msg = await meteredCreate(anthropic, {
         model: 'claude-opus-4-6',
         max_tokens: 1024,
         thinking: { type: 'adaptive' },
         ...(systemPrompt ? { system: systemPrompt } : {}),
         messages: [{ role: 'user', content: summaryPrompt }],
-      })
+      }, { caller: 'cio_synthesis', agentName: 'CIOSynthesis', userId: user.id, runId: context.runId ?? null, symbol: trade.symbol })
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       synthesis = JSON.parse(jsonMatch?.[0] ?? '{}')

@@ -715,6 +715,13 @@ export async function runCronTask(task: string): Promise<CronResult> {
       results.ladderMark = await markLadderPositions(supabase)
     } catch (e) { results.ladderMark = e instanceof Error ? e.message : 'error' }
 
+    // 3b2. Grade AI-committee decisions past their horizon (roadmap #7) —
+    // what each vetoed or approved copy would have done.
+    try {
+      const { gradeCommitteeRuns } = await import('@/lib/agents/committee-runs')
+      results.committeeGrading = await gradeCommitteeRuns(supabase)
+    } catch (e) { results.committeeGrading = e instanceof Error ? e.message : 'error' }
+
     // 3c. Refresh linked (Plaid, read-only) account balances.
     try {
       const { isPlaidConfigured } = await import('@/lib/plaid/client')

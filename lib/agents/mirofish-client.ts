@@ -113,11 +113,17 @@ Simulate 1000 autonomous agents analyzing this trade. Return a JSON object:
   "scenarioSummary": "<2-3 sentence summary>"
 }`
 
-  const msg = await client.messages.create({
+  const { meteredCreate } = await import('@/lib/ai/usage')
+  // The same simulation serves the copy committee (Agent 13) and the
+  // strategies' MiroFish confluence; the run id tells them apart.
+  const msg = await meteredCreate(client, {
     model: 'claude-opus-4-6',
     max_tokens: 1024,
     thinking: { type: 'adaptive' },
     messages: [{ role: 'user', content: prompt }],
+  }, {
+    caller: context.runId ? 'committee' : 'mirofish', agentName: 'MiroFishSimulationAgent',
+    userId: context.user.id, runId: context.runId ?? null, symbol: context.trade.symbol,
   })
 
   const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'

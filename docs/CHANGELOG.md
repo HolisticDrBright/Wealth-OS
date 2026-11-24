@@ -1,5 +1,69 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Roadmap #7: what the AI committee costs, and whether its vetoes pay
+
+- **Real cost meter** (`lib/ai/usage.ts`): every Anthropic call in the app
+  now goes through `meteredCreate()`, which logs the real token usage × price
+  (`MODEL_PRICES_USD_PER_MTOK`, including cache writes and reads) to
+  `llm_usage_log`. Failed calls are logged too, with $0 cost and the error.
+  Covered: committee agents (including their vault tool loops), CIO synthesis,
+  the MiroFish simulation, Kronos, the prediction-market agent, research
+  ideation and the opportunity screener. A test fails if any
+  `messages.create` bypasses the meter. Metering never changes a call: if it
+  breaks, only the log line is lost.
+  (The old `ai_usage_logs` booked a flat 3¢ or 12¢ per MiroFish run; that run
+  actually calls Opus.)
+- **Committee decisions are graded** (`lib/agents/committee-runs.ts`): each
+  copy-trade committee run gets an id, all its calls are logged under it, and
+  the run is stored with every agent's vote and the price at that moment.
+  `COMMITTEE_GRADE_HORIZON_DAYS` later the daily cron grades it on what the
+  trade would have done after costs. A vetoed copy never becomes a position,
+  so before this a veto could never be graded at all.
+- **Cost vs value report** (`/strategies/committee`, Pro, sidebar ›
+  Strategies › AI committee), per agent:
+  - calls, failed calls, cost
+  - graded vetoes, and how many were right (vetoed a loser)
+  - veto value: dollars the vetoed trades would have lost (+) or made (−)
+  - net value, and a verdict: keep, cut, never vetoes, mostly failing, not
+    enough evidence, or protected
+
+  Kronos is graded from the shadow portfolio (blocked strategy trades).
+  MiroFish in the strategy pipeline only shrinks trades and never blocks, so
+  the report says it can't be graded yet.
+- **Cutting**: an agent can be turned off only with evidence (at least
+  `COMMITTEE_MIN_GRADED_VETOES` graded vetoes that didn't cover their cost,
+  never vetoing across that many graded votes, or calls that mostly fail).
+  Turning it off records an approval first. A turned-off agent makes no call
+  and casts no vote, which is excluded from the weighted mean like an
+  abstention. Turning one back on is always allowed.
+  `PROTECTED_COMMITTEE_AGENTS` (the risk manager, whose veto is a hard
+  block) can never be turned off; this is enforced in the UI, the data layer,
+  the settings loader and the agent itself.
+
+**Flagged, not changed — probably your committee's biggest issue**: every
+Haiku 4.5 agent (8 of the 12 committee agents) sends
+`thinking: { type: 'adaptive' }`. Per Anthropic's API reference, Haiku 4.5
+doesn't support adaptive thinking (it takes `budget_tokens`). Those calls are
+likely being rejected and counted as abstentions. The meter will show it as
+"Mostly failing". Fixing it would change how the committee votes, so it is
+left for the owner.
+
+**New constants**: `MODEL_PRICES_USD_PER_MTOK` (Opus 4.6 $5/$25, Sonnet 4.6
+$3/$15, Haiku 4.5 $1/$5, Sonnet 5 $2/$10, plus Opus 5.5 $4/$20, Sonnet 5.5
+$2/$10, Haiku 5.5 $0.10/$0.50), `CACHE_WRITE_MULTIPLIER` 1.25,
+`CACHE_READ_MULTIPLIER` 0.10, `COMMITTEE_GRADE_HORIZON_DAYS` 5,
+`COMMITTEE_REVIEW_LOOKBACK_DAYS` 90, `COMMITTEE_MIN_GRADED_VETOES` 20,
+`PROTECTED_COMMITTEE_AGENTS` ['RiskManagementAgent'].
+
+**New migration**: `20260704s_ai_committee_costs.sql` — `llm_usage_log`
+(users read their own and system rows; service-role writes), `committee_runs`
+(users read their own; service-role writes), `committee_agent_settings`
+(owner RLS), `cut_agent` approval kind (all earlier kinds kept).
+
+**Not verifiable here**: no live model calls in this sandbox, so the costs,
+the failure rate and the Haiku issue all need the deployed app. Grading needs
+Yahoo daily prices at run time.
+
 ## 2026-11-24 — Roadmap #4: retire losing strategies automatically
 
 Promotion stays manual. Switching OFF is automatic: `paper_enabled = false`,

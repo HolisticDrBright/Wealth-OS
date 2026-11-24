@@ -1,3 +1,4 @@
+import { meteredCreate } from '@/lib/ai/usage'
 import Anthropic from '@anthropic-ai/sdk'
 import { VAULT_TOOLS, dispatchVaultTool, isVaultToolName } from '../tools/vault-tools'
 import type {
@@ -170,11 +171,12 @@ Analyse this data. Use vault tools to read recent context, then write a brief an
         { role: 'user', content: this.buildUserPrompt(ctx) },
       ]
 
-      let msg = await anthropic.messages.create({
+      const meta = { caller: 'polymarket_agent', agentName: this.name }
+      let msg = await meteredCreate(anthropic, {
         ...baseParams,
         tools: VAULT_TOOLS,
         messages,
-      })
+      }, meta)
 
       let vaultPath: string | null = null
       let rounds = 0
@@ -203,11 +205,11 @@ Analyse this data. Use vault tools to read recent context, then write a brief an
         )
 
         messages.push({ role: 'user', content: toolResults })
-        msg = await anthropic.messages.create({
+        msg = await meteredCreate(anthropic, {
           ...baseParams,
           tools: VAULT_TOOLS,
           messages,
-        })
+        }, meta)
       }
 
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'

@@ -246,3 +246,38 @@ export const RETIRE_EVIDENCE_DEADLINE_DAYS = 365
  * alpha / (number of strategies) — a Bonferroni correction.
  */
 export const LUCK_FAMILY_ALPHA = 0.05
+
+// ─── AI committee cost and value (roadmap #7) ───────────────────────────────
+
+/**
+ * Product default: Anthropic first-party prices in USD per million tokens,
+ * per model the app calls (plus current models, for a future switch). Cache
+ * writes bill at CACHE_WRITE_MULTIPLIER × input, cache reads at
+ * CACHE_READ_MULTIPLIER × input. Update when prices change.
+ */
+export const MODEL_PRICES_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
+  'claude-opus-4-6':   { input: 5.00, output: 25.00 },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
+  'claude-haiku-4-5':  { input: 1.00, output: 5.00 },
+  'claude-sonnet-5':   { input: 2.00, output: 10.00 },
+  'claude-opus-5-5':   { input: 4.00, output: 20.00 },
+  'claude-sonnet-5-5': { input: 2.00, output: 10.00 },
+  'claude-haiku-5-5':  { input: 0.10, output: 0.50 },
+}
+export const CACHE_WRITE_MULTIPLIER = 1.25
+export const CACHE_READ_MULTIPLIER = 0.10
+
+/** Product default: a committee decision is graded on the price move this many days later. */
+export const COMMITTEE_GRADE_HORIZON_DAYS = 5
+
+/** Product default: the cost-and-value report looks back this many days. */
+export const COMMITTEE_REVIEW_LOOKBACK_DAYS = 90
+
+/** Product default: an agent needs this many graded vetoes (or votes) before a keep/cut verdict. */
+export const COMMITTEE_MIN_GRADED_VETOES = 20
+
+/**
+ * Product default: agents whose "no" is a safety rule, not a vote — they can
+ * never be turned off from the cost report.
+ */
+export const PROTECTED_COMMITTEE_AGENTS: readonly string[] = ['RiskManagementAgent']
