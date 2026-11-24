@@ -1,5 +1,59 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Roadmap #4: retire losing strategies automatically
+
+Promotion stays manual. Switching OFF is automatic: `paper_enabled = false`,
+shadow tracking continues, the reason is logged, and the person is alerted.
+It never changes a maturity status and can only reduce trading.
+
+- **Weekly review** (`lib/strategies/retirement.ts`, job
+  `lib/strategies/retirement-job.ts`, the Monday `lifecycle` cron). Per person ×
+  paper-enabled strategy, using only trades since its last switch-off (a
+  re-enabled strategy starts fresh):
+  1. **Benchmark rule**: two complete quarters in a row behind the passive
+     benchmark, now NET of the round-trip fee. Before, it compared gross
+     returns, so a strategy beating the index only before costs was kept.
+  2. **Failing-gates streak (new)**: with at least the promotion minimum (30)
+     of closed trades, failing the promotion gates (after-cost expectancy or
+     drawdown) on `RETIRE_FAIL_WEEKS` weekly reviews in a row. About 2 months,
+     instead of 6+. It pools all trades, so a strategy with fewer than 5
+     trades a quarter is judged too.
+  3. **Evidence deadline (new)**: enabled `RETIRE_EVIDENCE_DEADLINE_DAYS` and
+     still short of 30 closed trades means it can't prove itself.
+- **"Edge beyond luck" promotion gate** (`lib/strategies/luck.ts`): the
+  per-trade net-return t-statistic must clear Φ⁻¹(1 − α/m), Bonferroni-corrected
+  for the m strategies being tested (about 3.15 for 62). Shown on the readiness
+  page and the Strategy Health Board. Report-only, since promotion is manual. It
+  is opt-in, so other callers keep their five gates.
+- **Visible**: the readiness page gains a "Retirement" column ("Switched off
+  <date> (rule)", or "Failing gates N of 8 weeks") and a footer explaining the
+  rules. Simple Home and phone Home weekly summaries say "Switched off the X
+  playbook — it kept missing its targets after costs. It's still tracked, and
+  you can turn it back on."
+- **Pre-existing bugs fixed**:
+  1. `strategy_retirement_log`, written by every demotion, never existed, so
+     switch-offs left no record. Migration r creates it.
+  2. `sendOpsAlert` wrote `type: 'ops'` and a `message` column, which the base
+     `alerts` table rejects (`type` CHECK, text in `body`), so ops alerts were
+     never saved. It now writes `type: 'system'` with `body` and
+     `metadata.source = 'ops'`, falling back to the old shape only if a
+     database was altered to accept it. This fixes the dead-worker,
+     stale-scan, CRISIS-playbook and retirement alerts.
+
+**New constants**: `RETIRE_MIN_TRADES_PER_QUARTER` 5 (was a local constant in
+lifecycle.ts, same value), `RETIRE_FAIL_WEEKS` 8,
+`RETIRE_EVIDENCE_DEADLINE_DAYS` 365, `LUCK_FAMILY_ALPHA` 0.05. The
+promotion-gate thresholds `MIN_CLOSED_TRADES` (30) and `MAX_DRAWDOWN` (0.15)
+are now exported and reused, unchanged.
+
+**New migration**: `20260704r_strategy_retirement.sql` —
+`strategy_retirement_log` (+ `rule`, `metrics`) and `strategy_gate_snapshots`;
+users read their own, the service role writes.
+
+**Not verifiable here**: Yahoo quarterly benchmark returns at run time (an
+unmeasured benchmark never triggers the benchmark rule). The live `alerts`
+table shape: the new writer tries the base shape first.
+
 ## 2026-11-24 — Roadmap #3: Explore must beat Core
 
 - **The comparison** (`lib/explore/vs-core.ts`): every closed Explore

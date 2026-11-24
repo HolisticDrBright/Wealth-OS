@@ -22,6 +22,7 @@ import { planLadderSetup, setupNeeded, coreDrift } from '@/lib/allocation/core-p
 import { tierMixForTotal, yearRangeForMix, badYearFraction } from '@/lib/allocation/bad-year'
 import { strategyRowsOnly, sleeveOfKey, LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 import { CORE_FUNDS } from '@/lib/config/product-defaults'
+import { toDisplayName } from '@/lib/strategies/strategy-display'
 import { getScanStaleness, alertIfScanStale } from '@/lib/ops/scan-heartbeat'
 import { loadNextDollarView, type NextDollarView } from '@/lib/advisory/next-dollar-data'
 import { loadExploreVsCore } from '@/lib/explore/vs-core-data'
@@ -154,6 +155,8 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
       .select('id, action, asset_class, suggested_notional').eq('user_id', userId).eq('status', 'pending'),
     loadLadder(supabase, userId).catch(() => null),
   ])
+  const { data: retiredRows } = await supabase.from('strategy_retirement_log').select('strategy_key')
+    .eq('user_id', userId).gte('created_at', weekAgo)
   const depositsUsd = ladder?.depositsUsd ?? 0
   const ladderPnlUsd = ladder?.ladderPnlUsd ?? 0
 
@@ -190,6 +193,7 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
     blocked: ((blocksRes.data ?? []) as Array<{ metadata: Record<string, unknown> | null }>)
       .map(r => ({ reason: (r.metadata?.reason as string | undefined) ?? null })),
     halted,
+    retired: ((retiredRows ?? []) as Array<{ strategy_key: string }>).map(r => toDisplayName(r.strategy_key)),
   })
 
   const suggestions = (suggestionsRes.data ?? []) as Array<{ id: string }>

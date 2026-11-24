@@ -9,7 +9,7 @@
 import Link from 'next/link'
 import { getTrackRecord } from '@/lib/actions/track-record'
 import { getUiMode } from '@/lib/actions/ui-prefs'
-import { SCAN_STALE_HOURS, SCAN_GAP_LOOKBACK_DAYS } from '@/lib/config/product-defaults'
+import { SCAN_STALE_HOURS, SCAN_GAP_LOOKBACK_DAYS, RETIRE_FAIL_WEEKS } from '@/lib/config/product-defaults'
 
 const usd = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(Math.round(n)).toLocaleString('en-US')}`
 const pct = (n: number | null) => (n == null ? '—' : `${(n * 100).toFixed(1)}%`)
@@ -98,6 +98,7 @@ export default async function ReadinessPage() {
               <th scope="col" className="px-3 py-2">vs Core</th>
               <th scope="col" className="px-3 py-2">Gates passed</th>
               <th scope="col" className="px-3 py-2">Scan gaps</th>
+              <th scope="col" className="px-3 py-2">Retirement</th>
             </tr>
           </thead>
           <tbody>
@@ -135,6 +136,17 @@ export default async function ReadinessPage() {
                     : r.gaps.length === 0 ? <span className="text-emerald-300">none</span>
                     : <span className="text-orange-300">{r.gaps.length} gap{r.gaps.length === 1 ? '' : 's'} ({r.gaps.reduce((h, g) => h + g.hours, 0).toFixed(0)}h) since first trade</span>}
                 </td>
+                <td className="px-3 py-2 text-xs">
+                  {r.retired && (
+                    <span className="text-orange-300" title={r.retired.reason}>
+                      Switched off {new Date(r.retired.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {r.retired.rule ? ` (${r.retired.rule.replace(/_/g, ' ')})` : ''}
+                    </span>
+                  )}
+                  {r.failingWeeks > 0
+                    ? <div className="text-orange-300">Failing gates {r.failingWeeks} of {RETIRE_FAIL_WEEKS} weeks</div>
+                    : !r.retired && <span className="text-text-1">—</span>}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -143,7 +155,9 @@ export default async function ReadinessPage() {
 
       <p className="text-xs text-text-1">
         Net after costs = realized paper P&amp;L (fills already include modeled slippage) minus the venue round-trip cost on
-        each trade — the same cost model the promotion gate uses. A gap is a stretch longer than {SCAN_STALE_HOURS}h
+        each trade — the same cost model the promotion gate uses. Strategies are switched off automatically (paper only;
+        promotion stays manual) after two quarters behind their benchmark after fees, {RETIRE_FAIL_WEEKS} straight weeks failing
+        their gates, or a year without enough trades to judge. A gap is a stretch longer than {SCAN_STALE_HOURS}h
         during market hours with no successful scheduled scan: trades the strategy would have taken then are missing from
         its record.
       </p>

@@ -22,6 +22,8 @@
  */
 
 import { roundTripCostBps } from '@/lib/costs/transaction-costs'
+import { luckThreshold, tStat } from '@/lib/strategies/luck'
+import { LUCK_FAMILY_ALPHA } from '@/lib/config/product-defaults'
 
 export interface PromotionCriterion {
   name: string
@@ -50,6 +52,13 @@ export interface PaperTradeStats {
   /** Worst peak-to-trough drawdown as a fraction of allocated notional. */
   maxDrawdownPct: number | null
   assetClass: string
+  /**
+   * Roadmap #4 (opt-in): each closed trade's return as a fraction, BEFORE the
+   * fee drag. When given, the "Edge beyond luck" gate is added.
+   */
+  tradeReturnsPct?: number[]
+  /** How many strategies are being tested at once (for the luck correction). */
+  strategiesTested?: number
 }
 
 export interface ShadowComparison {
@@ -61,7 +70,8 @@ export interface ShadowComparison {
 /** Closed paper trades a strategy needs before it can be considered for promotion. */
 export const MIN_CLOSED_TRADES = 30
 const MAX_BRIER = 0.22
-const MAX_DRAWDOWN = 0.15
+/** Max drawdown (fraction of allocated notional) a strategy may show and pass. */
+export const MAX_DRAWDOWN = 0.15
 /** Shadow may beat real by at most this much before we flag the gates. */
 const MAX_SHADOW_EDGE = 0.01
 const MIN_SHADOW_SAMPLES = 5
@@ -161,6 +171,31 @@ export function evaluatePaperToLive(
       pass: shadowEdge <= MAX_SHADOW_EDGE,
       evaluable: true,
     })
+  }
+
+  // 6. Edge beyond luck (roadmap #4): with many strategies tested at once,
+  //    some look good by chance. Per-trade net returns must clear a
+  //    Bonferroni-corrected one-sided t threshold.
+  if (stats.tradeReturnsPct !== undefined) {
+    const m = Math.max(1, stats.strategiesTested ?? 1)
+    const z = luckThreshold(m)
+    const t = stats.tradeReturnsPct.length >= MIN_CLOSED_TRADES
+      ? tStat(stats.tradeReturnsPct.map(r => r - feeDrag))
+      : null
+    criteria.push(t == null
+      ? {
+          name: 'Edge beyond luck',
+          required: `t ≥ ${z.toFixed(2)} (${(LUCK_FAMILY_ALPHA * 100).toFixed(0)}% across ${m} strategies)`,
+          actual: stats.tradeReturnsPct.length < MIN_CLOSED_TRADES ? `needs ${MIN_CLOSED_TRADES} closed trades` : 'no spread in returns',
+          pass: false, evaluable: false,
+        }
+      : {
+          name: 'Edge beyond luck',
+          required: `t ≥ ${z.toFixed(2)} (${(LUCK_FAMILY_ALPHA * 100).toFixed(0)}% across ${m} strategies)`,
+          actual: `t = ${t.toFixed(2)}`,
+          pass: t >= z,
+          evaluable: true,
+        })
   }
 
   const allEvaluable = criteria.every(c => c.evaluable)

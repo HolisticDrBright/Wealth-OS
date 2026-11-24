@@ -219,3 +219,30 @@ export const EXPLORE_MIN_CAP_FRACTION = 0.02
 
 /** Product default: "Not now" hides the shrink proposal for this many days. */
 export const EXPLORE_SHRINK_SNOOZE_DAYS = 30
+
+// ─── Automatic retirement (roadmap #4) ───────────────────────────────────────
+// Switching a strategy off only ever REDUCES trading (paper_enabled = false;
+// shadow tracking continues). It never changes a maturity status.
+
+/** Product default: quarters with fewer closed trades than this are not judged by the benchmark rule. */
+export const RETIRE_MIN_TRADES_PER_QUARTER = 5
+
+/**
+ * Product default: a strategy with at least the promotion minimum of closed
+ * trades that FAILS its promotion gates (after-cost expectancy or drawdown)
+ * on this many consecutive weekly reviews is switched off.
+ */
+export const RETIRE_FAIL_WEEKS = 8
+
+/**
+ * Product default: a strategy enabled this long that still hasn't produced the
+ * promotion minimum of closed trades is switched off — it can't prove itself.
+ */
+export const RETIRE_EVIDENCE_DEADLINE_DAYS = 365
+
+/**
+ * Product default: the "edge beyond luck" gate's family-wise false-positive
+ * rate. With many strategies under test, the bar per strategy is
+ * alpha / (number of strategies) — a Bonferroni correction.
+ */
+export const LUCK_FAMILY_ALPHA = 0.05

@@ -19,6 +19,8 @@ export interface WeeklyInputs {
    * Optional — omitted means none.
    */
   fundMoves?: { safetyBoughtUsd: number; coreBoughtUsd: number; coreSoldUsd: number }
+  /** Strategies switched off automatically this week (display names; roadmap #4). */
+  retired?: string[]
 }
 
 export const MAX_WEEKLY_SENTENCES = 5
@@ -55,6 +57,13 @@ export function generateWeeklySummary(i: WeeklyInputs): string[] {
 
   if (i.halted) {
     out.push('You paused all trading — nothing new will be bought or sold until you turn it back on.')
+  }
+
+  const retired = i.retired ?? []
+  if (retired.length === 1) {
+    out.push(`Switched off the ${retired[0]} playbook — it kept missing its targets after costs. It\u2019s still tracked, and you can turn it back on.`)
+  } else if (retired.length > 1) {
+    out.push(`Switched off ${retired.length} playbooks that kept missing their targets after costs. They\u2019re still tracked, and you can turn them back on.`)
   }
 
   const f = i.fundMoves

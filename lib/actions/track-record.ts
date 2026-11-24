@@ -37,6 +37,10 @@ export interface TrackRecordRow extends TrackRecordSummary {
   gaps: ScanGap[]
   /** Roadmap #3: after costs vs the same dollars in Core, last 12 months (null = no comparable trades). */
   vsCoreExcessUsd: number | null
+  /** Roadmap #4: the latest automatic switch-off, if any. */
+  retired: { at: string; reason: string; rule: string | null } | null
+  /** Consecutive failing weekly gate reviews since the last switch-off. */
+  failingWeeks: number
 }
 
 export interface TrackRecordView {
@@ -54,7 +58,7 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const [{ data: closed }, { data: shadowClosed }, scan, vsCore] = await Promise.all([
+  const [{ data: closed }, { data: shadowClosed }, scan, vsCore, retiredRes, snapsRes] = await Promise.all([
     supabase.from('paper_positions')
       .select('strategy_key, realized_pnl_pct, realized_pnl_usd, notional_usd, opened_at, closed_at')
       .not('strategy_key', 'in', LADDER_KEYS_FILTER)
@@ -64,7 +68,24 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
       .eq('user_id', user.id).eq('status', 'closed').limit(10_000),
     getScanHealth(supabase),
     loadExploreVsCore(supabase, user.id).catch(() => null),
+    supabase.from('strategy_retirement_log').select('strategy_key, created_at, reason, rule')
+      .eq('user_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('strategy_gate_snapshots').select('strategy_key, week, failing')
+      .eq('user_id', user.id).order('week', { ascending: false }),
   ])
+  const lastRetired = new Map<string, { at: string; reason: string; rule: string | null }>()
+  for (const r of (retiredRes.data ?? []) as Array<{ strategy_key: string; created_at: string; reason: string; rule: string | null }>) {
+    if (!lastRetired.has(r.strategy_key)) lastRetired.set(r.strategy_key, { at: r.created_at, reason: r.reason, rule: r.rule })
+  }
+  const failingWeeksBy = new Map<string, number>()
+  const streakDone = new Set<string>()
+  for (const s of (snapsRes.data ?? []) as Array<{ strategy_key: string; week: string; failing: boolean | null }>) {
+    if (streakDone.has(s.strategy_key)) continue
+    const since = lastRetired.get(s.strategy_key)?.at.slice(0, 10)
+    if (since && String(s.week).slice(0, 10) <= since) { streakDone.add(s.strategy_key); continue }
+    if (s.failing === true) failingWeeksBy.set(s.strategy_key, (failingWeeksBy.get(s.strategy_key) ?? 0) + 1)
+    else streakDone.add(s.strategy_key)
+  }
   const vsCoreByKey = new Map((vsCore?.available ? vsCore.comparison.perStrategy : []).map(l => [l.strategyKey, l]))
 
   const byKey = new Map<string, ClosedTradeRow[]>()
@@ -80,6 +101,7 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
   }
 
   const keys = Object.keys(STRATEGY_REGISTRY_CONFIG) as StrategyKey[]
+  const strategiesTested = Math.max(1, keys.filter(k => (byKey.get(k)?.length ?? 0) > 0).length)
   const brierKeys = keys
     .filter(k => (byKey.get(k)?.length ?? 0) >= BRIER_FETCH_MIN_TRADES)
     .sort((a, b) => (byKey.get(b)?.length ?? 0) - (byKey.get(a)?.length ?? 0))
@@ -100,6 +122,9 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
     const readiness = evaluatePaperToLive(key, {
       closedTrades: summary.closedTrades, avgReturnPct: summary.avgReturnPct,
       maxDrawdownPct: summary.maxDrawdownPct, assetClass: cfg.assetClass,
+      // Roadmap #4: the luck correction counts every strategy that has a record.
+      tradeReturnsPct: trades.map(t => t.realized_pnl_pct).filter((v): v is number => typeof v === 'number'),
+      strategiesTested,
     }, brier.get(key) ?? null, shadow)
     return {
       ...summary,
@@ -114,6 +139,8 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
       gatesTotal: readiness.criteria.length,
       gaps: gapsSince(scan.gaps, summary.firstTradeAt),
       vsCoreExcessUsd: vsCoreByKey.get(key)?.trades ? vsCoreByKey.get(key)!.excessUsd : null,
+      retired: lastRetired.get(key) ?? null,
+      failingWeeks: failingWeeksBy.get(key) ?? 0,
     }
   })
 

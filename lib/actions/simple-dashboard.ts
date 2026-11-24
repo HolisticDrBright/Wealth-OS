@@ -20,6 +20,7 @@ import {
   badYearSetbackMonths, type GoalStatus, type YearRangeUsd,
 } from '@/lib/planning/goal-projection'
 import { generateWeeklySummary } from '@/lib/simple/weekly-summary'
+import { toDisplayName } from '@/lib/strategies/strategy-display'
 import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 import { loadLadder } from '@/lib/allocation/ladder-data'
 import { tierMixForTotal, yearRangeForMix, badYearFraction } from '@/lib/allocation/bad-year'
@@ -87,7 +88,7 @@ export async function getSimpleDashboard(): Promise<SimpleDashboardData | null> 
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
   const todayUtc = new Date().toISOString().slice(0, 10)
 
-  const [assetsRes, curve, decisions, returns, bondReturns, ladder, goalsRes, closesRes, opensRes, blocksRes, flagsRes, fundTradesRes] =
+  const [assetsRes, curve, decisions, returns, bondReturns, ladder, goalsRes, closesRes, opensRes, blocksRes, flagsRes, fundTradesRes, retiredRes] =
     await Promise.all([
       supabase.from('assets').select('current_value').eq('user_id', user.id),
       getEquityCurve().catch(() => null),
@@ -117,6 +118,8 @@ export async function getSimpleDashboard(): Promise<SimpleDashboardData | null> 
         .select('strategy_key, status, notional_usd, quantity, exit_price, opened_at, closed_at, metadata')
         .in('strategy_key', ['core', 'safety']).eq('user_id', user.id)
         .or(`opened_at.gte.${weekAgo},closed_at.gte.${weekAgo}`),
+      supabase.from('strategy_retirement_log').select('strategy_key')
+        .eq('user_id', user.id).gte('created_at', weekAgo),
     ])
 
   const baseAssetsUsd = ((assetsRes.data ?? []) as Array<{ current_value: number | null }>)
@@ -204,6 +207,7 @@ export async function getSimpleDashboard(): Promise<SimpleDashboardData | null> 
       .map(r => ({ reason: (r.metadata?.reason as string | undefined) ?? null })),
     halted: tradingHalted,
     fundMoves: fundMovesOf((fundTradesRes.data ?? []) as FundRow[], weekAgo),
+    retired: ((retiredRes.data ?? []) as Array<{ strategy_key: string }>).map(r => toDisplayName(r.strategy_key)),
   })
 
   const nextDollar = await loadNextDollarView(supabase, user.id, ladder).catch(() => null)

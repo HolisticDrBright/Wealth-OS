@@ -88,6 +88,8 @@ export async function getPromotionPipeline(): Promise<PromotionPipelineRow[]> {
       shadowByKey.get(row.strategy_key)!.push(row.realized_pnl_usd / (row.would_have_notional as number))
     }
 
+    const strategiesTested = Math.max(1, Object.keys(STRATEGY_REGISTRY_CONFIG).filter(k => (closedByKey.get(k)?.length ?? 0) > 0).length)
+
     // Brier only for strategies with meaningful trade history
     const brierCandidates = paperKeys
       .filter(k => (closedByKey.get(k)?.length ?? 0) >= BRIER_FETCH_MIN_TRADES)
@@ -109,6 +111,9 @@ export async function getPromotionPipeline(): Promise<PromotionPipelineRow[]> {
         avgReturnPct: returns.length > 0 ? returns.reduce((s, v) => s + v, 0) / returns.length : null,
         maxDrawdownPct: computeDrawdown(closedRows),
         assetClass: cfg.assetClass,
+        // Roadmap #4: "edge beyond luck", corrected for every strategy with a record.
+        tradeReturnsPct: returns,
+        strategiesTested,
       }
 
       const shadowReturns = shadowByKey.get(key) ?? []

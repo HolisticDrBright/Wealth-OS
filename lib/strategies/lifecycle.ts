@@ -6,6 +6,8 @@
  * no LLM discretion in demotion. Re-promotion only through the normal gates.
  */
 
+import { RETIRE_MIN_TRADES_PER_QUARTER } from '@/lib/config/product-defaults'
+
 export const PASSIVE_BENCHMARKS: Record<string, { symbol: string; description: string }> = {
   stocks:       { symbol: 'SPY',     description: 'S&P 500 buy-and-hold' },
   options:      { symbol: 'SPY',     description: 'S&P 500 buy-and-hold' },
@@ -30,7 +32,8 @@ export interface LifecycleVerdict {
   report: string
 }
 
-export const MIN_TRADES_PER_QUARTER = 5
+/** Quarters with fewer trades aren't judged (product default, lib/config/product-defaults.ts). */
+export const MIN_TRADES_PER_QUARTER = RETIRE_MIN_TRADES_PER_QUARTER
 
 /**
  * Demote when the TWO most recent complete quarters (with enough trades)
