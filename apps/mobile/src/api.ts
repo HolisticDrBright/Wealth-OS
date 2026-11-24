@@ -40,6 +40,46 @@ export interface HomeData {
   weekItems: string[]
   /** Set when scheduled strategy scans have stopped during market hours. */
   scanStale: { hoursSince: number | null } | null
+  /** Where the next saved dollar should go (mirrors lib/advisory/next-dollar-data.ts). */
+  nextDollar: NextDollarView | null
+}
+
+export type NextDollarFact =
+  | 'monthly_expenses' | 'employer_match' | 'debts' | 'health_plan'
+  | 'household_income' | 'filing_status' | 'ytd_ira' | 'ytd_401k'
+
+export type NextDollarCard =
+  | {
+      kind: 'question'
+      stepId: string
+      fact: NextDollarFact
+      why: string
+      question: {
+        prompt: string
+        help: string | null
+        input: 'number' | 'choice' | 'debt'
+        choices?: Array<{ value: string; label: string }>
+        skipLabel: string
+      }
+      progress: { answered: number; total: number }
+    }
+  | { kind: 'recommendation'; stepId: string; title: string; body: string; action: 'add_money' | 'none'; skippedChecks: string[] }
+
+export interface RaisePrompt {
+  incomeBeforeUsd: number
+  incomeNowUsd: number
+  raiseUsd: number
+  goalId: string
+  goalName: string
+  currentMonthlyUsd: number
+  increaseUsd: number
+  suggestedMonthlyUsd: number
+}
+
+export interface NextDollarView {
+  card: NextDollarCard
+  raise: RaisePrompt | null
+  disclaimer: string
 }
 
 export interface ExploreUsage {
@@ -188,6 +228,15 @@ export const api = {
       '/api/mobile/deposit', { amount_usd: amount }),
   setMonthlyExpenses: (amount: number) =>
     postJson<{ ok: boolean }>('/api/mobile/goal', { monthly_expenses_usd: amount }),
+  /** Best-next-dollar card actions. */
+  nextDollarAnswer: (answer: Record<string, unknown>) =>
+    postJson<{ ok: boolean }>('/api/mobile/next-dollar', { action: 'answer', ...answer }),
+  nextDollarSkip: (fact: NextDollarFact) =>
+    postJson<{ ok: boolean }>('/api/mobile/next-dollar', { action: 'skip', fact }),
+  updateIncome: (amount: number) =>
+    postJson<{ ok: boolean }>('/api/mobile/next-dollar', { action: 'income', amount_usd: amount }),
+  resolveRaise: (accept: boolean) =>
+    postJson<{ ok: boolean }>('/api/mobile/next-dollar', { action: 'raise', accept }),
   explore: () => getJson<ExploreData>('/api/mobile/explore'),
   follow: (traderId: string, summary: string) =>
     postJson<{ ok: boolean }>('/api/mobile/follow', { trader_id: traderId, approved_summary: summary }),

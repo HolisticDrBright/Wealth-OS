@@ -43,7 +43,7 @@ describe('every mobile route is bearer-authenticated and never service-role', ()
   const routes = readdirSync(MOBILE_DIR)
 
   it('covers the expected surface', () => {
-    expect(new Set(routes)).toEqual(new Set(['home', 'goal', 'activity', 'approve', 'deposit', 'explore', 'follow', 'pause', 'resume']))
+    expect(new Set(routes)).toEqual(new Set(['home', 'goal', 'activity', 'approve', 'deposit', 'explore', 'follow', 'next-dollar', 'pause', 'resume']))
   })
 
   it.each(readdirSync(MOBILE_DIR))('%s/route.ts uses userClientFromBearer and no admin client', (dir) => {

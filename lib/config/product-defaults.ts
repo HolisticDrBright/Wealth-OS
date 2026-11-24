@@ -179,3 +179,20 @@ export const MARKET_CLOSE_MINUTES = 16 * 60
 
 /** Product default: how far back the readiness page looks for scan gaps. */
 export const SCAN_GAP_LOOKBACK_DAYS = 90
+
+// ─── Best next dollar (roadmap #1) ───────────────────────────────────────────
+
+/**
+ * Product default: a reported income at least this much above the last one
+ * we acknowledged counts as a raise and prompts a higher monthly deposit.
+ */
+export const RAISE_MIN_INCREASE = 0.03
+
+/** Product default: rough share of a gross raise that reaches the paycheck after tax. */
+export const RAISE_TAKE_HOME_FRACTION = 0.70
+
+/** Product default: the share of the after-tax raise we suggest saving ("save half your raise"). */
+export const RAISE_SAVE_SHARE = 0.50
+
+/** Product default: suggested deposit changes are rounded to this many dollars. */
+export const DEPOSIT_ROUND_USD = 5

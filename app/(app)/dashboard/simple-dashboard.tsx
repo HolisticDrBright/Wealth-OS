@@ -5,6 +5,7 @@
 
 import Link from 'next/link'
 import { getSimpleDashboard } from '@/lib/actions/simple-dashboard'
+import { NextDollarCard } from './NextDollarCard'
 import { GlossaryTerm } from '@/components/ui/glossary'
 
 function usd(n: number): string {
@@ -134,6 +135,9 @@ export async function SimpleDashboard() {
           No goal yet. <Link href="/onboarding/risk-profile" className="text-[var(--color-accent-cyan,#3cc8e6)] underline">Set one up</Link> — everything here works toward a goal you choose.
         </section>
       )}
+
+      {/* Roadmap #1: where the next saved dollar should go */}
+      {data.nextDollar && <NextDollarCard view={data.nextDollar} />}
 
       {/* d. Needs your decision */}
       {data.decisions.length > 0 ? (

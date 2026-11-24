@@ -1,5 +1,54 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Roadmap #1: best next dollar on Home (+ #6 raise prompt)
+
+- **Home card, web and phone** (`NextDollarCard`): "Your best next dollar"
+  on Simple Home and the phone Home. It shows ONE thing: the highest-ranked
+  question still unanswered, or the recommendation once we know enough. It
+  walks the existing waterfall in order (`lib/advisory/next-dollar-card.ts`).
+  `rankNextDollar`'s `bestNext` alone skips steps with missing data, so a blank
+  profile was told to "invest in taxable"; the card asks about essentials
+  first and never jumps past an unknown higher step.
+- **One question at a time, plain English**: monthly essentials, employer
+  match, debt above 6%, health plan, household income, filing status, IRA
+  and 401(k) contributions so far this year. Answers are saved where they
+  already live (`financial_profile`, `employer_benefits`, `debt_accounts`).
+  "Not sure" moves on and is listed later ("we couldn't check …"). Steps that
+  need tax limits we don't have are skipped and said so, instead of asking
+  the person something they can't fix.
+- **One emergency-fund definition**: the waterfall and the `/advisor`
+  checkup now use the ladder's Tier 1 Safety (6 months of essentials + goals
+  due within 2 years, against cash-like holdings). The old one
+  (`liquid_cash_usd` vs expenses × kb months, 3 by default) is retired, as are
+  the checkup's "idle cash above target" math on it. Shared mapper:
+  `lib/advisory/next-dollar-inputs.ts`.
+- **More honest inputs**: no debt rows now means "unknown" unless the person
+  says "none" (it used to read as no debt only when a row existed). IRA room
+  needs this year's contributions (it used to assume $0).
+- **Raise prompt (#6)**: when reported household income rises at least
+  `RAISE_MIN_INCREASE`, suggest adding `RAISE_SAVE_SHARE` of the after-tax raise
+  (`RAISE_TAKE_HOME_FRACTION` of gross) to the primary goal's monthly deposit,
+  rounded to `DEPOSIT_ROUND_USD`. Example: $80k → $90k suggests +$290/month.
+  "Raise my deposit" updates the goal; "Not now" just acknowledges. Either way
+  the prompt waits for the next raise. "Income changed? Update it" is on the card.
+- Phone: `POST /api/mobile/next-dollar` (answer / skip / income / raise),
+  bearer-authenticated; the card comes with `GET /api/mobile/home`.
+- **Pre-existing bug fixed**: `getDebtAccounts` ordered by `created_at`, which
+  `debt_accounts` doesn't have, so the read failed and no debt ever reached the
+  checkup. It now orders by `updated_at`.
+
+Nothing in this feature trades or touches positions (tested).
+
+**New constants**: `RAISE_MIN_INCREASE` 0.03, `RAISE_TAKE_HOME_FRACTION` 0.70,
+`RAISE_SAVE_SHARE` 0.50, `DEPOSIT_ROUND_USD` 5.
+
+**New migration**: `20260704o_next_dollar.sql` — `next_dollar_state` (owner
+RLS): "no high-interest debt" confirmation, skipped questions, income baseline.
+
+**Not verifiable here**: current-year `tax_constants` rows (without them the
+HSA / Roth / 401(k) steps show as "couldn't check"); the screens weren't
+viewed against a live database.
+
 ## 2026-11-24 — Wealth-manager allocation: summary (Phases 1–6)
 
 Paper mode throughout. No live trading enabled, no strategy promoted, no

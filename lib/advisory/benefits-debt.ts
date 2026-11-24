@@ -76,3 +76,37 @@ export function matchCaptureStatus(b: EmployerBenefits): MatchStatus {
   if (b.onTrackForFullMatch == null) return 'on_track_unknown'
   return b.onTrackForFullMatch ? 'captured' : 'unclaimed'
 }
+
+// ─── Row mappers (shared by the cookie actions and client-agnostic loaders) ──
+
+export const EMPTY_EMPLOYER_BENEFITS: EmployerBenefits = {
+  matchAvailable: null, matchFormula: null, matchPercent: null,
+  matchCapPctOfPay: null, vestingNotes: null, onTrackForFullMatch: null,
+  updatedAt: null,
+}
+
+export function employerBenefitsFromRow(data: Record<string, unknown> | null | undefined): EmployerBenefits {
+  if (!data) return EMPTY_EMPLOYER_BENEFITS
+  return {
+    matchAvailable: (data.match_available as boolean | null) ?? null,
+    matchFormula: (data.match_formula as string | null) ?? null,
+    matchPercent: data.match_percent != null ? Number(data.match_percent) : null,
+    matchCapPctOfPay: data.match_cap_pct_of_pay != null ? Number(data.match_cap_pct_of_pay) : null,
+    vestingNotes: (data.vesting_notes as string | null) ?? null,
+    onTrackForFullMatch: (data.on_track_for_full_match as boolean | null) ?? null,
+    updatedAt: (data.updated_at as string | null) ?? null,
+  }
+}
+
+export function debtAccountFromRow(d: Record<string, unknown>): DebtAccount {
+  return {
+    id: String(d.id),
+    name: String(d.name),
+    debtType: String(d.debt_type),
+    balanceUsd: Number(d.balance_usd ?? 0),
+    aprPct: d.apr_pct != null ? Number(d.apr_pct) : null,
+    minimumPaymentUsd: d.minimum_payment_usd != null ? Number(d.minimum_payment_usd) : null,
+    payoffPriority: d.payoff_priority != null ? Number(d.payoff_priority) : null,
+  }
+}
+

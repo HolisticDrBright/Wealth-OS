@@ -12,6 +12,7 @@ import {
   Card, Pill, PracticeBadge, Money, Delta, ProgressBar, StateView, formatUsd,
 } from '@/src/ui'
 import { LineChart } from '@/src/ui/LineChart'
+import { NextDollarCard } from '@/src/ui/NextDollarCard'
 import { colors } from '@/src/theme'
 
 function GoalPill({ status }: { status: GoalView['status'] }) {
@@ -151,6 +152,9 @@ export default function HomeScreen() {
               </Text>
             </Card>
           )}
+
+          {/* Best next dollar */}
+          {data.nextDollar && <NextDollarCard view={data.nextDollar} onChanged={reload} />}
 
           {/* Needs your decision */}
           {data.decision ? (

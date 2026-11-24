@@ -23,6 +23,7 @@ import { tierMixForTotal, yearRangeForMix, badYearFraction } from '@/lib/allocat
 import { strategyRowsOnly, sleeveOfKey, LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 import { CORE_FUNDS } from '@/lib/config/product-defaults'
 import { getScanStaleness, alertIfScanStale } from '@/lib/ops/scan-heartbeat'
+import { loadNextDollarView, type NextDollarView } from '@/lib/advisory/next-dollar-data'
 import { roundTripCostUsd } from '@/lib/costs/transaction-costs'
 import { liveTradingEnabled } from '@/lib/broker-adapters/execution-guard'
 
@@ -132,6 +133,8 @@ export interface MobileHome {
   weekItems: string[]
   /** Phase 6: set when scheduled strategy scans have stopped during market hours. */
   scanStale: { hoursSince: number | null } | null
+  /** Roadmap #1: where the next saved dollar should go (null if it can't be computed). */
+  nextDollar: NextDollarView | null
 }
 
 export async function buildMobileHome(supabase: SupabaseClient, userId: string): Promise<MobileHome> {
@@ -224,6 +227,7 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
     }
   }
 
+  const nextDollar = await loadNextDollarView(supabase, userId, ladder).catch(() => null)
   const scan = await getScanStaleness(supabase).catch(() => null)
   if (scan?.stale) await alertIfScanStale(supabase, userId, scan).catch(() => false)
 
@@ -231,6 +235,7 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
     practiceMode: !liveTradingEnabled(),
     tradingHalted: halted,
     scanStale: scan?.stale ? { hoursSince: scan.hoursSince == null ? null : Math.floor(scan.hoursSince) } : null,
+    nextDollar,
     totalValueUsd: Math.round(totalValueUsd),
     todayChangeUsd: Math.round(todayChangeUsd * 100) / 100,
     sinceStartChangeUsd: Math.round(sinceStartChangeUsd * 100) / 100,

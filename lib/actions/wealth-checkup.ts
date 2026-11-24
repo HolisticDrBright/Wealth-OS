@@ -19,16 +19,17 @@ import { fetchCurrentYields } from '@/lib/advisory/yields'
 import { evaluateAllRules } from '@/lib/advisory/engine'
 import { getFinancialProfile } from '@/lib/actions/advisory'
 import { getEmployerBenefits, getDebtAccounts } from '@/lib/actions/benefits-debt'
-import { summarizeDebts, matchCaptureStatus } from '@/lib/advisory/benefits-debt'
+import { summarizeDebts, matchCaptureStatus, EMPTY_EMPLOYER_BENEFITS } from '@/lib/advisory/benefits-debt'
 import { ADVISORY_DISCLAIMER, type FinancialProfile } from '@/lib/advisory/types'
 import { rankNextDollar, type NextDollarPlan, type NextDollarStep } from '@/lib/advisory/next-dollar'
-import { buildQualityLabel, splitInputs, type DataQualityLabel } from '@/lib/advisory/data-quality'
+import { nextDollarInputsFrom } from '@/lib/advisory/next-dollar-inputs'
+import { loadLadder } from '@/lib/allocation/ladder-data'
+import { buildQualityLabel, type DataQualityLabel } from '@/lib/advisory/data-quality'
 import {
   buildGovernanceStamp, evaluateStaleness, buildSuitabilityFile,
   WEALTH_CHECKUP_RULE_VERSION,
   type Explanation, type GovernanceStamp, type StalenessVerdict, type SuitabilityFile,
 } from '@/lib/advisory/suitability'
-import { tierCapForInvestable } from '@/lib/advisory/sweep-engine'
 
 export interface CheckupItem {
   id: string
@@ -158,41 +159,38 @@ export async function getWealthCheckup(): Promise<WealthCheckup> {
       })
     }
 
-    // ── Emergency fund ─────────────────────────────────────────────────────────
-    const months = params
-      ? (profile.income_stability === 'self_employed' ? params.emergency_months_self_employed
-        : profile.income_stability === 'variable' ? params.emergency_months_family
-        : params.emergency_months_w2) ?? 3
-      : 3
-    const emergencyTarget = profile.monthly_essential_expenses_usd != null
-      ? profile.monthly_essential_expenses_usd * months
-      : null
+    // ── Emergency fund = the ladder's Tier 1 Safety (one definition app-wide) ──
+    const ladder = await loadLadder(supabase, user.id).catch(() => null)
+    const t1 = ladder?.tier1 ?? null
     {
-      const { present, missing } = splitInputs(
-        { liquid_cash_usd: profile.liquid_cash_usd, monthly_essential_expenses_usd: profile.monthly_essential_expenses_usd },
-        { liquid_cash_usd: 'liquid cash balance', monthly_essential_expenses_usd: 'monthly essential expenses' }
-      )
-      const quality = buildQualityLabel({ presentInputs: present, missingInputs: missing, requiresProfessionalReview: false })
-      if (profile.liquid_cash_usd == null || emergencyTarget == null) {
+      const quality = buildQualityLabel({
+        presentInputs: t1 && t1.status !== 'needs_expenses' ? ['monthly essential expenses', 'cash-like holdings'] : [],
+        missingInputs: !t1 || t1.status === 'needs_expenses' ? ['monthly essential expenses'] : [],
+        requiresProfessionalReview: false,
+      })
+      if (!t1 || t1.status === 'needs_expenses' || t1.targetUsd == null) {
         addItem({
           id: 'emergency_fund', title: 'Emergency fund', status: 'needs_data',
-          summary: `Add ${missing.join(' and ')} to size the ${months}-month target.`, quality,
+          summary: 'Add your monthly essential expenses to size your safety cushion (6 months, plus goals due within 2 years).', quality,
         })
-        missingData.push(...missing)
-      } else if (profile.liquid_cash_usd < emergencyTarget) {
+        missingData.push('monthly essential expenses')
+      } else if (!t1.funded) {
         addItem({
           id: 'emergency_fund', title: 'Emergency fund', status: 'action',
-          summary: `$${Math.round(emergencyTarget - profile.liquid_cash_usd).toLocaleString()} below the ${months}-month target ($${Math.round(emergencyTarget).toLocaleString()}).`,
+          summary: `$${Math.round(t1.shortfallUsd).toLocaleString()} below your safety cushion target ($${Math.round(t1.targetUsd).toLocaleString()}).`,
           quality,
         })
       } else {
         addItem({
           id: 'emergency_fund', title: 'Emergency fund', status: 'ok',
-          summary: `Funded: $${Math.round(profile.liquid_cash_usd).toLocaleString()} vs $${Math.round(emergencyTarget).toLocaleString()} target.`,
+          summary: `Funded: $${Math.round(t1.heldUsd).toLocaleString()} vs $${Math.round(t1.targetUsd).toLocaleString()} target.`,
           quality,
         })
       }
     }
+
+    // Cash above the safety cushion target counts as idle.
+    const emergencyTarget = t1 && t1.status !== 'needs_expenses' ? t1.targetUsd : null
 
     // ── Idle cash + cash-yield opportunity ─────────────────────────────────────
     const cashAssets = (assetsRes as Array<{ category: string; current_value: number }>)
@@ -401,48 +399,14 @@ export async function getWealthCheckup(): Promise<WealthCheckup> {
     // ── Next-dollar waterfall ──────────────────────────────────────────────────
     const investable = (assetsRes as Array<{ category: string; current_value: number }>)
       .reduce((s, a) => s + (a.current_value ?? 0), 0)
-    const isMfj = profile.filing_status === 'mfj'
-    const magi = profile.magi_estimate_usd
-    let rothPath: 'direct' | 'backdoor' | 'ineligible' | null = null
-    if (constants && magi != null && profile.filing_status != null) {
-      const phaseStart = isMfj ? constants.roth_phaseout_mfj_start : constants.roth_phaseout_single_start
-      const phaseEnd = isMfj ? constants.roth_phaseout_mfj_end : constants.roth_phaseout_single_end
-      if (phaseStart != null && phaseEnd != null) {
-        rothPath = magi < phaseStart ? 'direct' : 'backdoor'
-      }
-    }
-    const hsaLimit = constants
-      ? (profile.filing_status === 'mfj' ? constants.hsa_limit_family : constants.hsa_limit_single)
-      : null
-
-    const nextDollar = rankNextDollar({
-      emergencyFundUsd: profile.liquid_cash_usd,
-      emergencyTargetUsd: emergencyTarget,
-      // Real first-class data (item 2): match capture status + highest-APR debt.
-      employerMatchAvailable: matchStatus === 'unknown' ? null
-        : matchStatus === 'none' ? false
-        : matchStatus === 'unclaimed' || matchStatus === 'on_track_unknown',
-      highInterestDebtAprPct: debts.length === 0 ? null : (debtSummary.highestApr?.aprPct ?? 0),
-      highInterestDebtBalanceUsd: debtSummary.highestApr?.balanceUsd ?? 0,
-      hsaEligible: profile.health_plan_type == null ? null : profile.health_plan_type === 'hdhp',
-      hsaRemainingUsd: hsaLimit != null
-        ? Math.max(0, hsaLimit - (profile.ytd_hsa_contribution_usd ?? 0))
-        : null,
-      rothPath,
-      iraRemainingUsd: constants?.ira_limit != null
-        ? Math.max(0, constants.ira_limit - (profile.ytd_ira_contribution_usd ?? 0))
-        : null,
-      employee401kRemainingUsd: constants?.solo401k_employee != null && profile.ytd_401k_employee_usd != null
-        ? Math.max(0, constants.solo401k_employee - profile.ytd_401k_employee_usd)
-        : null,
-      tbillYieldPct: yields?.tbill3moPct ?? null,
-      hysaYieldPct: yields?.savingsNationalAvgPct ?? null,
-      debtPayoffHurdleAprPct: params?.debt_payoff_hurdle_apr ?? 0.06,
-      speculativeSleeveCapFraction: params && investable > 0
-        ? tierCapForInvestable(investable, params)
-        : null,
-      yieldsFetchedAt,
-    })
+    // Roth path, HSA limit, debts, match: one shared mapping (next-dollar-inputs.ts).
+    const { data: ndState } = await supabase.from('next_dollar_state')
+      .select('no_high_interest_debt_confirmed_at').eq('user_id', user.id).maybeSingle()
+    const nextDollar = rankNextDollar(nextDollarInputsFrom({
+      profile, benefits: benefits ?? EMPTY_EMPLOYER_BENEFITS, debts,
+      noHighInterestDebtConfirmed: !!(ndState as { no_high_interest_debt_confirmed_at?: string | null } | null)?.no_high_interest_debt_confirmed_at,
+      constants, params, yields, ladder, investableUsd: investable,
+    }))
 
     // ── Model governance (item 8) + suitability file for the top move (item 3) ─
     const governance = buildGovernanceStamp({

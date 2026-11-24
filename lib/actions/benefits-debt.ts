@@ -8,32 +8,21 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { EmployerBenefits, DebtAccount } from '@/lib/advisory/benefits-debt'
+import {
+  employerBenefitsFromRow, debtAccountFromRow, EMPTY_EMPLOYER_BENEFITS,
+  type EmployerBenefits, type DebtAccount,
+} from '@/lib/advisory/benefits-debt'
 
 export async function getEmployerBenefits(): Promise<EmployerBenefits> {
-  const empty: EmployerBenefits = {
-    matchAvailable: null, matchFormula: null, matchPercent: null,
-    matchCapPctOfPay: null, vestingNotes: null, onTrackForFullMatch: null,
-    updatedAt: null,
-  }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return empty
+  if (!user) return EMPTY_EMPLOYER_BENEFITS
   const { data } = await supabase
     .from('employer_benefits')
     .select('*')
     .eq('user_id', user.id)
     .maybeSingle()
-  if (!data) return empty
-  return {
-    matchAvailable: data.match_available ?? null,
-    matchFormula: data.match_formula ?? null,
-    matchPercent: data.match_percent ?? null,
-    matchCapPctOfPay: data.match_cap_pct_of_pay ?? null,
-    vestingNotes: data.vesting_notes ?? null,
-    onTrackForFullMatch: data.on_track_for_full_match ?? null,
-    updatedAt: data.updated_at ?? null,
-  }
+  return employerBenefitsFromRow(data as Record<string, unknown> | null)
 }
 
 export async function upsertEmployerBenefits(payload: {
@@ -59,20 +48,14 @@ export async function getDebtAccounts(): Promise<DebtAccount[]> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
+  // debt_accounts has no created_at column (20260704f) — ordering by it made
+  // this read fail and return no debts at all. Order by updated_at.
   const { data } = await supabase
     .from('debt_accounts')
     .select('*')
     .eq('user_id', user.id)
-    .order('created_at', { ascending: true })
-  return ((data ?? []) as Array<Record<string, unknown>>).map(d => ({
-    id: String(d.id),
-    name: String(d.name),
-    debtType: String(d.debt_type),
-    balanceUsd: Number(d.balance_usd ?? 0),
-    aprPct: d.apr_pct != null ? Number(d.apr_pct) : null,
-    minimumPaymentUsd: d.minimum_payment_usd != null ? Number(d.minimum_payment_usd) : null,
-    payoffPriority: d.payoff_priority != null ? Number(d.payoff_priority) : null,
-  }))
+    .order('updated_at', { ascending: true })
+  return ((data ?? []) as Array<Record<string, unknown>>).map(debtAccountFromRow)
 }
 
 export async function upsertDebtAccount(payload: {

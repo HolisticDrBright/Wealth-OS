@@ -16,7 +16,7 @@ vi.mock('@/lib/supabase/server', () => ({
     from: (table: string) => {
       const rows = state.tables[table] ?? []
       const chain: Record<string, unknown> = {}
-      for (const m of ['select', 'eq', 'gte', 'order', 'limit', 'in']) chain[m] = () => chain
+      for (const m of ['select', 'eq', 'gte', 'order', 'limit', 'in', 'not']) chain[m] = () => chain
       chain.single = async () => ({ data: rows[0] ?? null, error: null })
       chain.maybeSingle = async () => ({ data: rows[0] ?? null, error: null })
       chain.then = (resolve: (v: unknown) => unknown) =>
@@ -83,6 +83,10 @@ describe('getWealthCheckup', () => {
   })
 
   it('funded profile → underfunded emergency fund flagged as action with math', async () => {
+    // Roadmap #1: the emergency fund IS the ladder's Tier 1 Safety — 6 months
+    // of essentials (EMERGENCY_FUND_MONTHS) against cash-like holdings.
+    state.tables.financial_profile = [{ monthly_essential_expenses_usd: 4_000 }]
+    state.tables.assets = [{ category: 'cash', current_value: 5_000 }, { category: 'stock', current_value: 40_000 }]
     state.profile = {
       liquid_cash_usd: 5_000,
       monthly_essential_expenses_usd: 4_000,
@@ -98,7 +102,7 @@ describe('getWealthCheckup', () => {
 
     const emergency = checkup.items.find(i => i.id === 'emergency_fund')
     expect(emergency?.status).toBe('action')
-    expect(emergency?.summary).toContain('$7,000')   // 12k target − 5k
+    expect(emergency?.summary).toContain('$19,000')   // 24k Tier 1 target − 5k cash
 
     // Direct Roth path flows into the waterfall.
     const roth = checkup.nextDollar.steps.find(s => s.id === 'roth_ira')

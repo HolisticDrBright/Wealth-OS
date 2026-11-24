@@ -24,6 +24,7 @@ import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 import { loadLadder } from '@/lib/allocation/ladder-data'
 import { tierMixForTotal, yearRangeForMix, badYearFraction } from '@/lib/allocation/bad-year'
 import { CORE_FUNDS } from '@/lib/config/product-defaults'
+import { loadNextDollarView, type NextDollarView } from '@/lib/advisory/next-dollar-data'
 
 export interface SimpleGoalView {
   id: string
@@ -53,6 +54,8 @@ export interface SimpleDashboardData {
   /** Good/typical/bad year in dollars for THIS portfolio (null = series unavailable). */
   yearRange: YearRangeUsd | null
   tradingHalted: boolean
+  /** Roadmap #1: where the next saved dollar should go (null if it can't be computed). */
+  nextDollar: NextDollarView | null
 }
 
 interface FundRow {
@@ -203,7 +206,10 @@ export async function getSimpleDashboard(): Promise<SimpleDashboardData | null> 
     fundMoves: fundMovesOf((fundTradesRes.data ?? []) as FundRow[], weekAgo),
   })
 
+  const nextDollar = await loadNextDollarView(supabase, user.id, ladder).catch(() => null)
+
   return {
+    nextDollar,
     totalValueUsd: Math.round(totalValueUsd),
     todayChangeUsd: Math.round(todayChangeUsd * 100) / 100,
     sinceStartChangeUsd: Math.round(sinceStartChangeUsd * 100) / 100,
