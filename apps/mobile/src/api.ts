@@ -36,7 +36,7 @@ export interface HomeData {
   valueSeries: Array<{ date: string; valueUsd: number }>
   goal: GoalView | null
   goalCount: number
-  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'rebalance'; title: string; subtitle: string; count: number } | null
+  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'explore_shrink' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
   /** Set when scheduled strategy scans have stopped during market hours. */
   scanStale: { hoursSince: number | null } | null
@@ -150,7 +150,7 @@ export interface ActivityItem {
 }
 
 export interface ApproveDecision {
-  kind: 'ladder_setup' | 'core_rebalance' | 'rebalance'
+  kind: 'ladder_setup' | 'core_rebalance' | 'explore_shrink' | 'rebalance'
   title: string
   explanation: string
   /** Before/after bar, e.g. { label: 'cash', beforePct: 4, afterPct: 18 }. */

@@ -26,7 +26,7 @@ export default async function ReadinessPage() {
   }
   const view = await getTrackRecord()
   if (!view) return <div className="px-4 py-10 text-sm text-text-1">Sign in to see the track record.</div>
-  const { rows, scan } = view
+  const { rows, scan, vsCoreTotal } = view
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
@@ -66,6 +66,24 @@ export default async function ReadinessPage() {
         )}
       </section>
 
+      {/* Roadmap #3: Explore vs the same dollars in Core */}
+      <section aria-labelledby="vs-core-heading" className="rounded-xl border border-line-strong bg-white/[0.03] p-4">
+        <h2 id="vs-core-heading" className="text-sm font-semibold text-text-0">Explore vs Core (last 12 months, after costs)</h2>
+        {vsCoreTotal == null ? (
+          <p className="mt-2 text-sm text-text-1">Core fund prices are unavailable right now — no comparison.</p>
+        ) : vsCoreTotal.trades === 0 ? (
+          <p className="mt-2 text-sm text-text-1">No closed Explore trades to compare yet.</p>
+        ) : (
+          <p className="mt-2 text-sm text-text-1">
+            {vsCoreTotal.trades} trades over {vsCoreTotal.daysCovered} days: strategies {usd(vsCoreTotal.netUsd)} vs the same dollars in
+            Core {usd(vsCoreTotal.coreUsd)} —{' '}
+            <span className={vsCoreTotal.excessUsd >= 0 ? 'text-emerald-300' : 'text-orange-300'}>
+              {vsCoreTotal.excessUsd >= 0 ? `${usd(vsCoreTotal.excessUsd)} ahead` : `${usd(-vsCoreTotal.excessUsd)} behind`}
+            </span>.
+          </p>
+        )}
+      </section>
+
       {/* Every strategy */}
       <section aria-labelledby="strategies-heading" className="overflow-x-auto rounded-xl border border-line-strong">
         <h2 id="strategies-heading" className="sr-only">Strategies</h2>
@@ -77,6 +95,7 @@ export default async function ReadinessPage() {
               <th scope="col" className="px-3 py-2">Closed trades</th>
               <th scope="col" className="px-3 py-2">Net after costs</th>
               <th scope="col" className="px-3 py-2">Max drawdown</th>
+              <th scope="col" className="px-3 py-2">vs Core</th>
               <th scope="col" className="px-3 py-2">Gates passed</th>
               <th scope="col" className="px-3 py-2">Scan gaps</th>
             </tr>
@@ -98,6 +117,9 @@ export default async function ReadinessPage() {
                   {r.closedTrades > 0 && <div className="text-xs text-text-1">gross {usd(r.grossPnlUsd)} − costs {usd(r.costsUsd)}</div>}
                 </td>
                 <td className="px-3 py-2 font-mono text-text-0">{pct(r.maxDrawdownPct)}</td>
+                <td className={`px-3 py-2 font-mono ${r.vsCoreExcessUsd == null ? 'text-text-1' : r.vsCoreExcessUsd >= 0 ? 'text-emerald-300' : 'text-orange-300'}`}>
+                  {r.vsCoreExcessUsd == null ? '—' : usd(r.vsCoreExcessUsd)}
+                </td>
                 <td className="px-3 py-2">
                   <span className="font-mono text-text-0">{r.gatesPassed} / {r.gatesTotal}</span>
                   <ul className="mt-1 space-y-0.5 text-xs">

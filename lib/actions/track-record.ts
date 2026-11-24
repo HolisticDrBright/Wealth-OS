@@ -19,6 +19,8 @@ import { summarizeTrackRecord, type ClosedTradeRow, type TrackRecordSummary } fr
 import { getRollingBrier } from '@/lib/learning/rolling-brier'
 import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 import { getScanHealth, gapsSince, type ScanGap, type ScanHealth } from '@/lib/ops/scan-heartbeat'
+import { loadExploreVsCore } from '@/lib/explore/vs-core-data'
+import type { VsCoreLine } from '@/lib/explore/vs-core'
 
 export interface TrackRecordRow extends TrackRecordSummary {
   strategyKey: string
@@ -33,11 +35,15 @@ export interface TrackRecordRow extends TrackRecordSummary {
   gatesTotal: number
   /** Scan gaps since this strategy's first closed trade. */
   gaps: ScanGap[]
+  /** Roadmap #3: after costs vs the same dollars in Core, last 12 months (null = no comparable trades). */
+  vsCoreExcessUsd: number | null
 }
 
 export interface TrackRecordView {
   rows: TrackRecordRow[]
   scan: ScanHealth
+  /** All Explore trades vs the same dollars in Core (null when Core prices are unavailable). */
+  vsCoreTotal: (VsCoreLine & { daysCovered: number }) | null
 }
 
 const BRIER_FETCH_MIN_TRADES = 10
@@ -48,7 +54,7 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const [{ data: closed }, { data: shadowClosed }, scan] = await Promise.all([
+  const [{ data: closed }, { data: shadowClosed }, scan, vsCore] = await Promise.all([
     supabase.from('paper_positions')
       .select('strategy_key, realized_pnl_pct, realized_pnl_usd, notional_usd, opened_at, closed_at')
       .not('strategy_key', 'in', LADDER_KEYS_FILTER)
@@ -57,7 +63,9 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
       .select('strategy_key, realized_pnl_usd, would_have_notional')
       .eq('user_id', user.id).eq('status', 'closed').limit(10_000),
     getScanHealth(supabase),
+    loadExploreVsCore(supabase, user.id).catch(() => null),
   ])
+  const vsCoreByKey = new Map((vsCore?.available ? vsCore.comparison.perStrategy : []).map(l => [l.strategyKey, l]))
 
   const byKey = new Map<string, ClosedTradeRow[]>()
   for (const r of (closed ?? []) as ClosedTradeRow[]) {
@@ -105,11 +113,15 @@ export async function getTrackRecord(): Promise<TrackRecordView | null> {
       gatesPassed: readiness.criteria.filter(c => c.evaluable && c.pass).length,
       gatesTotal: readiness.criteria.length,
       gaps: gapsSince(scan.gaps, summary.firstTradeAt),
+      vsCoreExcessUsd: vsCoreByKey.get(key)?.trades ? vsCoreByKey.get(key)!.excessUsd : null,
     }
   })
 
   // Paper-trading strategies first, then by evidence.
   const order: Record<string, number> = { live: 0, live_candidate: 1, paper_trading: 2, backtest_ready: 3, stub: 4, retired: 5 }
   rows.sort((a, b) => (order[a.maturity] ?? 9) - (order[b.maturity] ?? 9) || b.closedTrades - a.closedTrades)
-  return { rows, scan }
+  return {
+    rows, scan,
+    vsCoreTotal: vsCore?.available ? { ...vsCore.comparison.total, daysCovered: vsCore.comparison.daysCovered } : null,
+  }
 }

@@ -88,7 +88,7 @@ export interface TrustView {
   insufficient: boolean
 }
 
-export type DecisionKind = 'ladder_setup' | 'ladder_expenses' | 'core_rebalance' | 'review_candidate' | 'missing_env' | 'risk_controls'
+export type DecisionKind = 'ladder_setup' | 'ladder_expenses' | 'core_rebalance' | 'explore_shrink' | 'review_candidate' | 'missing_env' | 'risk_controls'
 
 export interface DecisionItem {
   id: string
@@ -349,6 +349,12 @@ async function loadLadderDecisions(): Promise<DecisionItem[]> {
     }
     if (view.rebalance) {
       return [{ id: 'core-rebalance', kind: 'core_rebalance', href: '/advisor', text: view.rebalance.summary }]
+    }
+    // Roadmap #3: Explore trailed Core over a meaningful stretch → shrink it.
+    const { getExploreVsCore } = await import('@/lib/actions/explore-vs-core')
+    const vs = await getExploreVsCore().catch(() => null)
+    if (vs?.verdict.propose && vs.summary) {
+      return [{ id: 'explore-shrink', kind: 'explore_shrink', href: '/traders', text: vs.summary }]
     }
     return []
   } catch {

@@ -196,3 +196,26 @@ export const RAISE_SAVE_SHARE = 0.50
 
 /** Product default: suggested deposit changes are rounded to this many dollars. */
 export const DEPOSIT_ROUND_USD = 5
+
+// ─── Explore must beat Core (roadmap #3) ─────────────────────────────────────
+
+/** Product default: closed Explore trades from this many days back are compared with Core. */
+export const EXPLORE_REVIEW_LOOKBACK_DAYS = 365
+
+/**
+ * Product default: a "meaningful stretch" — the comparison only counts once
+ * the first compared trade is at least this many days old…
+ */
+export const EXPLORE_REVIEW_MIN_DAYS = 180
+
+/** Product default: …and at least this many closed trades were compared. */
+export const EXPLORE_REVIEW_MIN_TRADES = 30
+
+/** Product default: when Explore trails Core, the proposal multiplies the Explore limit by this. */
+export const EXPLORE_SHRINK_FACTOR = 0.5
+
+/** Product default: a shrink proposal never goes below this Explore share (it keeps learning). */
+export const EXPLORE_MIN_CAP_FRACTION = 0.02
+
+/** Product default: "Not now" hides the shrink proposal for this many days. */
+export const EXPLORE_SHRINK_SNOOZE_DAYS = 30

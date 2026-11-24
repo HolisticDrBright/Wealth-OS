@@ -1,5 +1,39 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Roadmap #3: Explore must beat Core
+
+- **The comparison** (`lib/explore/vs-core.ts`): every closed Explore
+  (strategy) paper trade from the last `EXPLORE_REVIEW_LOOKBACK_DAYS`, after
+  costs (realized P&L minus the promotion gate's round-trip cost model), against
+  the same dollars held in the person's Core funds over the same days. Core is
+  their own glide-path mix of VTI/VXUS/BND, from daily closes; holding Core
+  costs nothing extra. Shown per strategy and in total. Trades with no Core
+  price history are counted as "couldn't compare", never guessed.
+- **The manager's call**: once at least `EXPLORE_REVIEW_MIN_TRADES` trades over
+  at least `EXPLORE_REVIEW_MIN_DAYS` days have been compared, and Explore's total
+  trails Core, a decision appears: shrink the Explore limit by
+  `EXPLORE_SHRINK_FACTOR` (10% → 5%), never below `EXPLORE_MIN_CAP_FRACTION`.
+  It only ever proposes a SMALLER limit (property-tested). Approving records
+  the approval first, then lowers the Explore sleeve and raises Core's share.
+  Nothing is sold: new strategy trades wait until Explore fits. "Not now"
+  snoozes for `EXPLORE_SHRINK_SNOOZE_DAYS`.
+- **Where it shows**:
+  - Explore page (`/traders`) card, in both modes; per-strategy table in Pro
+  - Command Center / Simple Home "Needs your decision"
+  - phone Home decision and Approve screen (`kind: 'explore_shrink'`)
+  - promotion-readiness page: a "vs Core" column per strategy and a total line
+- If Core fund prices can't be fetched there is no comparison and no proposal.
+
+**New constants**: `EXPLORE_REVIEW_LOOKBACK_DAYS` 365, `EXPLORE_REVIEW_MIN_DAYS`
+180, `EXPLORE_REVIEW_MIN_TRADES` 30, `EXPLORE_SHRINK_FACTOR` 0.5,
+`EXPLORE_MIN_CAP_FRACTION` 0.02, `EXPLORE_SHRINK_SNOOZE_DAYS` 30.
+
+**New migration**: `20260704q_explore_vs_core.sql` — `explore_shrink` approval
+kind (all earlier kinds kept); `explore_review_state` (owner RLS) for the snooze.
+
+**Not verifiable here**: Yahoo daily closes for the Core funds at run time; in
+this sandbox the comparison reports "prices unavailable".
+
 ## 2026-11-24 — Roadmap #2: read-only account linking (Plaid)
 
 - **Plaid, read-only** (`lib/plaid/`): link a bank or card (Transactions +

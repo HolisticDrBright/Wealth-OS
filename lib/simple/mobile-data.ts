@@ -24,6 +24,7 @@ import { strategyRowsOnly, sleeveOfKey, LADDER_KEYS_FILTER } from '@/lib/allocat
 import { CORE_FUNDS } from '@/lib/config/product-defaults'
 import { getScanStaleness, alertIfScanStale } from '@/lib/ops/scan-heartbeat'
 import { loadNextDollarView, type NextDollarView } from '@/lib/advisory/next-dollar-data'
+import { loadExploreVsCore } from '@/lib/explore/vs-core-data'
 import { roundTripCostUsd } from '@/lib/costs/transaction-costs'
 import { liveTradingEnabled } from '@/lib/broker-adapters/execution-guard'
 
@@ -129,7 +130,7 @@ export interface MobileHome {
   goal: MobileGoalView | null
   goalCount: number
   /** Ladder decisions come first: Explore is $0 until Tier 1 Safety is funded. */
-  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'rebalance'; title: string; subtitle: string; count: number } | null
+  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'explore_shrink' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
   /** Phase 6: set when scheduled strategy scans have stopped during market hours. */
   scanStale: { hoursSince: number | null } | null
@@ -218,7 +219,20 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
       subtitle: 'Your stock/bond mix has drifted from your plan. Takes one tap.',
       count: 1,
     }
-  } else if (suggestions.length > 0) {
+  }
+  if (!decision && ladder) {
+    // Roadmap #3: Explore trailed Core over a meaningful stretch → offer to shrink it.
+    const vs = await loadExploreVsCore(supabase, userId).catch(() => null)
+    if (vs?.verdict.propose && vs.verdict.newCapFraction != null) {
+      decision = {
+        kind: 'explore_shrink',
+        title: 'Explore is trailing your Core funds',
+        subtitle: `Shrink its limit from ${Math.round(vs.verdict.currentCapFraction * 1000) / 10}% to ${Math.round(vs.verdict.newCapFraction * 1000) / 10}%. Nothing is sold.`,
+        count: 1,
+      }
+    }
+  }
+  if (!decision && suggestions.length > 0) {
     decision = {
       kind: 'rebalance',
       title: 'Rebalance your accounts',

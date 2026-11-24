@@ -20,6 +20,7 @@ const KIND_META: Record<DecisionKind, { icon: LucideIcon; color: string }> = {
   ladder_setup: { icon: ShieldCheck, color: 'text-accent-cyan' },
   ladder_expenses: { icon: ShieldCheck, color: 'text-orange-300' },
   core_rebalance: { icon: ShieldCheck, color: 'text-sky-300' },
+  explore_shrink: { icon: ShieldCheck, color: 'text-orange-300' },
   review_candidate: { icon: Gavel, color: 'text-amber-400' },
   missing_env: { icon: PlugZap, color: 'text-sky-400' },
   risk_controls: { icon: ShieldAlert, color: 'text-red-400' },

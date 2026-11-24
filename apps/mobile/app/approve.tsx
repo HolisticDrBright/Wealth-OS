@@ -135,6 +135,8 @@ export default function ApproveScreen() {
                       ? `Done — ${formatUsd(res.safetyUsd ?? 0)} is in your safety cushion and ${formatUsd(res.coreUsd ?? 0)} is in your core funds. Practice money.`
                       : d.kind === 'core_rebalance'
                       ? 'Done — your core funds are back to your plan. You can see the trades in Activity.'
+                      : d.kind === 'explore_shrink'
+                      ? 'Done — your Explore limit is smaller. Nothing was sold; the rest stays with your Core funds.'
                       : res.executed > 0
                       ? `Done — ${res.executed} change${res.executed === 1 ? '' : 's'} placed. You can see them in Activity.`
                       : skipped > 0

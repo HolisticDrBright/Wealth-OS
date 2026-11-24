@@ -9,6 +9,7 @@
  * POST /api/mobile/approve — approve it ({ kind, approved_summary }).
  *      ladder_setup   → approveLadderSetup   (records approval, then paper fund buys)
  *      core_rebalance → approveCoreRebalance (records approval, then paper fund trades)
+ *      explore_shrink → approveExploreShrink (records approval, then LOWERS the Explore limit; nothing sold)
  *      rebalance      → records accept_rebalance, then the web's guarded rebalance path.
  *      Nothing happens without approval. Core is never traded automatically.
  *
@@ -27,6 +28,7 @@ import {
 import { planLadderSetup, setupNeeded, coreDrift, planCoreRebalance, type FundTrade } from '@/lib/allocation/core-plans'
 import { tierMixOf, mixAfterTrades, yearRangeForMix } from '@/lib/allocation/bad-year'
 import { CORE_FUNDS } from '@/lib/config/product-defaults'
+import { loadExploreVsCore, approveExploreShrink } from '@/lib/explore/vs-core-data'
 
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
 const pct = (n: number) => Math.round(n * 1000) / 10
@@ -109,7 +111,28 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // ── 3. Legacy recorded-account rebalance ────────────────────────────────
+    // ── 3. Explore trailed Core → shrink the Explore limit (roadmap #3) ─────
+    const vs = await loadExploreVsCore(ctx.supabase, ctx.userId).catch(() => null)
+    if (vs?.verdict.propose && vs.summary && vs.verdict.newCapFraction != null) {
+      return NextResponse.json({
+        decision: {
+          kind: 'explore_shrink',
+          title: 'Shrink your Explore limit',
+          explanation: `${vs.verdict.reason} When strategies don't beat simply holding your Core funds, the sensible move is to give them less room.`,
+          change: { label: 'Explore limit', beforePct: pct(vs.verdict.currentCapFraction), afterPct: pct(vs.verdict.newCapFraction) },
+          amountMovedUsd: 0,
+          estimatedCostUsd: 0,
+          estimatedTaxUsd: 0,
+          taxNote: 'none — nothing is sold',
+          badYearBeforeUsd: null,
+          badYearAfterUsd: null,
+          doNothing: 'If you do nothing, Explore keeps its current limit. Nothing happens until you approve.',
+          summary: vs.summary,
+        },
+      })
+    }
+
+    // ── 4. Legacy recorded-account rebalance ────────────────────────────────
     const scan = await runRebalanceScan(ctx.supabase, ctx.userId, { executeTrades: false })
     if (!scan.trades.length) {
       return NextResponse.json({ decision: null })
@@ -171,6 +194,12 @@ export async function POST(req: NextRequest) {
   // The phone flow ALWAYS approves explicitly — same bar as web simple mode.
   if (!summary) {
     return NextResponse.json({ error: 'approval_required: approved_summary missing' }, { status: 400 })
+  }
+
+  if (body.kind === 'explore_shrink') {
+    const res = await approveExploreShrink(ctx.supabase, ctx.userId, summary)
+    if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
+    return NextResponse.json({ ok: true, kind: 'explore_shrink', capFraction: res.capFraction, executed: 0, skippedOrders: [], errors: [] })
   }
 
   if (body.kind === 'ladder_setup' || body.kind === 'core_rebalance') {
