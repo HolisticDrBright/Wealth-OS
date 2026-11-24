@@ -1,6 +1,11 @@
 /**
  * Book-level risk allocation — computes live exposure per strategy book from
- * open paper positions and enforces book notional caps + regime rotation.
+ * open paper positions and enforces book caps + regime rotation.
+ *
+ * Each book's cap applies twice (Phase 4): to its share of open NOTIONAL and
+ * to its share of open RISK UNITS (notional × annualized volatility; a binary
+ * market's stake). The gate takes the smaller allowed size, so a book of
+ * volatile positions fills its budget sooner than its dollars alone suggest.
  *
  * This layer only ever REDUCES size relative to what the existing controls
  * (per-position cap, Kelly haircuts, correlation caps, regime haircut)
@@ -13,14 +18,27 @@ import {
   type StrategyBook,
 } from '@/lib/strategies/strategy-books'
 import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
+import { getAnnualVol, riskUnits, type VolEstimate } from '@/lib/risk/risk-units'
 
 export interface BookExposure {
   book: StrategyBook
   openNotionalUsd: number
   /** Share of total open notional (0 when book is empty or book is everything). */
   share: number
+  /** Open risk units (notional × annualized vol) in this book. */
+  riskUnits: number
+  /** Share of total open risk units. */
+  riskShare: number
   capShare: number
-  utilization: number  // share / capShare
+  /** The binding utilization: max(dollar share, risk share) / capShare. */
+  utilization: number
+}
+
+export interface BookState {
+  totalNotionalUsd: number
+  byBook: Record<StrategyBook, number>
+  totalRiskUnits: number
+  riskByBook: Record<StrategyBook, number>
 }
 
 export interface BookGateResult {
@@ -31,39 +49,72 @@ export interface BookGateResult {
   book: StrategyBook
 }
 
-/** Sum open notional per book from the user's open paper positions. */
+type VolFor = (symbol: string, assetClass: string) => Promise<VolEstimate>
+
+/**
+ * Sum open notional AND risk units per book from the user's open paper
+ * strategy positions. `volFor` is injectable for tests.
+ */
 export async function computeBookExposures(
   supabase: SupabaseClient,
   userId: string,
-): Promise<{ totalNotionalUsd: number; byBook: Record<StrategyBook, number> }> {
-  const byBook = Object.fromEntries(ALL_BOOKS.map(b => [b, 0])) as Record<StrategyBook, number>
+  volFor: VolFor = getAnnualVol,
+): Promise<BookState> {
+  const zero = () => Object.fromEntries(ALL_BOOKS.map(b => [b, 0])) as Record<StrategyBook, number>
+  const byBook = zero()
+  const riskByBook = zero()
 
   const { data } = await supabase
     .from('paper_positions')
-    .select('strategy_key, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
+    .select('strategy_key, symbol, asset_class, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', userId)
     .eq('status', 'open')
 
+  const rows = (data ?? []) as Array<{ strategy_key: string; symbol: string | null; asset_class: string | null; notional_usd: number | null }>
+  const vols = new Map<string, number>()
+  await Promise.all([...new Set(rows.map(r => `${r.asset_class ?? ''}|${r.symbol ?? ''}`))].map(async k => {
+    const [cls, sym] = k.split('|')
+    vols.set(k, (await volFor(sym, cls).catch(() => null))?.vol ?? 1)   // unknown → as risky as a binary
+  }))
+
   let total = 0
-  for (const row of data ?? []) {
-    const notional = (row.notional_usd as number) ?? 0
+  let totalRisk = 0
+  for (const row of rows) {
+    const notional = Math.abs(row.notional_usd ?? 0)
+    const ru = riskUnits(notional, vols.get(`${row.asset_class ?? ''}|${row.symbol ?? ''}`) ?? 1)
+    const book = bookFor(row.strategy_key)
     total += notional
-    byBook[bookFor(row.strategy_key as string)] += notional
+    totalRisk += ru
+    byBook[book] += notional
+    riskByBook[book] += ru
   }
 
-  return { totalNotionalUsd: total, byBook }
+  return { totalNotionalUsd: total, byBook, totalRiskUnits: totalRisk, riskByBook }
 }
 
 export function summarizeBookExposures(
   totalNotionalUsd: number,
   byBook: Record<StrategyBook, number>,
+  totalRiskUnits = 0,
+  riskByBook: Partial<Record<StrategyBook, number>> = {},
 ): BookExposure[] {
   return ALL_BOOKS.map(book => {
     const open = byBook[book] ?? 0
     const share = totalNotionalUsd > 0 ? open / totalNotionalUsd : 0
+    const ru = riskByBook[book] ?? 0
+    const riskShare = totalRiskUnits > 0 ? ru / totalRiskUnits : 0
     const capShare = BOOK_NOTIONAL_CAP[book]
-    return { book, openNotionalUsd: open, share, capShare, utilization: capShare > 0 ? share / capShare : 0 }
+    return {
+      book, openNotionalUsd: open, share, riskUnits: ru, riskShare, capShare,
+      utilization: capShare > 0 ? Math.max(share, riskShare) / capShare : 0,
+    }
   })
+}
+
+/** Largest x ≤ ∞ with (open + x·w) / (total + x·w) ≤ cap, in units of x. */
+function roomFor(cap: number, total: number, open: number, weight: number): number {
+  if (cap >= 1 || weight <= 0) return Infinity
+  return (cap * total - open) / ((1 - cap) * weight)
 }
 
 /**
@@ -80,6 +131,13 @@ export function gateThroughBook(opts: {
   regime: string
   totalNotionalUsd: number
   bookNotionalUsd: number
+  /**
+   * Phase 4 risk-unit gate (ADDITIONAL). Omitted → dollar gate only.
+   * proposedVol: the new position's annualized vol (1 for a binary stake).
+   */
+  proposedVol?: number
+  totalRiskUnits?: number
+  bookRiskUnits?: number
 }): BookGateResult {
   const { strategyKey, proposedNotionalUsd, regime, totalNotionalUsd, bookNotionalUsd } = opts
   const book = bookFor(strategyKey)
@@ -95,13 +153,19 @@ export function gateThroughBook(opts: {
 
   const proposed = proposedNotionalUsd * regimeMult
 
-  // Book cap: solve for the largest x ≤ proposed with
+  // Book cap on DOLLARS: the largest x ≤ proposed with
   // (bookOpen + x) / (total + x) ≤ cap  →  x ≤ (cap·total − bookOpen) / (1 − cap)
   const cap = BOOK_NOTIONAL_CAP[book]
-  let roomUsd = Infinity
-  if (cap < 1) {
-    roomUsd = (cap * totalNotionalUsd - bookNotionalUsd) / (1 - cap)
-  }
+  const dollarRoomUsd = roomFor(cap, totalNotionalUsd, bookNotionalUsd, 1)
+
+  // Book cap on RISK UNITS (Phase 4): (bookRisk + x·v) / (totalRisk + x·v) ≤ cap.
+  const riskActive = opts.proposedVol != null && opts.totalRiskUnits != null && opts.bookRiskUnits != null &&
+    (opts.totalRiskUnits ?? 0) > 0
+  const riskRoomUsd = riskActive
+    ? roomFor(cap, opts.totalRiskUnits!, opts.bookRiskUnits!, Math.max(opts.proposedVol!, 1e-9))
+    : Infinity
+  const roomUsd = Math.min(dollarRoomUsd, riskRoomUsd)
+  const riskBinds = riskRoomUsd < dollarRoomUsd
 
   // Empty portfolio: the first position is always 100% of one book — allow a
   // floor so the book layer can't deadlock a fresh account.
@@ -109,10 +173,11 @@ export function gateThroughBook(opts: {
     return { allowed: true, multiplier: regimeMult, book, reason: regimeMult < 1 ? `${book} book reduced ${Math.round((1 - regimeMult) * 100)}% in ${regime} regime.` : null }
   }
 
+  const what = riskBinds ? 'of open risk' : 'of open notional'
   if (roomUsd <= proposed * 0.1) {
     return {
       allowed: false, multiplier: 0, book,
-      reason: `${book} book at cap (${Math.round(cap * 100)}% of open notional) — no meaningful room.`,
+      reason: `${book} book at cap (${Math.round(cap * 100)}% ${what}) — no meaningful room.`,
     }
   }
 
@@ -122,7 +187,7 @@ export function gateThroughBook(opts: {
       allowed: true,
       multiplier: Math.min(regimeMult, fitMult),
       book,
-      reason: `${book} book near cap — size reduced to fit ${Math.round(cap * 100)}% budget.`,
+      reason: `${book} book near cap — size reduced to fit ${Math.round(cap * 100)}% ${riskBinds ? 'risk ' : ''}budget.`,
     }
   }
 

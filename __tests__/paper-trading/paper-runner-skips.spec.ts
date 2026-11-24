@@ -25,8 +25,16 @@ vi.mock('@/lib/strategies/all-pipeline-strategies', () => ({
 // ── Explore cap mock (cap behavior has its own suite in __tests__/explore) ───
 vi.mock('@/lib/explore/cap', () => ({
   exploreCapAllows: async () => ({ allowed: true, usage: {} }),
+  getExploreUsage: async () => ({ capUsd: 0 }),
+  exploreCapVerdict: () => ({ allowed: true }),
   logExploreCapBlock: async () => {},
 }))
+
+// ── Risk units: no market-data HTTP in this suite ─────────────────────────────
+vi.mock('@/lib/risk/risk-units', async (orig) => {
+  const real = await orig<typeof import('@/lib/risk/risk-units')>()
+  return { ...real, getAnnualVol: async (_s: string, cls: string) => real.resolveVol(cls, []) }
+})
 
 // ── CIO engine mock ───────────────────────────────────────────────────────────
 const mockDecide = vi.fn()

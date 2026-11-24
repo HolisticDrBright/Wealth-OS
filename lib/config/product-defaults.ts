@@ -94,3 +94,48 @@ export const DEFAULT_EXPLORE_CAP_FRACTION = 0.10
 
 /** Product default: the HARD ceiling on Explore — no user setting may exceed it. */
 export const EXPLORE_CAP_HARD_MAX_FRACTION = 0.25
+
+// ─── Risk units (Phase 4) ────────────────────────────────────────────────────
+// A position's risk units = notional × annualized volatility (a binary
+// prediction market: the stake, its maximum loss). Every rule built on them
+// is an ADDITIONAL gate — it can only shrink or block a trade.
+
+/**
+ * Product default: realized volatility is used only when at least this many
+ * daily returns are available; otherwise the conservative per-asset-class
+ * default below applies.
+ */
+export const VOL_MIN_OBSERVATIONS = 20
+
+/** Product default: calendar days of daily closes used for realized volatility. */
+export const VOL_LOOKBACK_DAYS = 90
+
+/**
+ * Product default: conservative annualized volatility per asset class, used
+ * when realized volatility can't be measured. Set at or above what each class
+ * typically shows so a missing history never makes a trade look safer.
+ * Options always use this (an option can lose its whole premium).
+ */
+export const DEFAULT_ANNUAL_VOL: Record<string, number> = {
+  stocks: 0.40,
+  options: 1.00,
+  crypto: 0.90,
+  forex: 0.15,
+  'multi-asset': 0.40,
+}
+
+/** Product default: realized volatility is never taken below this (quiet spells aren't safety). */
+export const VOL_FLOOR_ANNUAL = 0.05
+
+/**
+ * Product default: the reference volatility that turns Explore's dollar cap
+ * into a risk budget (Explore risk budget = Explore cap dollars × this).
+ * Roughly a broad stock index's annual volatility.
+ */
+export const EXPLORE_RISK_REFERENCE_VOL = 0.20
+
+/**
+ * Product default: one position may use at most this share of the Explore
+ * risk budget (owner decision: measured against the Explore risk budget).
+ */
+export const MAX_POSITION_RISK_SHARE = 0.20

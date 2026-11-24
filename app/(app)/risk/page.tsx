@@ -4,12 +4,15 @@ import { RiskClient } from './risk-client'
 import { createClient } from '@/lib/supabase/server'
 import { computeRiskMetrics, type PositionInput } from '@/lib/risk-engine'
 import { getBarsForSymbols, getBars } from '@/lib/market-data'
+import { getBookAllocation } from '@/lib/actions/book-exposure'
+import { BookAllocationPanel } from '../strategies/BookAllocationPanel'
 
 export default async function RiskPage() {
-  const [controls, summary, jobs] = await Promise.all([
+  const [controls, summary, jobs, books] = await Promise.all([
     getRiskControls(),
     getRiskSummary(),
     getSimulationJobs(),
+    getBookAllocation(),
   ])
 
   // Fetch real risk metrics from the engine
@@ -46,6 +49,8 @@ export default async function RiskPage() {
         <h1 className="text-2xl font-bold text-white">Risk Management</h1>
         <p className="text-sm text-gray-500 mt-1">Live exposure, controls, and scenario simulations</p>
       </div>
+      {/* Phase 4: each book's share of open dollars next to its share of open risk. */}
+      {books && <BookAllocationPanel data={books} />}
       <RiskClient
         initialControls={controls}
         summary={summary}

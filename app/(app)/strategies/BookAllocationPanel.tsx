@@ -1,9 +1,11 @@
 'use client'
 
 /**
- * Book allocation panel — how the open paper portfolio is distributed across
- * the six multi-strat books vs. each book's notional cap, plus the current
- * regime's rotation stance (which books are cut and by how much).
+ * Book allocation panel — how the open paper strategy book is distributed
+ * across the multi-strat books vs. each book's cap, by dollars AND by risk
+ * units (notional × annualized volatility; a binary market's stake). The cap
+ * binds on whichever share is higher. Plus the regime's rotation stance and
+ * the Explore risk budget.
  */
 
 import { cn } from '@/lib/utils'
@@ -28,8 +30,8 @@ export function BookAllocationPanel({ data }: { data: BookAllocationView }) {
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-indigo-400" />
           <h3 className="text-sm font-semibold text-gray-200">Risk Books</h3>
-          <span className="text-xs text-gray-600">
-            ${Math.round(data.totalNotionalUsd).toLocaleString()} open notional
+          <span className="text-xs text-text-1">
+            ${Math.round(data.totalNotionalUsd).toLocaleString()} open notional · {Math.round(data.totalRiskUnits).toLocaleString()} risk units
           </span>
         </div>
         <span className={cn('text-xs font-medium', REGIME_TONE[data.regime] ?? 'text-text-1')}>
@@ -57,8 +59,11 @@ export function BookAllocationPanel({ data }: { data: BookAllocationView }) {
               </div>
               <p className="mt-1 text-sm font-semibold tabular-nums text-gray-200">
                 {pct(b.share)}
-                <span className="ml-1 text-xs font-normal text-gray-600">of {pct(b.capShare)} cap</span>
+                <span className="ml-1 text-xs font-normal text-text-1">$ · </span>
+                {pct(b.riskShare)}
+                <span className="ml-1 text-xs font-normal text-text-1">risk</span>
               </p>
+              <p className="text-xs text-text-1">cap {pct(b.capShare)} on each</p>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-fill">
                 <div
                   className={cn(
@@ -72,6 +77,14 @@ export function BookAllocationPanel({ data }: { data: BookAllocationView }) {
           )
         })}
       </div>
+      {data.exploreRiskBudget != null && (
+        <p className="mt-3 text-xs leading-relaxed text-text-1">
+          Explore risk budget: {Math.round(data.exploreRiskBudget).toLocaleString()} risk units
+          (your Explore limit × {Math.round(data.referenceVol * 100)}% reference volatility). One position may use at most{' '}
+          {Math.round(data.positionRiskCeiling ?? 0).toLocaleString()} of them. Risk units = position size × its annualized
+          volatility; for prediction markets, the stake.
+        </p>
+      )}
     </div>
   )
 }

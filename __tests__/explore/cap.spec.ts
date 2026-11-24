@@ -71,7 +71,9 @@ const read = (p: string) => readFileSync(join(process.cwd(), ...p.split('/')), '
 describe('explore cap is enforced in the pre-trade path and logged', () => {
   it('the paper runner checks the cap BEFORE filling, and logs blocks', () => {
     const src = read('lib/paper-trading/PaperTradeRunner.ts')
-    const gateIdx = src.indexOf('exploreCapAllows(')
+    // Phase 4: the runner loads usage once (for the risk ceiling) and applies
+    // the same pure verdict exploreCapAllows wraps.
+    const gateIdx = src.indexOf('exploreCapVerdict(usage')
     const fillIdx = src.indexOf('broker.fill(')
     expect(gateIdx).toBeGreaterThan(-1)
     expect(gateIdx).toBeLessThan(fillIdx)

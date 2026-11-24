@@ -22,7 +22,8 @@ import {
 } from '@/lib/brokers/asset-broker-routing'
 import { getBroker, type BrokerCache } from '@/lib/brokers/BrokerFactory'
 import { preExecutionGuard, DEFAULT_MANUAL_EDGE } from '@/lib/broker-adapters/execution-guard'
-import { exploreCapAllows, logExploreCapBlock } from '@/lib/explore/cap'
+import { exploreCapAllows, logExploreCapBlock, getExploreUsage } from '@/lib/explore/cap'
+import { getAnnualVol, defaultVol, capToRiskCeiling } from '@/lib/risk/risk-units'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -220,6 +221,26 @@ export async function runCopyTradeExecution(supabase: AdminClient): Promise<Copy
           await supabase.from('trader_trades').update({ cio_scored: true }).eq('id', trade.id)
         } catch (cioErr) {
           console.warn('[CIO] analysis failed, proceeding with original size:', cioErr)
+        }
+      }
+
+      // Per-position risk ceiling (Phase 4): a copy may use at most
+      // MAX_POSITION_RISK_SHARE of the Explore risk budget. Shrinks only; when
+      // Explore's cap is $0 (Tier 1 short) the Explore gate below blocks and
+      // logs instead.
+      {
+        const usage = await getExploreUsage(supabase, userId).catch(() => null)
+        if (usage && usage.capUsd > 0) {
+          const vol = await getAnnualVol(trade.symbol, trade.asset_class)
+            .catch(() => ({ vol: defaultVol(trade.asset_class) }))
+          const ceiling = capToRiskCeiling(approvedNotional, usage.capUsd, vol.vol)
+          if (ceiling.capped) {
+            if (ceiling.notionalUsd < 1) {
+              errors.push(`${trade.symbol}: blocked — risk_ceiling: too volatile for your Explore risk budget`)
+              continue
+            }
+            approvedNotional = Math.floor(ceiling.notionalUsd * 100) / 100
+          }
         }
       }
 

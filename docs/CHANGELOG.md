@@ -1,5 +1,49 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Wealth-manager allocation, Phase 4: risk units
+
+The strategy slice is now budgeted by RISK as well as dollars. Every new rule
+is an additional gate — the smaller allowed size wins, nothing can grow.
+
+- **Risk units** (`lib/risk/risk-units.ts`): notional × annualized volatility.
+  Volatility is the instrument's realized volatility from daily closes
+  (`VOL_LOOKBACK_DAYS` of history) when at least `VOL_MIN_OBSERVATIONS` daily
+  returns exist, floored at `VOL_FLOOR_ANNUAL`; otherwise the conservative
+  per-asset-class default `DEFAULT_ANNUAL_VOL`. Binary prediction markets use
+  the stake as maximum loss (risk units = stake). Options always use the
+  default (an option can lose its whole premium). Unknown → treated as risky
+  as a binary.
+- **Book caps on risk share** (`gateThroughBook`): each book's existing cap
+  now also applies to its share of open risk units; the gate takes the
+  smaller of the dollar and risk room. Without risk inputs it behaves exactly
+  as before (tested); with them it never allows more (property-tested over
+  1,000 random books × regimes). `computeBookExposures` returns risk per book.
+- **Per-position ceiling** (owner decision: measured against the Explore risk
+  budget): Explore risk budget = Explore cap dollars ×
+  `EXPLORE_RISK_REFERENCE_VOL`; one position may use at most
+  `MAX_POSITION_RISK_SHARE` of it. Applied in the paper runner (after the book
+  gate, before the Explore cap and the fill) and in the copy-trade executor
+  (before the copy is recorded or sent). When Explore's cap is $0 (Tier 1
+  short) the Explore gate still blocks and logs as before.
+- **Pro-mode Risk Room** (`/risk`) and the Strategy Health Board's book panel
+  show each book's dollar share next to its risk share, the total risk units,
+  the Explore risk budget and the per-position ceiling.
+
+**Burn-in impact**: strategy positions get smaller. With a $9,600 Explore cap
+the ceiling is 384 risk units — about $960 of a stock at the 40% default vol,
+$427 of crypto at 90%, a $384 prediction-market stake.
+
+**New constants**: `VOL_MIN_OBSERVATIONS` 20, `VOL_LOOKBACK_DAYS` 90,
+`DEFAULT_ANNUAL_VOL` {stocks 0.40, options 1.00, crypto 0.90, forex 0.15,
+multi-asset 0.40}, `VOL_FLOOR_ANNUAL` 0.05, `EXPLORE_RISK_REFERENCE_VOL` 0.20,
+`MAX_POSITION_RISK_SHARE` 0.20.
+
+**No new migration.**
+
+**Not verifiable here**: realized volatility needs Yahoo daily history at run
+time; in this sandbox (and on any fetch failure) every symbol falls back to the
+conservative default, which is the stricter side.
+
 ## 2026-11-24 — Wealth-manager allocation, Phase 3: Core is real (paper)
 
 Core and Tier 1 Safety are now actual paper fund positions, distinguishable

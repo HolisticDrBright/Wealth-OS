@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { exploreCapAllows, logExploreCapBlock } from '@/lib/explore/cap'
+import { getExploreUsage, exploreCapVerdict, logExploreCapBlock } from '@/lib/explore/cap'
+import { getAnnualVol, defaultVol, riskUnits, capToRiskCeiling, type VolEstimate } from '@/lib/risk/risk-units'
 import { ALL_STRATEGIES } from '@/lib/strategies/all-pipeline-strategies'
 import { CIODecisionEngine } from '@/lib/agents/cio-decision-engine'
 import { PaperBroker } from './PaperBroker'
@@ -83,6 +84,8 @@ export async function runPaperTradingPass(
   const bookState = await computeBookExposures(supabase, userId).catch(() => ({
     totalNotionalUsd: 0,
     byBook: {} as Record<string, number>,
+    totalRiskUnits: 0,
+    riskByBook: {} as Record<string, number>,
   }))
 
   const allStrategyKeys = ALL_STRATEGIES.map(s => s.key as string)
@@ -174,8 +177,15 @@ export async function runPaperTradingPass(
             continue
           }
 
-          // Book-level gate: regime rotation + book notional cap. Only ever
-          // reduces size — never bypasses or inflates upstream controls.
+          // Risk units (Phase 4): this position's annualized volatility —
+          // realized when there's enough history, else the conservative
+          // per-asset-class default; a binary market's stake is its max loss.
+          const vol: VolEstimate = await getAnnualVol(opp.symbol, opp.assetClass)
+            .catch(() => ({ vol: defaultVol(opp.assetClass), source: 'default' as const, observations: 0 }))
+
+          // Book-level gate: regime rotation + book cap on dollars AND on
+          // risk units (the smaller allowed size wins). Only ever reduces
+          // size — never bypasses or inflates upstream controls.
           const book = bookFor(key)
           const bookGate = gateThroughBook({
             strategyKey: key,
@@ -183,6 +193,9 @@ export async function runPaperTradingPass(
             regime,
             totalNotionalUsd: bookState.totalNotionalUsd,
             bookNotionalUsd: bookState.byBook[book] ?? 0,
+            proposedVol: vol.vol,
+            totalRiskUnits: bookState.totalRiskUnits,
+            bookRiskUnits: bookState.riskByBook[book] ?? 0,
           })
 
           if (!bookGate.allowed) {
@@ -197,14 +210,38 @@ export async function runPaperTradingPass(
           }
 
           const sizedNotional = decision.size.notionalUsd * bookGate.multiplier
-          const gatedSize = bookGate.multiplier < 1
+          let gatedSize = bookGate.multiplier < 1
             ? { ...decision.size, notionalUsd: sizedNotional, rationale: `${decision.size.rationale} | ${bookGate.reason}` }
             : decision.size
+
+          // Per-position risk ceiling (Phase 4): one position may use at most
+          // MAX_POSITION_RISK_SHARE of the Explore risk budget (Explore cap ×
+          // reference vol). Shrinks the order; never grows it. When the cap is
+          // $0 (Tier 1 short) the Explore gate below blocks and logs instead.
+          const usage = await getExploreUsage(supabase, userId)
+          if (usage.capUsd > 0) {
+            const ceiling = capToRiskCeiling(gatedSize.notionalUsd, usage.capUsd, vol.vol)
+            if (ceiling.capped) {
+              if (ceiling.notionalUsd < 1) {
+                const reason = `risk_ceiling: ${opp.symbol} is too volatile for even $1 inside your Explore risk budget.`
+                skipped.positionCapBlocked++
+                skippedDetails.push(skipDetail(key, opp.symbol, opp.assetClass, 'riskCeilingBlocked', reason, opp.direction, opp.id))
+                shadow.track(opp, 'positionCapBlocked', reason, userId, supabase).catch(() => {})
+                continue
+              }
+              gatedSize = {
+                ...gatedSize,
+                notionalUsd: ceiling.notionalUsd,
+                fraction: gatedSize.notionalUsd > 0 ? gatedSize.fraction * (ceiling.notionalUsd / gatedSize.notionalUsd) : 0,
+                rationale: `${gatedSize.rationale} | risk ceiling: ${Math.round(vol.vol * 100)}% vol (${vol.source}) → max $${Math.round(ceiling.ceilingUsd)}`,
+              }
+            }
+          }
 
           // Explore cap (Phase 4.2): ALL strategy activity lives in the
           // Explore sleeve. An order that would push Explore usage over the
           // cap is blocked and logged like every other pre-trade block.
-          const exploreGate = await exploreCapAllows(supabase, userId, gatedSize.notionalUsd)
+          const exploreGate = exploreCapVerdict(usage, gatedSize.notionalUsd)
           if (!exploreGate.allowed) {
             skipped.exploreCapBlocked++
             skippedDetails.push(skipDetail(
@@ -225,9 +262,13 @@ export async function runPaperTradingPass(
           if (fill.status === 'opened') {
             positionsOpened++
             // Keep book exposure current within this run so later
-            // opportunities see the notional we just added.
-            bookState.totalNotionalUsd += sizedNotional
-            bookState.byBook[book] = (bookState.byBook[book] ?? 0) + sizedNotional
+            // opportunities see the notional and risk we just added.
+            const added = gatedSize.notionalUsd
+            const addedRisk = riskUnits(added, vol.vol)
+            bookState.totalNotionalUsd += added
+            bookState.byBook[book] = (bookState.byBook[book] ?? 0) + added
+            bookState.totalRiskUnits += addedRisk
+            bookState.riskByBook[book] = (bookState.riskByBook[book] ?? 0) + addedRisk
           } else {
             // Map broker result status to skip counter
             const { status, reason } = fill

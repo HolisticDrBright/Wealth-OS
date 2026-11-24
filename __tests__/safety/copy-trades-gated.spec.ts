@@ -57,6 +57,13 @@ vi.mock('@/lib/workers/auto-simulate', () => ({
   runAutoSimulate: vi.fn(async () => {}),
 }))
 
+// Volatility comes from market data, not a broker — stub it so "no HTTP at
+// all" keeps meaning "no broker HTTP" (risk-unit rules have their own suite).
+vi.mock('@/lib/risk/risk-units', async (orig) => {
+  const real = await orig<typeof import('@/lib/risk/risk-units')>()
+  return { ...real, getAnnualVol: async (_s: string, cls: string) => real.resolveVol(cls, []) }
+})
+
 import { POST } from '@/app/api/execute-copy-trades/route'
 
 function request(): NextRequest {
