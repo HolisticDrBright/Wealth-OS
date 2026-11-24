@@ -159,3 +159,23 @@ export const SPECULATIVE_REGIME_MULTIPLIER = {
   RISK_OFF: 0,
   CRISIS: 0,
 } as const
+
+// ─── Track record (Phase 6) ──────────────────────────────────────────────────
+
+/**
+ * Product default: during US market hours, if no SCHEDULED scan has finished
+ * successfully for this many hours, an alert is raised and a banner shows on
+ * every page. Past stretches like that are flagged as gaps in a strategy's
+ * track record.
+ */
+export const SCAN_STALE_HOURS = 6
+
+/** Product default: the market clock used for "market hours" (US equities). */
+export const MARKET_TIMEZONE = 'America/New_York'
+
+/** Product default: market open / close, minutes after local midnight (9:30 / 16:00). */
+export const MARKET_OPEN_MINUTES = 9 * 60 + 30
+export const MARKET_CLOSE_MINUTES = 16 * 60
+
+/** Product default: how far back the readiness page looks for scan gaps. */
+export const SCAN_GAP_LOOKBACK_DAYS = 90

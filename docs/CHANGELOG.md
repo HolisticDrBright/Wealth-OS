@@ -1,5 +1,145 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Wealth-manager allocation: summary (Phases 1–6)
+
+Paper mode throughout. No live trading enabled, no strategy promoted, no
+maturity status changed, no strategy signal logic changed. Every new control
+only shrinks or blocks a trade relative to before.
+
+### New migrations (all RLS)
+| Migration | Phase | What |
+|---|---|---|
+| `20260704l_ladder.sql` | 2 | `ladder_state` (owner RLS); `setup_ladder` approval kind |
+| `20260704m_core_positions.sql` | 3 | exit_reason CHECK widened (`manual_flatten`, `rebalance`); `(user_id, strategy_key, status)` index; `paper_deposits` (owner RLS); `core_rebalance` + `deposit` approval kinds; user INSERT policy on `paper_trades` for `'core'`/`'safety'` rows only |
+| `20260704n_scan_heartbeats.sql` | 6 | `scan_heartbeats` (users read system + own rows, write only their own unscheduled runs; service role all); creates the missing `worker_heartbeats` |
+
+### Every constant (`lib/config/product-defaults.ts`; each is a changeable product default)
+| Constant | Default |
+|---|---|
+| `CORE_FUNDS` | usStocks VTI, intlStocks VXUS, bonds BND, cashLike SGOV |
+| `US_SHARE_OF_STOCKS` | 0.70 |
+| `PROFILE_MIX` (stocks/bonds/cash) | vault .20/.60/.20, conservative .40/.50/.10, balanced .60/.35/.05, growth .80/.18/.02, speculative .90/.08/.02 |
+| `DEFAULT_PROFILE_KEY` | 'balanced' |
+| `EMERGENCY_FUND_MONTHS` | 6 |
+| `SHORT_HORIZON_YEARS` | 2 |
+| `CASH_LIKE_CATEGORIES` | ['cash'] |
+| `LADDER_EXCLUDED_CATEGORIES` | ['real_estate'] |
+| `GLIDE_FULL_HORIZON_YEARS` | 10 |
+| `GLIDE_SHORT_FRACTION` | 0.25 |
+| `PROFILE_TILT_MAX` | 0.15 |
+| `GLIDE_REFERENCE_PROFILE` | 'balanced' |
+| `CORE_DRIFT_THRESHOLD` | 0.05 |
+| `CORE_MIN_TRADE_USD` | 10 |
+| `DEFAULT_EXPLORE_CAP_FRACTION` | 0.10 |
+| `EXPLORE_CAP_HARD_MAX_FRACTION` | 0.25 |
+| `VOL_MIN_OBSERVATIONS` | 20 |
+| `VOL_LOOKBACK_DAYS` | 90 |
+| `DEFAULT_ANNUAL_VOL` | stocks 0.40, options 1.00, crypto 0.90, forex 0.15, multi-asset 0.40 |
+| `VOL_FLOOR_ANNUAL` | 0.05 |
+| `EXPLORE_RISK_REFERENCE_VOL` | 0.20 |
+| `MAX_POSITION_RISK_SHARE` | 0.20 |
+| `SPECULATIVE_BOOK_CAP` | 0.10 |
+| `SPECULATIVE_REGIME_MULTIPLIER` | RISK_ON 0.5, NEUTRAL 0.5, RISK_OFF 0, CRISIS 0 |
+| `SCAN_STALE_HOURS` | 6 |
+| `MARKET_TIMEZONE` | 'America/New_York' |
+| `MARKET_OPEN_MINUTES` / `MARKET_CLOSE_MINUTES` | 570 (9:30) / 960 (16:00) |
+| `SCAN_GAP_LOOKBACK_DAYS` | 90 |
+
+The promotion minimum of 30 closed trades is the existing
+`MIN_CLOSED_TRADES` in `lib/strategies/promotion-gates.ts` (now exported, value
+unchanged).
+
+### Not verifiable without live Supabase credentials (or the live network)
+1. That migrations l, m and n (and earlier 20260703c `financial_profile`, j, k)
+   are applied. Until they are, the ladder reads "needs expenses" (Explore
+   stays $0), deposits and heartbeats fail softly, and the readiness page says
+   heartbeats are unavailable.
+2. The constraint names `paper_positions_exit_reason_check` and
+   `automation_approvals_kind_check` are Postgres's default names. If the remote
+   names differ, the old CHECK survives and pauses still can't close positions
+   (`closeAt` then falls back to `'manual'` and reports it).
+3. User-session RLS for the new writes: Core/Safety inserts and updates on
+   `paper_positions`, the new `paper_trades` insert policy, `paper_deposits`,
+   `scan_heartbeats` reads of system rows.
+4. The `alerts` table's live shape. The base schema has `type` CHECK without
+   `'ops'` and `body` (not `message`); existing `sendOpsAlert`, advisory-staleness
+   and behavior-gap inserts use `'ops'`/`message` and may be failing today
+   (pre-existing). The new stale-scan alert uses the base shape (`'system'`,
+   `body`, `action_url`, `metadata`).
+5. `worker_heartbeats` may already exist remotely in another shape; the
+   migration only creates it if missing.
+6. Market data at run time: Yahoo daily closes (realized vol), BND/S&P monthly
+   series (bad-year), SGOV/VTI/VXUS/BND prices for fund trades. In this sandbox
+   all fall back (default vols; bad-year hidden; fund trades report "no price").
+7. Whether the GitHub Actions scheduler is running (`WEALTH_OS_API_KEY`,
+   `NEXT_PUBLIC_SITE_URL` secrets). After deploy the stale banner shows during
+   market hours until the first scheduled scan records a heartbeat (≤ 15 min if
+   healthy).
+8. The real effect on burn-in of the correlation caps now binding (Phase 3 fix)
+   and the per-position risk ceiling (Phase 4).
+
+### Phase 5 questionable strategies (nothing moved; owner decisions)
+Full table with reasoning: `docs/strategy-book-review.md`.
+| Strategy | Book now | Suggested | One-line reason |
+|---|---|---|---|
+| `vix_term_structure` | convexity | carry | **Sells** SPX put spreads (short vol) in the one book open in CRISIS (backtest_ready, can't trade yet) |
+| `factor_crowded_trade_fade` | convexity | event | Stub; the brief's "convexity keeps only…" conflicts with "move nothing else", so it was left in place |
+| `onchain_signal` | trend | event / speculative | Buys BTC/ETH below the 30-day SMA (counter-trend) |
+| `dca_halving` | trend | speculative | Dip-buying crypto beta, not momentum |
+| `narrative_rotation` | trend | speculative | 24h alt-coin momentum, similar to memecoins |
+| `london_4pm_fix_endmonth` | arb | event | Directional month-end flow trade |
+| `month_end_fix` | arb | event | Directional USD fade on the fix; same exposure as above |
+| `correlation_divergence` | arb | event | Statistical convergence with tail risk, not structural arb |
+| `cex_latency_arb` | arb | arb (review) | Latency edge a polled paper sim can't validate |
+| `polymarket_wallet_copy` | info | event / copy | Follows others' flow; no information edge of its own |
+| `defi_yield` | carry | speculative | Principal-loss tail (hacks, depegs) on 12%+ "stable" yields |
+| `dividend_aristocrat` | carry | trend / retire | Long equity beta that duplicates Core |
+| `qvm_multifactor` | trend | event / factor | Mostly value/quality, not momentum |
+| `liquidation_hunting` | event (+convexity) | speculative | Fast, leveraged cascade trades |
+
+### Flagged for the owner (from earlier phases)
+- The sweep engine's kb_parameters sleeve caps (5% under $100k, 10% from $100k
+  to $5M, 15%, 20%) disagree with the flat 10% Explore cap. They only drive
+  alerts. Unchanged, decision pending.
+
+## 2026-11-24 — Wealth-manager allocation, Phase 6: protect the track record
+
+- **Scan heartbeat** (`lib/ops/scan-heartbeat.ts`, table `scan_heartbeats`):
+  every scan run writes a row at start (`running`) and finish (`ok`/`failed`
+  with counts or the error): scheduled `scan-all` (GitHub Actions / VPS
+  timer), the daily cron's paper pass, and manual "Run now" (recorded as
+  unscheduled, so it never makes the scheduler look healthy). A heartbeat that
+  can't be written never changes the scan itself.
+- **Stale = market hours AND no successful scheduled scan in
+  `SCAN_STALE_HOURS`** (US equities clock, DST-aware; holidays not modeled, which is the
+  strict side). When stale: a banner on every authenticated web page (Simple
+  and Pro wording) and on the phone Home, plus one `alerts` row per stale
+  episode per user. A failed `scan-all` while stale also goes to the ops
+  channel.
+- **Promotion readiness page** (`/strategies/readiness`, Pro mode, sidebar ›
+  Strategies › Readiness): READ-ONLY. Every registered strategy (all 62, any
+  maturity) with maturity, closed paper trades vs 30, net result after costs
+  (realized P&L minus the gate's round-trip cost model, shown as gross − costs),
+  max drawdown, each promotion gate's pass/fail, and scan gaps since the
+  strategy's first trade. No promote button, form or write path (tested).
+- **Gap flags**: a gap is any past stretch between successful scheduled scans
+  during which the stale banner would have shown. Listed with dates on the
+  readiness page (last `SCAN_GAP_LOOKBACK_DAYS` days) and counted per strategy.
+- Drawdown math moved to `lib/strategies/track-record.ts` (shared with the
+  Strategy Health Board's pipeline, unchanged behavior).
+- Small Phase 3 follow-up: the correlation-cap book now normalizes copied
+  positions' asset class (`'stock'` → `'stocks'`) so copies count toward the
+  asset-class cap (only tightens).
+
+**Pre-existing gap fixed**: `worker_heartbeats`, read by the ops watchdog's
+dead-man switch and written by the position monitor, had no migration, so the
+dead-man switch could never fire. Migration n creates it if missing.
+
+**New constants**: `SCAN_STALE_HOURS` 6, `MARKET_TIMEZONE` 'America/New_York',
+`MARKET_OPEN_MINUTES` 570, `MARKET_CLOSE_MINUTES` 960, `SCAN_GAP_LOOKBACK_DAYS` 90.
+
+**New migration**: `20260704n_scan_heartbeats.sql`.
+
 ## 2026-11-24 — Wealth-manager allocation, Phase 5: book labels
 
 - **New `speculative` book** (`lib/strategies/strategy-books.ts`): cap

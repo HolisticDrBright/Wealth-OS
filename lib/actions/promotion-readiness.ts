@@ -22,6 +22,7 @@ import {
 } from '@/lib/strategies/promotion-gates'
 import { getRollingBrier } from '@/lib/learning/rolling-brier'
 import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
+import { computeDrawdown } from '@/lib/strategies/track-record'
 
 export interface PromotionPipelineRow extends PromotionReadiness {
   displayName: string
@@ -42,26 +43,6 @@ interface ShadowRow {
   strategy_key: string
   realized_pnl_usd: number | null
   would_have_notional: number | null
-}
-
-function computeDrawdown(rows: ClosedRow[]): number | null {
-  const ordered = rows
-    .filter(r => r.closed_at != null)
-    .sort((a, b) => (a.closed_at! < b.closed_at! ? -1 : 1))
-  if (ordered.length < 5) return null
-
-  const avgNotional = ordered.reduce((s, r) => s + (r.notional_usd ?? 0), 0) / ordered.length
-  if (avgNotional <= 0) return null
-
-  let equity = 0
-  let peak = 0
-  let maxDdUsd = 0
-  for (const r of ordered) {
-    equity += r.realized_pnl_usd ?? 0
-    if (equity > peak) peak = equity
-    maxDdUsd = Math.max(maxDdUsd, peak - equity)
-  }
-  return maxDdUsd / avgNotional
 }
 
 /** Only fetch Brier for strategies that could plausibly promote — keeps the

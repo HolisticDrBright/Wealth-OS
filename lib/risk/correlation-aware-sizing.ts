@@ -245,6 +245,9 @@ export async function loadCorrelationBook(
   userId: string,
 ): Promise<BookPosition[]> {
   const { LADDER_KEYS_FILTER } = await import('@/lib/allocation/sleeves')
+  // Copied positions spell classes differently ('stock' vs 'stocks'); one
+  // vocabulary so they count toward the asset-class cap too.
+  const { toRiskClass } = await import('@/lib/risk/risk-units')
   const [paperRes, copiedRes] = await Promise.all([
     supabase.from('paper_positions')
       .select('strategy_key, asset_class, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
@@ -255,10 +258,10 @@ export async function loadCorrelationBook(
   ])
   const book: BookPosition[] = []
   for (const r of (paperRes.data ?? []) as Array<{ strategy_key: string | null; asset_class: string; notional_usd: number | string | null }>) {
-    book.push({ strategyKey: r.strategy_key as StrategyKey, assetClass: r.asset_class as AssetClass, notionalUsd: Math.abs(Number(r.notional_usd ?? 0)) })
+    book.push({ strategyKey: r.strategy_key as StrategyKey, assetClass: toRiskClass(r.asset_class) as AssetClass, notionalUsd: Math.abs(Number(r.notional_usd ?? 0)) })
   }
   for (const r of (copiedRes.data ?? []) as Array<{ strategy_key: string | null; asset_class: string; notional_value: number | string | null }>) {
-    book.push({ strategyKey: r.strategy_key as StrategyKey, assetClass: r.asset_class as AssetClass, notionalUsd: Math.abs(Number(r.notional_value ?? 0)) })
+    book.push({ strategyKey: r.strategy_key as StrategyKey, assetClass: toRiskClass(r.asset_class) as AssetClass, notionalUsd: Math.abs(Number(r.notional_value ?? 0)) })
   }
   return book
 }

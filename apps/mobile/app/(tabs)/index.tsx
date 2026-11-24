@@ -98,6 +98,17 @@ export default function HomeScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={colors.accent} />}
         >
           {data.tradingHalted && <PausedBanner onResumed={reload} />}
+          {data.scanStale && (
+            <Card className="gap-1 border-loss">
+              <Text accessibilityRole="header" className="font-inter-semibold text-[15px] text-ink">Strategy scans have stopped</Text>
+              <Text className="font-inter text-[13px] leading-5 text-ink-secondary">
+                {data.scanStale.hoursSince == null
+                  ? 'No scheduled scan has finished yet. '
+                  : `No scheduled scan has finished in ${data.scanStale.hoursSince} hours during market hours. `}
+                Nothing new is being bought or sold until they resume. Your money is not affected.
+              </Text>
+            </Card>
+          )}
 
           {/* You have */}
           <View className="gap-1.5">

@@ -304,7 +304,7 @@ describe('correlation caps read the real open strategy book', () => {
     const calls: Array<{ table: string; not?: unknown[] }> = []
     const data: Record<string, unknown[]> = {
       paper_positions: [{ strategy_key: 'funding_basis_arb', asset_class: 'crypto', notional_usd: 3_000 }],
-      user_copied_positions: [{ strategy_key: 'quant_momentum', asset_class: 'stocks', notional_value: '2000' }],
+      user_copied_positions: [{ strategy_key: 'quant_momentum', asset_class: 'stock', notional_value: '2000' }],   // copy spelling
     }
     const sb = {
       from: (table: string) => {

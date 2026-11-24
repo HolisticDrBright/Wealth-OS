@@ -58,7 +58,8 @@ export interface ShadowComparison {
   closedShadowTrades: number
 }
 
-const MIN_CLOSED_TRADES = 30
+/** Closed paper trades a strategy needs before it can be considered for promotion. */
+export const MIN_CLOSED_TRADES = 30
 const MAX_BRIER = 0.22
 const MAX_DRAWDOWN = 0.15
 /** Shadow may beat real by at most this much before we flag the gates. */

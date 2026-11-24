@@ -823,8 +823,17 @@ export async function runCronTask(task: string): Promise<CronResult> {
       }
       if (byUser.size > 0) {
         const { runPaperTradingPass } = await import('@/lib/paper-trading/PaperTradeRunner')
-        const ptResults = await Promise.allSettled(
-          [...byUser.entries()].map(([uid, keys]) => runPaperTradingPass(uid, supabase, keys))
+        const { recordScan } = await import('@/lib/ops/scan-heartbeat')
+        // Phase 6: the daily pass is a scheduled scan run like scan-all.
+        const ptResults = await recordScan(
+          supabase, { source: 'cron:daily', scheduled: true },
+          () => Promise.allSettled(
+            [...byUser.entries()].map(([uid, keys]) => runPaperTradingPass(uid, supabase, keys))
+          ),
+          rs => ({
+            usersScanned: byUser.size,
+            positionsOpened: rs.reduce((n, r) => n + (r.status === 'fulfilled' ? r.value.positionsOpened : 0), 0),
+          }),
         )
         results.paperTrading = {
           users: byUser.size,

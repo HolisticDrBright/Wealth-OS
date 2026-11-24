@@ -38,6 +38,8 @@ export interface HomeData {
   goalCount: number
   decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
+  /** Set when scheduled strategy scans have stopped during market hours. */
+  scanStale: { hoursSince: number | null } | null
 }
 
 export interface ExploreUsage {

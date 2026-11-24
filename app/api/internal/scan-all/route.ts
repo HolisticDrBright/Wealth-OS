@@ -10,6 +10,9 @@
  * For each enabled strategy, runs detectOpportunities() then routes each
  * opportunity through the full pipeline (edge -> mirofish -> kronos -> risk ->
  * size -> execute). Returns counts per strategy for monitoring.
+ *
+ * Phase 6: every run is recorded in scan_heartbeats (start + finish) — the
+ * evidence behind the stale-scan banner and the track-record gap flags.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -20,6 +23,7 @@ import { loadUserProfile, getEffectiveStrategies } from '@/lib/strategies/profil
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
 import type { StrategyKey } from '@/lib/strategies/strategy-registry'
 import { runPaperTradingPass } from '@/lib/paper-trading/PaperTradeRunner'
+import { recordScan, getScanHealth } from '@/lib/ops/scan-heartbeat'
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +42,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const supabase = createAdminClient()
+  try {
+    const body = await recordScan(
+      supabase, { source: 'scan-all', scheduled: true },
+      () => runScanAll(supabase),
+      b => ({
+        usersScanned: b.paper_trading.users,
+        strategiesRun: b.strategies_scanned,
+        positionsOpened: b.paper_trading.positionsOpened,
+      }),
+    )
+    return NextResponse.json(body)
+  } catch (err) {
+    // The run is recorded as 'failed'. If scans are now stale during market
+    // hours, say so through the ops channel too.
+    const health = await getScanHealth(supabase).catch(() => null)
+    if (health?.stale) {
+      const { sendOpsAlert } = await import('@/lib/ops/alert')
+      await sendOpsAlert(supabase, {
+        severity: 'critical',
+        title: 'Strategy scans have stopped',
+        message: `scan-all failed and no scheduled scan has succeeded in ${health.hoursSince == null ? 'ever' : `${Math.floor(health.hoursSince)}h`} during market hours`,
+      }).catch(() => {})
+    }
+    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 })
+  }
+}
+
+async function runScanAll(supabase: ReturnType<typeof createAdminClient>) {
   const strategies = getAllPipelineStrategies()
   const paperTrading = await runScheduledPaperTradingPasses(supabase)
 
@@ -163,13 +195,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const elapsed = Date.now() - startedAt
 
-  return NextResponse.json({
+  return {
     ok: true,
     elapsed_ms: elapsed,
     strategies_scanned: Object.keys(results).length,
     paper_trading: paperTrading,
     results,
-  })
+  }
 }
 
 // Allow GET for health checks from GitHub Actions

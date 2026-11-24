@@ -22,6 +22,7 @@ import { planLadderSetup, setupNeeded, coreDrift } from '@/lib/allocation/core-p
 import { tierMixForTotal, yearRangeForMix, badYearFraction } from '@/lib/allocation/bad-year'
 import { strategyRowsOnly, sleeveOfKey, LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 import { CORE_FUNDS } from '@/lib/config/product-defaults'
+import { getScanStaleness, alertIfScanStale } from '@/lib/ops/scan-heartbeat'
 import { roundTripCostUsd } from '@/lib/costs/transaction-costs'
 import { liveTradingEnabled } from '@/lib/broker-adapters/execution-guard'
 
@@ -129,6 +130,8 @@ export interface MobileHome {
   /** Ladder decisions come first: Explore is $0 until Tier 1 Safety is funded. */
   decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
+  /** Phase 6: set when scheduled strategy scans have stopped during market hours. */
+  scanStale: { hoursSince: number | null } | null
 }
 
 export async function buildMobileHome(supabase: SupabaseClient, userId: string): Promise<MobileHome> {
@@ -221,9 +224,13 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
     }
   }
 
+  const scan = await getScanStaleness(supabase).catch(() => null)
+  if (scan?.stale) await alertIfScanStale(supabase, userId, scan).catch(() => false)
+
   return {
     practiceMode: !liveTradingEnabled(),
     tradingHalted: halted,
+    scanStale: scan?.stale ? { hoursSince: scan.hoursSince == null ? null : Math.floor(scan.hoursSince) } : null,
     totalValueUsd: Math.round(totalValueUsd),
     todayChangeUsd: Math.round(todayChangeUsd * 100) / 100,
     sinceStartChangeUsd: Math.round(sinceStartChangeUsd * 100) / 100,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { runPaperTradingPass } from '@/lib/paper-trading/PaperTradeRunner'
 import { emptySkipCounts } from '@/lib/paper-trading/types'
+import { recordScan } from '@/lib/ops/scan-heartbeat'
 
 export async function POST() {
   const supabase = await createClient()
@@ -32,7 +33,13 @@ export async function POST() {
       })
     }
 
-    const result = await runPaperTradingPass(user.id, supabase, enabledKeys)
+    // Phase 6: recorded like every scan run, but as a manual (unscheduled) run
+    // — it never makes the scheduler look healthy.
+    const result = await recordScan(
+      supabase, { source: 'manual', scheduled: false, userId: user.id },
+      () => runPaperTradingPass(user.id, supabase, enabledKeys),
+      r => ({ usersScanned: 1, strategiesRun: r.strategiesRun, opportunitiesFound: r.opportunitiesFound, positionsOpened: r.positionsOpened }),
+    )
     return NextResponse.json(result)
   } catch (err) {
     console.error('[paper-trading/run]', err)
