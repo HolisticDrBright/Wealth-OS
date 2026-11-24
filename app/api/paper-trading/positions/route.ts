@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 function assetClassFilter(assetClass: string | null): string[] | null {
   if (!assetClass) return null
@@ -19,14 +20,14 @@ export async function GET(req: NextRequest) {
 
   let openQuery = supabase
     .from('paper_positions')
-    .select('*')
+    .select('*').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', user.id)
     .eq('status', 'open')
     .order('opened_at', { ascending: false })
 
   let recentQuery = supabase
     .from('paper_positions')
-    .select('*')
+    .select('*').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', user.id)
     .eq('status', 'closed')
     .order('closed_at', { ascending: false })

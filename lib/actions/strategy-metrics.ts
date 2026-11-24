@@ -8,6 +8,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface StrategyMetrics {
   strategyKey: string
@@ -103,7 +104,7 @@ export async function getStrategyMetrics(): Promise<StrategyMetrics[]> {
 
   const { data } = await supabase
     .from('paper_positions')
-    .select('strategy_key, closed_at, opened_at, realized_pnl_pct')
+    .select('strategy_key, closed_at, opened_at, realized_pnl_pct').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', user.id)
     .eq('status', 'closed')
     .limit(5000)

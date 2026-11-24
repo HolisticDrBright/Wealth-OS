@@ -18,7 +18,7 @@ vi.mock('@/lib/supabase/admin', () => ({
     from: (table: string) => {
       const rows = dbState.tables[table] ?? []
       const chain: Record<string, unknown> = {}
-      for (const m of ['select', 'eq', 'order', 'limit', 'in', 'gte']) {
+      for (const m of ['select', 'eq', 'order', 'limit', 'in', 'gte', 'not']) {
         chain[m] = () => chain
       }
       chain.single = async () => ({ data: rows[0] ?? null, error: null })

@@ -88,7 +88,7 @@ export interface TrustView {
   insufficient: boolean
 }
 
-export type DecisionKind = 'ladder_setup' | 'ladder_expenses' | 'review_candidate' | 'missing_env' | 'risk_controls'
+export type DecisionKind = 'ladder_setup' | 'ladder_expenses' | 'core_rebalance' | 'review_candidate' | 'missing_env' | 'risk_controls'
 
 export interface DecisionItem {
   id: string
@@ -346,6 +346,9 @@ async function loadLadderDecisions(): Promise<DecisionItem[]> {
     }
     if (view.setup) {
       return [{ id: 'ladder-setup', kind: 'ladder_setup', href: '/advisor', text: view.setup.summary }]
+    }
+    if (view.rebalance) {
+      return [{ id: 'core-rebalance', kind: 'core_rebalance', href: '/advisor', text: view.rebalance.summary }]
     }
     return []
   } catch {

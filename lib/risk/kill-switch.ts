@@ -14,6 +14,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { strategyRowsOnly } from '@/lib/allocation/sleeves'
 import { getRiskControl, getPortfolioUsd } from '@/lib/strategies/risk-controls'
 
 export interface RiskCheckResult {
@@ -166,12 +167,12 @@ export async function preTradeRiskCheck(ctx: PreTradeContext): Promise<RiskCheck
     const [closedRes, openRes] = await Promise.all([
       supabase
         .from('paper_positions')
-        .select('closed_at, realized_pnl_usd')
+        .select('closed_at, realized_pnl_usd, strategy_key')
         .eq('user_id', userId)
         .eq('status', 'closed'),
       supabase
         .from('paper_positions')
-        .select('unrealized_pnl_usd')
+        .select('unrealized_pnl_usd, strategy_key')
         .eq('user_id', userId)
         .eq('status', 'open'),
     ])
@@ -182,7 +183,10 @@ export async function preTradeRiskCheck(ctx: PreTradeContext): Promise<RiskCheck
 
     const byDay = new Map<string, number>()
     const todayUtc = new Date().toISOString().slice(0, 10)
-    for (const row of ((closedRes.data ?? []) as ClosedRow[])) {
+    // The kill switch guards STRATEGY risk: Core / Safety holdings (Phase 3)
+    // are excluded, so an approved Core rebalance that realizes a loss can't
+    // trip the daily-loss halt. Strategy positions are measured exactly as before.
+    for (const row of strategyRowsOnly((closedRes.data ?? []) as Array<ClosedRow & { strategy_key?: string | null }>)) {
       if (!row.closed_at) continue
       const day = row.closed_at.slice(0, 10)
       const pnl = row.realized_pnl_usd ?? 0
@@ -190,7 +194,7 @@ export async function preTradeRiskCheck(ctx: PreTradeContext): Promise<RiskCheck
       if (day === todayUtc) dailyRealizedPnlUsd += pnl
     }
     const series = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v)
-    const unrealized = ((openRes.data ?? []) as OpenRow[])
+    const unrealized = strategyRowsOnly((openRes.data ?? []) as Array<OpenRow & { strategy_key?: string | null }>)
       .reduce((s, r) => s + (r.unrealized_pnl_usd ?? 0), 0)
 
     // Null equity → drawdown ratio can't be computed (sizing refuses to trade

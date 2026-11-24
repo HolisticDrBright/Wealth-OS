@@ -2,7 +2,9 @@
  * Pause everything (modal). GET /api/mobile/pause gives the live impact;
  * POST runs the SAME pause core as the web's Flatten & Halt (halt flag first,
  * pending orders cancelled, optional sell-Explore through the runner's exit
- * path, audit row). On failure we show the error and stay on the screen.
+ * path, audit row). "Sell Explore" sells strategy positions ONLY — Core funds
+ * and Tier 1 Safety are never sold by a pause. On failure we show the error
+ * and stay on the screen.
  */
 
 import { useState } from 'react'
@@ -132,7 +134,9 @@ export default function PauseScreen() {
 
               <Card className="gap-2.5">
                 <Text accessibilityRole="header" className="font-inter-semibold text-[15px] text-ink">What stays the same</Text>
-                <Text className="font-inter text-[14px] leading-5 text-ink-body">Your core portfolio stays invested either way.</Text>
+                <Text className="font-inter text-[14px] leading-5 text-ink-body">
+                  Your core funds and your safety cushion are never sold by a pause — either way.
+                </Text>
                 <Text className="font-inter text-[14px] leading-5 text-ink-body">Your monthly deposit still arrives and waits as cash.</Text>
                 <Text className="font-inter text-[14px] leading-5 text-ink-body">
                   {data.pendingOrders > 0

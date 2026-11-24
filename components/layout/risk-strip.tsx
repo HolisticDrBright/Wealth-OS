@@ -276,7 +276,8 @@ function HaltConfirmDialog({ impact, actionError, busy, onCancel, onHalt }: {
         <div className="mt-3 space-y-1.5 text-xs text-gray-300">
           {impact ? (
             <>
-              <p>{impact.openPositions} open paper position(s) ({fmtUsd(impact.openNotionalUsd)}) will be closed NOW at current prices.</p>
+              <p>{impact.openPositions} open Explore (strategy) paper position(s) ({fmtUsd(impact.openNotionalUsd)}) will be closed NOW at current prices.</p>
+              <p className="text-emerald-300/90">Core funds and your Tier 1 safety cushion are never sold by a halt — they stay exactly as they are.</p>
               <p>Estimated exit costs: {fmtUsd(impact.estimatedExitCostUsd)} (per-venue spread + fees).</p>
               <p>{impact.pendingOrders} pending order intent(s) will stop being placed.</p>
               <p className="text-gray-500">The kill switch blocks every new order until you re-enable with typed confirmation.</p>

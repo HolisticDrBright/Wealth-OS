@@ -5,7 +5,9 @@
  *   1. set the trading_halted flag FIRST (kill switch blocks new orders),
  *   2. cancel pending order intents (they stop being placed either way; the
  *      rows are marked so the UI promise "pending orders cancelled" is true),
- *   3. optionally close every open paper position (sell Explore),
+ *   3. optionally close every open Explore (strategy) position — Core and
+ *      Tier 1 Safety fund positions are NEVER sold by a pause (Phase 3;
+ *      PaperBroker.flattenAllPositions skips the reserved ladder keys),
  *   4. write the audit_logs row.
  * Resume only flips the flag back and is meant to sit behind an explicit
  * confirmation step in every UI.
@@ -64,7 +66,8 @@ export async function pauseTradingCore(
     .select('id')
   cancelledOrders = (cancelled ?? []).length
 
-  // 3. Optionally flatten (sell Explore = close every open paper position).
+  // 3. Optionally sell Explore: close every open STRATEGY position. Core and
+  // Safety fund positions are left exactly as they are.
   let closed = 0
   let failures: string[] = []
   if (args.sellExplore) {

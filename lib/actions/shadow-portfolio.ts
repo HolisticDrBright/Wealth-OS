@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { toDisplayName } from '@/lib/strategies/strategy-display'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface ShadowPosition {
   id: string
@@ -122,7 +123,7 @@ export async function getShadowPortfolio(limit = 50): Promise<ShadowPortfolioSum
         .limit(limit),
       supabase
         .from('paper_positions')
-        .select('realized_pnl_usd, unrealized_pnl_usd, status')
+        .select('realized_pnl_usd, unrealized_pnl_usd, status').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('user_id', user.id),
     ])
 

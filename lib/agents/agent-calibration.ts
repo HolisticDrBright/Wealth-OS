@@ -13,6 +13,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 // The long-standing committee weights — the FALLBACK, never deleted.
 export const HARDCODED_AGENT_WEIGHTS: Record<string, number> = {
@@ -154,7 +155,7 @@ export async function runAgentCalibration(supabase: SupabaseClient): Promise<{
       .limit(5000),
     supabase
       .from('paper_positions')
-      .select('symbol, opened_at, realized_pnl_usd')
+      .select('symbol, opened_at, realized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('status', 'closed')
       .gte('opened_at', since)
       .limit(5000),

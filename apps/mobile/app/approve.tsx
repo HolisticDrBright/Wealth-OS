@@ -127,9 +127,14 @@ export default function ApproveScreen() {
                 try {
                   const res = await api.approve(d.kind, d.summary)
                   const skipped = res.skippedOrders.length
+                  const fundTrades = d.kind === 'ladder_setup' || d.kind === 'core_rebalance'
                   setDone(
-                    d.kind === 'ladder_setup'
-                      ? `Your safety cushion is set up with ${formatUsd(res.designatedUsd ?? 0)} of practice money. Explore can start once Safety is full.`
+                    fundTrades && res.errors.length > 0
+                      ? `Partly done — ${res.executed} trade${res.executed === 1 ? '' : 's'} went through; some didn't: ${res.errors.join('; ')}`
+                      : d.kind === 'ladder_setup'
+                      ? `Done — ${formatUsd(res.safetyUsd ?? 0)} is in your safety cushion and ${formatUsd(res.coreUsd ?? 0)} is in your core funds. Practice money.`
+                      : d.kind === 'core_rebalance'
+                      ? 'Done — your core funds are back to your plan. You can see the trades in Activity.'
                       : res.executed > 0
                       ? `Done — ${res.executed} change${res.executed === 1 ? '' : 's'} placed. You can see them in Activity.`
                       : skipped > 0

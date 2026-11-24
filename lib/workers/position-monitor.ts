@@ -13,6 +13,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { strategyRowsOnly, isLadderKey } from '@/lib/allocation/sleeves'
 import http from 'node:http'
 import { fetchCurrentPrice } from '@/lib/paper-trading/price-feed'
 import type { OpenPosition, PriceTick, ManageAction } from '@/lib/strategies/pipeline-types'
@@ -242,7 +243,8 @@ export class PositionMonitor {
       .order('opened_at', { ascending: true }) as { data: PaperPositionRow[] | null; error: { message: string } | null }
 
     if (error) throw new Error(`sweep select: ${error.message}`)
-    const rows = rawRows ?? []
+    // Core / Safety holdings are never exited by the monitor (Phase 3).
+    const rows = strategyRowsOnly(rawRows ?? [])
     this.positionsTracked = rows.length
     if (!rows.length) return
 
@@ -278,6 +280,8 @@ export class PositionMonitor {
       .single() as { data: Partial<PaperPositionRow> | null }
 
     if (!row) return
+    // Core / Safety holdings are only ever sold by an approved rebalance.
+    if (isLadderKey(row.strategy_key)) return
 
     const entry   = row.entry_price   ?? 0
     const current = row.current_price ?? entry

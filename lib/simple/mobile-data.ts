@@ -9,36 +9,44 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchSpxMonthlyReturns } from '@/lib/planning/market-returns'
+import { fetchSpxMonthlyReturns, fetchMonthlyReturns } from '@/lib/planning/market-returns'
 import {
-  medianOf, projectGoalMonths, addMonths, goalStatusOf, yearRangeUsd,
+  medianOf, projectGoalMonths, addMonths, goalStatusOf,
   badYearSetbackMonths, type GoalStatus, type YearRangeUsd,
 } from '@/lib/planning/goal-projection'
 import { generateWeeklySummary, exitPhrase, isCostReason, isTier1Reason } from '@/lib/simple/weekly-summary'
 import { getExploreUsage, type ExploreUsage } from '@/lib/explore/cap'
 import { loadLadder } from '@/lib/allocation/ladder-data'
 import { ladderSetupAmount, type Ladder } from '@/lib/allocation/ladder'
+import { planLadderSetup, setupNeeded, coreDrift } from '@/lib/allocation/core-plans'
+import { tierMixForTotal, yearRangeForMix, badYearFraction } from '@/lib/allocation/bad-year'
+import { strategyRowsOnly, sleeveOfKey, LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
+import { CORE_FUNDS } from '@/lib/config/product-defaults'
 import { roundTripCostUsd } from '@/lib/costs/transaction-costs'
 import { liveTradingEnabled } from '@/lib/broker-adapters/execution-guard'
 
 // ─── Shared row loaders ──────────────────────────────────────────────────────
 
-interface ClosedRow { symbol: string; exit_reason: string | null; realized_pnl_usd: number | null; closed_at: string | null; asset_class: string }
-interface OpenRow { symbol: string; notional_usd: number | null; unrealized_pnl_usd: number | null; opened_at: string | null; asset_class: string }
+interface ClosedRow { symbol: string; strategy_key: string | null; exit_reason: string | null; realized_pnl_usd: number | null; closed_at: string | null; asset_class: string }
+interface OpenRow { symbol: string; strategy_key: string | null; notional_usd: number | null; unrealized_pnl_usd: number | null; opened_at: string | null; asset_class: string }
 
+/**
+ * STRATEGY (Explore) positions only — Core / Safety fund rows are valued by
+ * the ladder (loadLadder → ladderPnlUsd), so they're never counted twice.
+ */
 async function loadPositions(supabase: SupabaseClient, userId: string) {
   const [closedRes, openRes, assetsRes] = await Promise.all([
     supabase.from('paper_positions')
-      .select('symbol, exit_reason, realized_pnl_usd, closed_at, asset_class')
+      .select('symbol, strategy_key, exit_reason, realized_pnl_usd, closed_at, asset_class')
       .eq('user_id', userId).eq('status', 'closed').order('closed_at', { ascending: true }),
     supabase.from('paper_positions')
-      .select('symbol, notional_usd, unrealized_pnl_usd, opened_at, asset_class')
+      .select('symbol, strategy_key, notional_usd, unrealized_pnl_usd, opened_at, asset_class')
       .eq('user_id', userId).eq('status', 'open'),
     supabase.from('assets').select('current_value').eq('user_id', userId),
   ])
   return {
-    closed: (closedRes.data ?? []) as ClosedRow[],
-    open: (openRes.data ?? []) as OpenRow[],
+    closed: strategyRowsOnly((closedRes.data ?? []) as ClosedRow[]),
+    open: strategyRowsOnly((openRes.data ?? []) as OpenRow[]),
     baseAssetsUsd: ((assetsRes.data ?? []) as Array<{ current_value: number | null }>)
       .reduce((s, r) => s + (r.current_value ?? 0), 0),
   }
@@ -78,7 +86,8 @@ export interface MobileGoalView {
   badYearSetbackMonths: number | null
 }
 
-function buildGoalView(g: GoalRow, savedUsd: number, returns: number[]): MobileGoalView {
+/** badYearFrac: the bad-year loss as a share of money (≤ 0) for the actual tier mix. */
+function buildGoalView(g: GoalRow, savedUsd: number, returns: number[], badYearFrac: number | null): MobileGoalView {
   const targetAmountUsd = Number(g.target_amount_usd)
   const monthlyContributionUsd = Number(g.monthly_contribution_usd ?? 0)
   const medianMonthly = medianOf(returns)
@@ -89,11 +98,10 @@ function buildGoalView(g: GoalRow, savedUsd: number, returns: number[]): MobileG
       currentUsd: savedUsd, monthlyContributionUsd, targetUsd: targetAmountUsd, monthlyReturn: medianMonthly,
     })
     if (months != null) expectedDate = addMonths(new Date().toISOString(), months)
-    const range = yearRangeUsd(Math.max(1, savedUsd), returns)
-    if (range) {
+    if (badYearFrac != null) {
       setback = badYearSetbackMonths({
         currentUsd: savedUsd, monthlyContributionUsd, targetUsd: targetAmountUsd,
-        monthlyReturn: medianMonthly, badYearUsd: range.badYearUsd,
+        monthlyReturn: medianMonthly, badYearUsd: badYearFrac * savedUsd,
       })
     }
   }
@@ -119,7 +127,7 @@ export interface MobileHome {
   goal: MobileGoalView | null
   goalCount: number
   /** Ladder decisions come first: Explore is $0 until Tier 1 Safety is funded. */
-  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'rebalance'; title: string; subtitle: string; count: number } | null
+  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
 }
 
@@ -127,16 +135,20 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
   const todayUtc = new Date().toISOString().slice(0, 10)
 
-  const [{ closed, open, baseAssetsUsd }, halted, goals, returns, blocksRes, suggestionsRes] = await Promise.all([
+  const [{ closed, open, baseAssetsUsd }, halted, goals, returns, bondReturns, blocksRes, suggestionsRes, ladder] = await Promise.all([
     loadPositions(supabase, userId),
     isHalted(supabase, userId),
     loadGoals(supabase, userId),
     fetchSpxMonthlyReturns(),
+    fetchMonthlyReturns(CORE_FUNDS.bonds),
     supabase.from('audit_logs')
       .select('metadata').eq('user_id', userId).eq('decision', 'block').gte('decided_at', weekAgo),
     supabase.from('rebalance_suggestions')
       .select('id, action, asset_class, suggested_notional').eq('user_id', userId).eq('status', 'pending'),
+    loadLadder(supabase, userId).catch(() => null),
   ])
+  const depositsUsd = ladder?.depositsUsd ?? 0
+  const ladderPnlUsd = ladder?.ladderPnlUsd ?? 0
 
   // Value series: base assets + cumulative realized P&L by close day.
   const byDay = new Map<string, number>()
@@ -153,13 +165,15 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
   let cum = 0
   const valueSeries = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, pnl]) => {
     cum += pnl
-    return { date, valueUsd: Math.round(baseAssetsUsd + cum) }
+    return { date, valueUsd: Math.round(baseAssetsUsd + depositsUsd + cum) }
   })
   const totalUnrealized = open.reduce((s, r) => s + (r.unrealized_pnl_usd ?? 0), 0)
-  const sinceStartChangeUsd = totalRealized + totalUnrealized
-  const totalValueUsd = baseAssetsUsd + sinceStartChangeUsd
+  // Strategy P&L + the Core / Safety funds' P&L; deposits add value, not gains.
+  const sinceStartChangeUsd = totalRealized + totalUnrealized + ladderPnlUsd
+  const totalValueUsd = baseAssetsUsd + depositsUsd + sinceStartChangeUsd
 
-  const goal = goals.length ? buildGoalView(goals[0], Math.max(0, totalValueUsd), returns) : null
+  const badFrac = ladder ? badYearFraction(tierMixForTotal(ladder, Math.max(0, totalValueUsd)), returns, bondReturns) : null
+  const goal = goals.length ? buildGoalView(goals[0], Math.max(0, totalValueUsd), returns, badFrac) : null
 
   const openedThisWeek = open.filter(r => (r.opened_at ?? '') >= weekAgo)
   const closedThisWeek = closed.filter(r => (r.closed_at ?? '') >= weekAgo)
@@ -172,8 +186,6 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
   })
 
   const suggestions = (suggestionsRes.data ?? []) as Array<{ id: string }>
-  const ladder = await loadLadder(supabase, userId).catch(() => null)
-  const setupUsd = ladder ? ladderSetupAmount(ladder) : 0
   let decision: MobileHome['decision'] = null
   if (ladder?.tier1.status === 'needs_expenses') {
     decision = {
@@ -182,18 +194,29 @@ export async function buildMobileHome(supabase: SupabaseClient, userId: string):
       subtitle: 'We size your safety cushion from them. Explore stays at $0 until it is full.',
       count: 1,
     }
-  } else if (setupUsd > 0) {
+  } else if (ladder && setupNeeded(ladder)) {
+    const plan = planLadderSetup(ladder)
+    const setupUsd = plan.reduce((sum, t) => sum + t.usd, 0)
     decision = {
       kind: 'ladder_setup',
-      title: 'Set up your safety cushion',
-      subtitle: `Move $${Math.round(setupUsd).toLocaleString('en-US')} of practice money into cash first. Takes one tap.`,
+      title: ladder.tier1.funded ? 'Invest your core' : 'Set up your safety cushion',
+      subtitle: ladder.tier1.funded
+        ? `Put $${Math.round(setupUsd).toLocaleString('en-US')} of practice money into your long-term funds. Takes one tap.`
+        : `Move $${Math.round(ladderSetupAmount(ladder)).toLocaleString('en-US')} of practice money into cash first. Takes one tap.`,
+      count: 1,
+    }
+  } else if (ladder && coreDrift(ladder).needsRebalance) {
+    decision = {
+      kind: 'core_rebalance',
+      title: 'Rebalance your core funds',
+      subtitle: 'Your stock/bond mix has drifted from your plan. Takes one tap.',
       count: 1,
     }
   } else if (suggestions.length > 0) {
     decision = {
       kind: 'rebalance',
-      title: 'Rebalance your core portfolio',
-      subtitle: 'Your mix has drifted from your plan. Takes one tap.',
+      title: 'Rebalance your accounts',
+      subtitle: 'Your recorded mix has drifted from your plan. Takes one tap.',
       count: suggestions.length,
     }
   }
@@ -221,33 +244,40 @@ export interface MobileGoalDetail {
   exploreUsage: ExploreUsage
   /** The three-tier ladder (Safety / Core / Explore). */
   ladder: Ladder
-  /** Present when the "Set up your ladder" decision is waiting. */
+  /** Dollars the "Set up your ladder" decision would place (0 = nothing waiting). */
   ladderSetupUsd: number
+  /** True when Core has drifted past CORE_DRIFT_THRESHOLD and awaits approval. */
+  coreRebalanceNeeded: boolean
 }
 
 export async function buildMobileGoal(supabase: SupabaseClient, userId: string): Promise<MobileGoalDetail> {
-  const [{ closed, open, baseAssetsUsd }, goals, returns, usage, ladder] = await Promise.all([
+  const [{ closed, open, baseAssetsUsd }, goals, returns, bondReturns, usage, ladder] = await Promise.all([
     loadPositions(supabase, userId),
     loadGoals(supabase, userId),
     fetchSpxMonthlyReturns(),
+    fetchMonthlyReturns(CORE_FUNDS.bonds),
     getExploreUsage(supabase, userId),
     loadLadder(supabase, userId),
   ])
   const totalRealized = closed.reduce((s, r) => s + (r.realized_pnl_usd ?? 0), 0)
   const totalUnrealized = open.reduce((s, r) => s + (r.unrealized_pnl_usd ?? 0), 0)
-  const totalValueUsd = Math.max(0, baseAssetsUsd + totalRealized + totalUnrealized)
+  const totalValueUsd = Math.max(0,
+    baseAssetsUsd + ladder.depositsUsd + ladder.ladderPnlUsd + totalRealized + totalUnrealized)
 
   // Explore = everything strategies/copying hold right now; Core = the rest.
   const exploreUsd = usage.usedUsd
   const coreUsd = Math.max(0, totalValueUsd - exploreUsd)
 
+  const mix = tierMixForTotal(ladder, totalValueUsd)
+  const badFrac = badYearFraction(mix, returns, bondReturns)
   return {
-    goals: goals.map(g => buildGoalView(g, totalValueUsd, returns)),
-    yearRange: yearRangeUsd(Math.max(1, totalValueUsd), returns),
+    goals: goals.map(g => buildGoalView(g, totalValueUsd, returns, badFrac)),
+    yearRange: yearRangeForMix(mix, returns, bondReturns),
     split: { coreUsd: Math.round(coreUsd), exploreUsd: Math.round(exploreUsd) },
     exploreUsage: usage,
     ladder,
-    ladderSetupUsd: ladderSetupAmount(ladder),
+    ladderSetupUsd: setupNeeded(ladder) ? planLadderSetup(ladder).reduce((sum, t) => sum + t.usd, 0) : 0,
+    coreRebalanceNeeded: coreDrift(ladder).needsRebalance,
   }
 }
 
@@ -256,7 +286,7 @@ export async function buildMobileGoal(supabase: SupabaseClient, userId: string):
 export interface MobileActivityItem {
   id: string
   /** 'Explore · Sold' style label parts. */
-  sleeve: 'Core' | 'Explore'
+  sleeve: 'Safety' | 'Core' | 'Explore'
   type: string
   dateIso: string
   headline: string
@@ -286,11 +316,11 @@ export async function buildMobileActivity(
   const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString()
   const [closesRes, opensRes, blocksRes] = await Promise.all([
     supabase.from('paper_positions')
-      .select('id, symbol, exit_reason, realized_pnl_usd, closed_at')
+      .select('id, symbol, strategy_key, exit_reason, realized_pnl_usd, closed_at')
       .eq('user_id', userId).eq('status', 'closed').gte('closed_at', since)
       .order('closed_at', { ascending: false }).limit(60),
     supabase.from('paper_positions')
-      .select('id, symbol, opened_at, strategy_key')
+      .select('id, symbol, opened_at, strategy_key, metadata')
       .eq('user_id', userId).gte('opened_at', since)
       .order('opened_at', { ascending: false }).limit(60),
     supabase.from('audit_logs')
@@ -301,9 +331,22 @@ export async function buildMobileActivity(
 
   const items: MobileActivityItem[] = []
 
-  for (const r of (closesRes.data ?? []) as Array<{ id: string; symbol: string; exit_reason: string | null; realized_pnl_usd: number | null; closed_at: string | null }>) {
+  for (const r of (closesRes.data ?? []) as Array<{ id: string; symbol: string; strategy_key: string | null; exit_reason: string | null; realized_pnl_usd: number | null; closed_at: string | null }>) {
     if (!r.closed_at) continue
     const pnl = r.realized_pnl_usd ?? 0
+    const fund = sleeveOfKey(r.strategy_key)
+    if (fund !== 'explore') {
+      items.push({
+        id: `close-${r.id}`,
+        sleeve: fund === 'core' ? 'Core' : 'Safety',
+        type: 'Sold',
+        dateIso: r.closed_at,
+        headline: `Sold some ${r.symbol} (${money(pnl)} ${pnl >= 0 ? 'gain' : 'loss'})`,
+        why: 'Why: you approved a rebalance to bring your core funds back to your plan.',
+        kind: 'trade',
+      })
+      continue
+    }
     items.push({
       id: `close-${r.id}`,
       sleeve: 'Explore',
@@ -315,8 +358,25 @@ export async function buildMobileActivity(
     })
   }
 
-  for (const r of (opensRes.data ?? []) as Array<{ id: string; symbol: string; opened_at: string | null; strategy_key: string | null }>) {
+  for (const r of (opensRes.data ?? []) as Array<{ id: string; symbol: string; opened_at: string | null; strategy_key: string | null; metadata: Record<string, unknown> | null }>) {
     if (!r.opened_at) continue
+    const fund = sleeveOfKey(r.strategy_key)
+    // A partial fund sale is stored as a split-off lot; it's not a new buy.
+    if (fund !== 'explore' && r.metadata?.split_from) continue
+    if (fund !== 'explore') {
+      items.push({
+        id: `open-${r.id}`,
+        sleeve: fund === 'core' ? 'Core' : 'Safety',
+        type: 'Bought',
+        dateIso: r.opened_at,
+        headline: `Bought ${r.symbol} for your ${fund === 'core' ? 'long-term core' : 'safety cushion'}`,
+        why: fund === 'core'
+          ? 'Why: you approved putting long-term money into broad, low-cost funds.'
+          : 'Why: you approved filling your safety cushion with a cash-like fund first.',
+        kind: 'trade',
+      })
+      continue
+    }
     items.push({
       id: `open-${r.id}`,
       sleeve: 'Explore',
@@ -349,6 +409,7 @@ export async function buildMobileActivity(
 
 // ─── Pause impact ────────────────────────────────────────────────────────────
 
+/** What a pause would sell: Explore (strategy) positions only — never Core or Safety. */
 export interface MobilePauseImpact {
   openPositions: number
   openNotionalUsd: number
@@ -360,7 +421,8 @@ export interface MobilePauseImpact {
 export async function buildPauseImpact(supabase: SupabaseClient, userId: string): Promise<MobilePauseImpact> {
   const [openRes, intentsRes, halted] = await Promise.all([
     supabase.from('paper_positions')
-      .select('asset_class, notional_usd').eq('user_id', userId).eq('status', 'open'),
+      .select('asset_class, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
+      .eq('user_id', userId).eq('status', 'open'),
     supabase.from('order_intents')
       .select('id').eq('user_id', userId).in('status', ['pending', 'submitted', 'partially_filled']),
     isHalted(supabase, userId),

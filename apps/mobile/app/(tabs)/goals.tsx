@@ -121,7 +121,7 @@ export default function GoalsScreen() {
               Set up your first goal on the web app — everything here works toward it.
             </Text>
           </Card>
-          {data && <LadderCard ladder={data.ladder} setupUsd={data.ladderSetupUsd} onChanged={reload} />}
+          {data && <LadderCard ladder={data.ladder} setupUsd={data.ladderSetupUsd} rebalanceNeeded={data.coreRebalanceNeeded} onChanged={reload} />}
         </ScrollView>
       ) : (
         <ScrollView
@@ -186,7 +186,7 @@ export default function GoalsScreen() {
           </Card>
 
           {/* Where the money is — the three-tier ladder */}
-          {data && <LadderCard ladder={data.ladder} setupUsd={data.ladderSetupUsd} onChanged={reload} />}
+          {data && <LadderCard ladder={data.ladder} setupUsd={data.ladderSetupUsd} rebalanceNeeded={data.coreRebalanceNeeded} onChanged={reload} />}
 
           <SecondaryButton title="Change monthly deposit" onPress={() => setEditing(true)} />
         </ScrollView>

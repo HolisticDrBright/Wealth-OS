@@ -15,6 +15,7 @@ import {
 import { fetchSpxMonthlyReturns } from '@/lib/planning/market-returns'
 import { planningBuckets } from '@/lib/allocation/policy'
 import type { Recommendation } from '@/lib/advisory/types'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface PlanningView {
   goalProbabilityPct: number
@@ -47,7 +48,7 @@ export async function getPlanningView(
 
   const [{ data: assets }, { data: closed }, monthlyReturns] = await Promise.all([
     supabase.from('assets').select('current_value, category').eq('user_id', user.id),
-    supabase.from('paper_positions').select('realized_pnl_pct').eq('user_id', user.id).eq('status', 'closed').limit(2000),
+    supabase.from('paper_positions').select('realized_pnl_pct').not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('user_id', user.id).eq('status', 'closed').limit(2000),
     fetchSpxMonthlyReturns(),
   ])
   if (monthlyReturns.length < 60) return null  // no fabricated return history

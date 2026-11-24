@@ -1,18 +1,20 @@
 /**
- * Shared historical market-return series (Phase 3) — the same 20y S&P 500
- * monthly return series the planning Monte Carlo block-bootstraps from, moved
- * out of lib/actions/planning.ts so goal projection and the simple dashboard
- * use ONE source. Cached for a day; returns [] on failure (callers must
+ * Shared historical market-return series. The 20y S&P 500 monthly return
+ * series the planning Monte Carlo block-bootstraps from, plus any other
+ * symbol's monthly series (Phase 3: the bond fund, for the tier-mix bad
+ * year). Cached for a day per symbol; returns [] on failure (callers must
  * handle the honest "can't estimate right now" case).
  */
 
-let _monthlyCache: { returns: number[]; at: number } | null = null
+const _cache = new Map<string, { returns: number[]; at: number }>()
 
-export async function fetchSpxMonthlyReturns(): Promise<number[]> {
-  if (_monthlyCache && Date.now() - _monthlyCache.at < 86_400_000) return _monthlyCache.returns
+/** Monthly simple returns for a Yahoo symbol over the last 20 years. */
+export async function fetchMonthlyReturns(symbol: string): Promise<number[]> {
+  const hit = _cache.get(symbol)
+  if (hit && Date.now() - hit.at < 86_400_000) return hit.returns
   try {
     const res = await fetch(
-      'https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1mo&range=20y',
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&range=20y`,
       { signal: AbortSignal.timeout(8_000) }
     )
     if (!res.ok) return []
@@ -24,9 +26,13 @@ export async function fetchSpxMonthlyReturns(): Promise<number[]> {
       .filter((c): c is number => typeof c === 'number' && c > 0)
     const returns: number[] = []
     for (let i = 1; i < closes.length; i++) returns.push(closes[i] / closes[i - 1] - 1)
-    if (returns.length >= 60) _monthlyCache = { returns, at: Date.now() }
+    if (returns.length >= 60) _cache.set(symbol, { returns, at: Date.now() })
     return returns
   } catch {
     return []
   }
+}
+
+export async function fetchSpxMonthlyReturns(): Promise<number[]> {
+  return fetchMonthlyReturns('^GSPC')
 }

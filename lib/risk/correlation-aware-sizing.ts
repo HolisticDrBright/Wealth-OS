@@ -226,3 +226,39 @@ export function applyCorrelationCaps(
     capApplied,
   }
 }
+
+// ─── Current book loader ──────────────────────────────────────────────────────
+
+/**
+ * The open STRATEGY book the caps measure against: open paper strategy
+ * positions plus open copied positions, each with ITS OWN asset class.
+ * Core / Tier 1 Safety fund positions are excluded (Phase 3) — they are
+ * long-term holdings, not strategy exposure — while the cap denominator
+ * (total portfolio value) still includes the money behind them.
+ *
+ * Before Phase 3 the engine read `size_notional_usd` from
+ * user_copied_positions — a column that doesn't exist — so every row was $0
+ * and these caps never bound. Reading the real columns can only REDUCE size.
+ */
+export async function loadCorrelationBook(
+  supabase: import('@supabase/supabase-js').SupabaseClient,
+  userId: string,
+): Promise<BookPosition[]> {
+  const { LADDER_KEYS_FILTER } = await import('@/lib/allocation/sleeves')
+  const [paperRes, copiedRes] = await Promise.all([
+    supabase.from('paper_positions')
+      .select('strategy_key, asset_class, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
+      .eq('user_id', userId).eq('status', 'open'),
+    supabase.from('user_copied_positions')
+      .select('strategy_key, asset_class, notional_value')
+      .eq('user_id', userId).eq('status', 'open'),
+  ])
+  const book: BookPosition[] = []
+  for (const r of (paperRes.data ?? []) as Array<{ strategy_key: string | null; asset_class: string; notional_usd: number | string | null }>) {
+    book.push({ strategyKey: r.strategy_key as StrategyKey, assetClass: r.asset_class as AssetClass, notionalUsd: Math.abs(Number(r.notional_usd ?? 0)) })
+  }
+  for (const r of (copiedRes.data ?? []) as Array<{ strategy_key: string | null; asset_class: string; notional_value: number | string | null }>) {
+    book.push({ strategyKey: r.strategy_key as StrategyKey, assetClass: r.asset_class as AssetClass, notionalUsd: Math.abs(Number(r.notional_value ?? 0)) })
+  }
+  return book
+}

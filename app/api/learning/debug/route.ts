@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export async function GET() {
   const supabase = await createClient()
@@ -28,14 +29,14 @@ export async function GET() {
     { data: recentDec },
     { data: recentOut },
   ] = await Promise.all([
-    admin.from('paper_positions').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'open'),
-    admin.from('paper_positions').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'closed'),
+    admin.from('paper_positions').select('id', { count: 'exact', head: true }).not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('user_id', uid).eq('status', 'open'),
+    admin.from('paper_positions').select('id', { count: 'exact', head: true }).not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('user_id', uid).eq('status', 'closed'),
     admin.from('decision_log').select('id', { count: 'exact', head: true }).eq('user_id', uid),
     admin.from('decision_log').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('outcome_graded', true),
     admin.from('decision_log').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('outcome_graded', false),
     admin.from('decision_log').select('id', { count: 'exact', head: true }).eq('user_id', uid).not('paper_position_id', 'is', null),
     admin.from('outcome_log').select('id', { count: 'exact', head: true }).eq('user_id', uid),
-    admin.from('paper_positions').select('id, strategy_key, status, opened_at, closed_at, realized_pnl_pct').eq('user_id', uid).order('opened_at', { ascending: false }).limit(5),
+    admin.from('paper_positions').select('id, strategy_key, status, opened_at, closed_at, realized_pnl_pct').not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('user_id', uid).order('opened_at', { ascending: false }).limit(5),
     admin.from('decision_log').select('id, strategy, asset_class, outcome_graded, resolution_due_at, paper_position_id').eq('user_id', uid).order('created_at', { ascending: false }).limit(5),
     admin.from('outcome_log').select('id, actual_direction, actual_return, brier_score, resolved_at').eq('user_id', uid).order('resolved_at', { ascending: false }).limit(5),
   ])

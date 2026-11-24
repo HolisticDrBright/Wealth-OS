@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { PaperSummary } from '@/lib/paper-trading/types'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 function assetClassFilter(assetClass: string | null): string[] | null {
   if (!assetClass) return null
@@ -20,13 +21,13 @@ export async function GET(req: NextRequest) {
 
   let closedQuery = supabase
     .from('paper_positions')
-    .select('realized_pnl_usd, strategy_key, exit_reason')
+    .select('realized_pnl_usd, strategy_key, exit_reason').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', user.id)
     .eq('status', 'closed')
 
   let openQuery = supabase
     .from('paper_positions')
-    .select('unrealized_pnl_usd, strategy_key')
+    .select('unrealized_pnl_usd, strategy_key').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', user.id)
     .eq('status', 'open')
 

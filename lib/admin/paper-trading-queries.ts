@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface TradesByStrategy {
   strategy_key: string
@@ -37,7 +38,7 @@ export async function getTradesByStrategy(supabase: SupabaseClient): Promise<Tra
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from('paper_positions') as any)
-    .select('strategy_key, realized_pnl_usd')
+    .select('strategy_key, realized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('status', 'closed')
     .gte('closed_at', since)
 
@@ -63,7 +64,7 @@ export async function getPnlByStrategy(supabase: SupabaseClient): Promise<PnlByS
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from('paper_positions') as any)
-    .select('strategy_key, realized_pnl_usd, realized_pnl_pct')
+    .select('strategy_key, realized_pnl_usd, realized_pnl_pct').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('status', 'closed')
     .gte('closed_at', since)
 
@@ -93,7 +94,7 @@ export async function getPnlByStrategy(supabase: SupabaseClient): Promise<PnlByS
 export async function getOpenPositions(supabase: SupabaseClient): Promise<OpenPositionRow[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from('paper_positions') as any)
-    .select('id, user_id, strategy_key, symbol, asset_class, direction, notional_usd, entry_price, opened_at')
+    .select('id, user_id, strategy_key, symbol, asset_class, direction, notional_usd, entry_price, opened_at').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('status', 'open')
     .order('opened_at', { ascending: false })
 
@@ -106,7 +107,7 @@ export async function getExitReasonBreakdown(supabase: SupabaseClient): Promise<
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from('paper_positions') as any)
-    .select('close_reason')
+    .select('close_reason').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('status', 'closed')
     .gte('closed_at', since)
 

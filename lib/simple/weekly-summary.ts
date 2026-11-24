@@ -14,6 +14,11 @@ export interface WeeklyInputs {
   blocked: Array<{ reason: string | null }>
   /** True if trading was halted (paused) at any point this week. */
   halted: boolean
+  /**
+   * Approved Core / Safety fund moves this week (Phase 3), in dollars.
+   * Optional — omitted means none.
+   */
+  fundMoves?: { safetyBoughtUsd: number; coreBoughtUsd: number; coreSoldUsd: number }
 }
 
 export const MAX_WEEKLY_SENTENCES = 5
@@ -50,6 +55,18 @@ export function generateWeeklySummary(i: WeeklyInputs): string[] {
 
   if (i.halted) {
     out.push('You paused all trading — nothing new will be bought or sold until you turn it back on.')
+  }
+
+  const f = i.fundMoves
+  if (f && (f.safetyBoughtUsd >= 1 || f.coreBoughtUsd >= 1 || f.coreSoldUsd >= 1)) {
+    if (f.coreSoldUsd >= 1) {
+      out.push(`Rebalanced your core funds as you approved — sold ${money(f.coreSoldUsd)} of what grew and bought what lagged.`)
+    } else {
+      const parts: string[] = []
+      if (f.safetyBoughtUsd >= 1) parts.push(`${money(f.safetyBoughtUsd)} into your safety cushion`)
+      if (f.coreBoughtUsd >= 1) parts.push(`${money(f.coreBoughtUsd)} into your long-term core funds`)
+      out.push(`Put ${parts.join(' and ')}, as you approved.`)
+    }
   }
 
   for (const c of i.closes.slice(0, MAX_CLOSE_SENTENCES)) {

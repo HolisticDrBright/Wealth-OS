@@ -43,7 +43,7 @@ describe('every mobile route is bearer-authenticated and never service-role', ()
   const routes = readdirSync(MOBILE_DIR)
 
   it('covers the expected surface', () => {
-    expect(new Set(routes)).toEqual(new Set(['home', 'goal', 'activity', 'approve', 'explore', 'follow', 'pause', 'resume']))
+    expect(new Set(routes)).toEqual(new Set(['home', 'goal', 'activity', 'approve', 'deposit', 'explore', 'follow', 'pause', 'resume']))
   })
 
   it.each(readdirSync(MOBILE_DIR))('%s/route.ts uses userClientFromBearer and no admin client', (dir) => {
@@ -72,6 +72,21 @@ describe('trading-state writes keep the web rules', () => {
     expect(appr).toBeGreaterThan(-1)
     expect(appr).toBeLessThan(exec)
     expect(post).toContain('runRebalanceScan')
+  })
+
+  it('ladder approvals (setup, core rebalance) go through the shared approval-first cores', () => {
+    const post = read('app/api/mobile/approve/route.ts')
+    const p = post.slice(post.indexOf('export async function POST'))
+    expect(p).toContain('approveLadderSetup')
+    expect(p).toContain('approveCoreRebalance')
+    // The approval guard runs before either core is called.
+    expect(p.indexOf('approval_required')).toBeLessThan(p.indexOf('approveLadderSetup'))
+  })
+
+  it('deposit uses the shared depositFunds core', () => {
+    const src = read('app/api/mobile/deposit/route.ts')
+    expect(src).toContain('depositFunds')
+    expect(src).not.toContain("from('paper_positions')")
   })
 
   it('pause uses the shared core and resume demands explicit confirmation', () => {

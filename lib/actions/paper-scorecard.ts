@@ -23,6 +23,7 @@ import {
   type SkippedDetailRow,
 } from '@/lib/paper-trading/scorecard-core'
 import { computeAttribution, type AttributionTrade } from '@/lib/paper-trading/attribution'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 interface PositionRow {
   strategy_key: string
@@ -76,7 +77,7 @@ export async function loadScorecardsForUser(
   const [positions, trades, audits, shadows, runs, enabled] = await Promise.all([
     supabase
       .from('paper_positions')
-      .select('strategy_key, asset_class, status, closed_at, realized_pnl_pct, notional_usd, exit_reason')
+      .select('strategy_key, asset_class, status, closed_at, realized_pnl_pct, notional_usd, exit_reason').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('user_id', userId)
       .limit(5000)
       .then(r => (r.data ?? []) as PositionRow[], () => [] as PositionRow[]),

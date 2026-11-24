@@ -1,8 +1,9 @@
 /**
- * "Where the money is" — the three-tier ladder (Phase 2.4): one row per tier
+ * "Where the money is" — the three-tier ladder (Phases 2–3): one row per tier
  * with dollars, what the tier is for, and whether it is funded. Hosts the
- * monthly-expenses input when Tier 1 can't be sized yet, and the shortcut to
- * the "Set up your safety cushion" decision.
+ * monthly-expenses input when Tier 1 can't be sized yet, the shortcut to the
+ * "Set up your ladder" / "Rebalance your core" decisions, and Add money
+ * (fills Safety first, then Core).
  */
 
 import { useState } from 'react'
@@ -40,12 +41,15 @@ function TierRow({ n, name, amount, of, status, statusOk, body }: {
   )
 }
 
-export function LadderCard({ ladder, setupUsd, onChanged }: {
+export function LadderCard({ ladder, setupUsd, rebalanceNeeded, onChanged }: {
   ladder: Ladder
   setupUsd: number
+  rebalanceNeeded: boolean
   onChanged: () => void
 }) {
   const [expenses, setExpenses] = useState('')
+  const [deposit, setDeposit] = useState('')
+  const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const t1 = ladder.tier1
@@ -96,7 +100,7 @@ export function LadderCard({ ladder, setupUsd, onChanged }: {
 
       {setupUsd > 0 && (
         <PrimaryButton
-          title={`Set up my safety cushion (${formatUsd(setupUsd)})`}
+          title={`${t1.funded ? 'Invest my core' : 'Set up my ladder'} (${formatUsd(setupUsd)})`}
           onPress={() => router.push('/approve')}
         />
       )}
@@ -104,11 +108,16 @@ export function LadderCard({ ladder, setupUsd, onChanged }: {
       <TierRow
         n={2}
         name="Core"
-        amount={ladder.core.amountUsd}
-        status={t1.funded ? 'Invested' : 'Waits for Safety'}
-        statusOk={t1.funded}
-        body={`Long-term money in broad, low-cost funds: ${stockPct}% stocks, ${100 - stockPct}% bonds. The stock share steps down as your goals get closer.`}
+        amount={ladder.core.heldUsd}
+        of={ladder.core.targetUsd}
+        status={!ladder.core.invested ? (t1.funded ? 'Not invested yet' : 'Waits for Safety') : rebalanceNeeded ? 'Drifted from plan' : 'Invested'}
+        statusOk={ladder.core.invested && !rebalanceNeeded}
+        body={`Long-term money in broad, low-cost funds (${ladder.core.funds.map(f => f.symbol).join(', ')}): ${stockPct}% stocks, ${100 - stockPct}% bonds. The stock share steps down as your goals get closer.`}
       />
+
+      {rebalanceNeeded && (
+        <PrimaryButton title="Review core rebalance" onPress={() => router.push('/approve')} />
+      )}
 
       <TierRow
         n={3}
@@ -121,6 +130,38 @@ export function LadderCard({ ladder, setupUsd, onChanged }: {
           (ladder.explore.open ? '' : ' It stays at $0 until your safety cushion is full.')}
       />
 
+      <View className="gap-2 border-t border-stroke pt-3">
+        <Text className="font-inter text-[13px] text-ink-body">Add practice money — it fills Safety first, then Core.</Text>
+        <TextInput
+          accessibilityLabel="Amount to add in dollars"
+          value={deposit}
+          onChangeText={setDeposit}
+          keyboardType="number-pad"
+          placeholder="500"
+          placeholderTextColor={colors.inkMuted}
+          className="min-h-[48px] rounded-btn border border-stroke bg-inset px-4 text-ink"
+          style={{ fontFamily: 'JetBrainsMono_600SemiBold', fontSize: 16 }}
+        />
+        <PrimaryButton
+          title="Add money"
+          busy={busy}
+          disabled={!(Number(deposit) > 0)}
+          onPress={async () => {
+            setBusy(true); setErr(null); setNote(null)
+            try {
+              const res = await api.deposit(Number(deposit))
+              setDeposit('')
+              setNote(res.errors.length
+                ? `Added, but some trades didn't go through: ${res.errors.join('; ')}`
+                : `Added — ${formatUsd(res.safetyUsd)} to Safety, ${formatUsd(res.coreUsd)} to Core.`)
+              onChanged()
+            } catch (e) { setErr(e instanceof Error ? e.message : 'Could not add money') }
+            finally { setBusy(false) }
+          }}
+        />
+      </View>
+
+      {note && <Text accessibilityLiveRegion="polite" className="font-inter text-[13px] text-gain">{note}</Text>}
       {err && <Text accessibilityLiveRegion="polite" className="font-inter text-[13px] text-loss">{err}</Text>}
     </Card>
   )

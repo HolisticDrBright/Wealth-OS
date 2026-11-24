@@ -4,6 +4,7 @@
  * In-process memory cache reduces DB reads — only reloads when TTL expires.
  */
 import { createAdminClient } from '@/lib/supabase/admin'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 // ─── Defaults & constraints ───────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ export async function loadRegimeAdjustedWeights(userId: string): Promise<{
 
     const { data: closed } = await admin
       .from('paper_positions')
-      .select('strategy_key, closed_at, realized_pnl_pct')
+      .select('strategy_key, closed_at, realized_pnl_pct').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('user_id', userId)
       .eq('status', 'closed')
       .order('closed_at', { ascending: false })

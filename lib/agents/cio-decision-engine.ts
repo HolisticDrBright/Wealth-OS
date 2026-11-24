@@ -448,19 +448,12 @@ Write a CIO synthesis as JSON:
     adjustedFraction *= regimeHaircut
     adjustedNotional *= regimeHaircut
 
-    // T4.4 — Correlation-aware sizing caps (fetch current book)
-    const { applyCorrelationCaps } = await import('@/lib/risk/correlation-aware-sizing')
-    const { data: bookRows } = await supabase
-      .from('user_copied_positions')
-      .select('strategy_key, size_notional_usd')
-      .eq('user_id', userId)
-      .eq('status', 'open')
+    // T4.4 — Correlation-aware sizing caps against the open STRATEGY book
+    // (paper strategy + copied positions, each with its own asset class; Core
+    // and Safety fund positions excluded — lib/risk/correlation-aware-sizing.ts).
+    const { applyCorrelationCaps, loadCorrelationBook } = await import('@/lib/risk/correlation-aware-sizing')
     const portfolioUsd = rawSize.fraction > 0 ? rawSize.notionalUsd / rawSize.fraction : 10_000
-    const currentBook = (bookRows ?? []).map((r: Record<string, unknown>) => ({
-      strategyKey: r.strategy_key as import('@/lib/strategies/strategy-registry').StrategyKey,
-      assetClass: strat.assetClass,
-      notionalUsd: (r.size_notional_usd as number) ?? 0,
-    }))
+    const currentBook = await loadCorrelationBook(supabase, userId).catch(() => [])
     const corr = applyCorrelationCaps(
       opp.strategyKey,
       strat.assetClass,

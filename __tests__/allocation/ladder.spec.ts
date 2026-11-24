@@ -196,7 +196,8 @@ describe('computeLadder — Explore cap on money NOT in Tier 1', () => {
   it('in-use and left track open Explore notional', () => {
     const l = computeLadder(input({ exploreInUseUsd: 2_500 }))
     expect(l.explore.leftUsd).toBe(7_100)
-    expect(l.core.amountUsd).toBe(120_000 - 24_000 - 2_500)
+    // Core's target leaves the Explore reserve aside, whatever is in use now.
+    expect(l.core.targetUsd).toBe((120_000 - 24_000) * 0.9)
   })
 
   it('a pro cap above the hard maximum is clamped', () => {
@@ -260,27 +261,40 @@ interface Row { [k: string]: unknown }
 const db = vi.hoisted(() => ({
   tables: {} as Record<string, Row[]>,
   writes: [] as Array<{ table: string; op: string; row: Row }>,
+  seq: 0,
 }))
+vi.mock('@/lib/paper-trading/price-feed', () => ({ fetchCurrentPrice: async () => 100 }))
 
 function chain(table: string): Record<string, unknown> {
-  const rows = db.tables[table] ?? []
+  const rows = () => db.tables[table] ?? []
   const c: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in', 'order', 'limit']) c[m] = () => c
-  c.maybeSingle = async () => ({ data: rows[0] ?? null, error: null })
-  c.insert = async (row: Row) => { db.writes.push({ table, op: 'insert', row }); return { error: null } }
+  for (const m of ['select', 'eq', 'in', 'not', 'order', 'limit', 'gte']) c[m] = () => c
+  c.maybeSingle = async () => ({ data: rows()[0] ?? null, error: null })
+  c.insert = (row: Row) => {
+    const stored = { id: `r${++db.seq}`, ...row }
+    db.writes.push({ table, op: 'insert', row: stored })
+    db.tables[table] = [...rows(), stored]
+    const res = { error: null }
+    return {
+      select: () => ({ single: async () => ({ data: { id: stored.id }, error: null }) }),
+      then: (ok: (v: unknown) => unknown, bad?: (e: unknown) => unknown) => Promise.resolve(res).then(ok, bad),
+    }
+  }
   c.upsert = async (row: Row) => { db.writes.push({ table, op: 'upsert', row }); db.tables[table] = [row]; return { error: null } }
-  c.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(res)
+  c.update = (patch: Row) => ({ eq: async () => { db.writes.push({ table, op: 'update', row: patch }); return { error: null } } })
+  c.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: rows(), error: null }).then(res)
   return c
 }
 const fakeSupabase = { from: (t: string) => chain(t) } as never
 
-describe('approveLadderSetup', () => {
+describe('approveLadderSetup — approval first, then paper fund buys', () => {
   async function run(summary: string) {
     const { approveLadderSetup } = await import('@/lib/allocation/ladder-data')
     return approveLadderSetup(fakeSupabase, 'u1', summary)
   }
   function seed(expenses: number | null) {
     db.writes = []
+    db.seq = 0
     db.tables = {
       assets: [{ category: 'stock', current_value: 90_000 }, { category: 'cash', current_value: 10_000 }],
       financial_profile: expenses == null ? [] : [{ monthly_essential_expenses_usd: expenses }],
@@ -301,17 +315,31 @@ describe('approveLadderSetup', () => {
     expect(r.error).toMatch(/monthly expenses/)
   })
 
-  it('records the setup_ladder approval BEFORE designating Tier 1', async () => {
+  it('records the setup_ladder approval BEFORE any paper trade, then funds Safety and Core', async () => {
     seed(4_000)
-    const r = await run('Set up my safety cushion')
+    const r = await run('Set up my money ladder')
     expect(r.ok).toBe(true)
-    expect(r.designatedUsd).toBe(14_000)
     const apprIdx = db.writes.findIndex(w => w.table === 'automation_approvals' && w.row.kind === 'setup_ladder')
-    const stateIdx = db.writes.findIndex(w => w.table === 'ladder_state')
+    const firstBuy = db.writes.findIndex(w => w.table === 'paper_positions')
     expect(apprIdx).toBeGreaterThan(-1)
-    expect(stateIdx).toBeGreaterThan(apprIdx)
-    expect(db.writes[stateIdx].row.tier1_designated_usd).toBe(14_000)
+    expect(firstBuy).toBeGreaterThan(apprIdx)
+
+    // Tier 1: $14k short, grossed up for the purchase cost so it lands FULL.
+    expect(r.safetyUsd).toBeGreaterThanOrEqual(14_000)
+    expect(r.safetyUsd).toBeLessThan(14_050)
+    // Core: (100k − 24k Tier 1 target) × 90% — the Explore reserve stays unplaced.
+    expect(r.coreUsd).toBeCloseTo(68_400, 0)
+
+    const buys = db.writes.filter(w => w.table === 'paper_positions').map(w => w.row)
+    expect(new Set(buys.map(b => b.strategy_key))).toEqual(new Set(['safety', 'core']))
+    expect(buys.every(b => b.status === 'open' && b.direction === 'long')).toBe(true)
+
     expect(r.ladder?.tier1.status).toBe('funded')
+    expect(r.ladder?.core.invested).toBe(true)
+    // Nothing counted twice: Safety + Core + unplaced = the money there is.
+    const l = r.ladder!
+    expect(l.tier1.inFundUsd + l.core.heldUsd + l.unplacedUsd).toBeCloseTo(l.investableUsd, 2)
+    expect(l.explore.open).toBe(true)
   })
 })
 

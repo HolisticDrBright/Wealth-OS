@@ -21,6 +21,7 @@ import {
   type PromotionReadiness, type PaperTradeStats, type ShadowComparison,
 } from '@/lib/strategies/promotion-gates'
 import { getRollingBrier } from '@/lib/learning/rolling-brier'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface PromotionPipelineRow extends PromotionReadiness {
   displayName: string
@@ -81,7 +82,7 @@ export async function getPromotionPipeline(): Promise<PromotionPipelineRow[]> {
     const [{ data: closed }, { data: shadowClosed }] = await Promise.all([
       supabase
         .from('paper_positions')
-        .select('strategy_key, realized_pnl_pct, realized_pnl_usd, notional_usd, closed_at')
+        .select('strategy_key, realized_pnl_pct, realized_pnl_usd, notional_usd, closed_at').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('user_id', user.id)
         .eq('status', 'closed')
         .limit(5000),

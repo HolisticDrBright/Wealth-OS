@@ -9,6 +9,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { toDisplayName } from '@/lib/strategies/strategy-display'
 import type { SkipCounts, SkippedDetail } from '@/lib/paper-trading/types'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface PaperPosition {
   id: string
@@ -117,7 +118,7 @@ export async function getActivePaperPositions(limit = 50): Promise<PaperPosition
 
     const { data, error } = await supabase
       .from('paper_positions')
-      .select('id, strategy_key, symbol, asset_class, direction, notional_usd, entry_price, current_price, unrealized_pnl_usd, unrealized_pnl_pct, opened_at, status')
+      .select('id, strategy_key, symbol, asset_class, direction, notional_usd, entry_price, current_price, unrealized_pnl_usd, unrealized_pnl_pct, opened_at, status').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('user_id', user.id)
       .eq('status', 'open')
       .order('opened_at', { ascending: false })
@@ -156,7 +157,7 @@ export async function getPaperTradingSummary(): Promise<PaperTradingSummary> {
 
     const { data, error } = await supabase
       .from('paper_positions')
-      .select('status, unrealized_pnl_usd, realized_pnl_usd')
+      .select('status, unrealized_pnl_usd, realized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('user_id', user.id)
 
     if (error || !data || data.length === 0) return empty

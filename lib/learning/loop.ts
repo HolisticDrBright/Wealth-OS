@@ -24,6 +24,7 @@ import {
   clampEvolution,
   MIN_SAMPLES,
 } from './weights'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface LearningPassResult {
   updated: boolean
@@ -63,7 +64,7 @@ async function gradeOutcomes(userId: string): Promise<number> {
     const posIds = linkedPending.map(d => d.paper_position_id as string)
     const { data: closedPos } = await admin
       .from('paper_positions')
-      .select('id, realized_pnl_pct, realized_pnl_usd, status, metadata')
+      .select('id, realized_pnl_pct, realized_pnl_usd, status, metadata').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .in('id', posIds)
       .eq('status', 'closed')
 
@@ -230,7 +231,7 @@ export async function runLearningPass(userId: string): Promise<LearningPassResul
       source = 'paper_positions'
       const { data: closed } = await admin
         .from('paper_positions')
-        .select('strategy_key, realized_pnl_pct, realized_pnl_usd')
+        .select('strategy_key, realized_pnl_pct, realized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('user_id', userId)
         .eq('status', 'closed')
         .limit(5000)

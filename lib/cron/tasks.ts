@@ -10,6 +10,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export class UnknownCronTaskError extends Error {
   constructor(task: string) { super(`Unknown task: ${task}`) }
@@ -178,7 +179,7 @@ export async function runCronTask(task: string): Promise<CronResult> {
     // still have decision_log entries that may need grading or outcome data to learn from.
     const { data: rows } = await supabase
       .from('paper_positions')
-      .select('user_id')
+      .select('user_id').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     const userIds = [...new Set((rows ?? []).map(r => r.user_id as string))]
     if (!userIds.length) {
       return { task: 'learning', users: 0, message: 'No users with paper positions' }
@@ -382,7 +383,7 @@ export async function runCronTask(task: string): Promise<CronResult> {
 
     const { data: closed } = await supabase
       .from('paper_positions')
-      .select('user_id, strategy_key, asset_class, closed_at, realized_pnl_pct')
+      .select('user_id, strategy_key, asset_class, closed_at, realized_pnl_pct').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('status', 'closed')
       .limit(20_000)
 
@@ -609,7 +610,7 @@ export async function runCronTask(task: string): Promise<CronResult> {
     const rAnnual = (yields.tbill3moPct ?? 0) / 100
 
     const { data: open } = await supabase
-      .from('paper_positions').select('user_id, asset_class, notional_usd, unrealized_pnl_usd').eq('status', 'open')
+      .from('paper_positions').select('user_id, asset_class, notional_usd, unrealized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('status', 'open')
     const byUserSleeve = new Map<string, number>()
     for (const r of open ?? []) {
       const key = `${r.user_id}|${r.asset_class}`
@@ -656,13 +657,13 @@ export async function runCronTask(task: string): Promise<CronResult> {
     const params = await loadKbParameters(supabase)
 
     const { data: users } = await supabase
-      .from('paper_positions').select('user_id').eq('status', 'open')
+      .from('paper_positions').select('user_id').not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('status', 'open')
     const userIds = [...new Set((users ?? []).map(r => r.user_id as string))]
     let actionsTotal = 0
 
     for (const uid of userIds) {
       const [{ data: open }, { data: assets }, { data: flags }, { data: profile }, { data: floors }] = await Promise.all([
-        supabase.from('paper_positions').select('asset_class, notional_usd').eq('user_id', uid).eq('status', 'open'),
+        supabase.from('paper_positions').select('asset_class, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('user_id', uid).eq('status', 'open'),
         supabase.from('assets').select('current_value').eq('user_id', uid),
         supabase.from('system_flags').select('user_id, enabled').eq('key', 'trading_halted'),
         supabase.from('financial_profile').select('monthly_essential_expenses_usd, liquid_cash_usd, income_stability').eq('user_id', uid).maybeSingle(),
@@ -724,7 +725,7 @@ export async function runCronTask(task: string): Promise<CronResult> {
     // Gather all unique tickers currently held in open paper positions
     const { data: positions } = await supabase
       .from('paper_positions')
-      .select('symbol, asset_class')
+      .select('symbol, asset_class').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('status', 'open')
       .in('asset_class', ['stocks', 'options'])
     const tickers = [...new Set((positions ?? []).map(p => (p.symbol as string).split(/[-/]/)[0].toUpperCase()))]
@@ -740,6 +741,11 @@ export async function runCronTask(task: string): Promise<CronResult> {
   // Mondays so their clamps/cadences behave as designed; the behavior-gap
   // report fires on the 1st of the month. Each sub-task is a DIRECT call —
   // no HTTP hop back into /api/cron.
+  if (task === 'ladder-mark') {
+    const { markLadderPositions } = await import('@/lib/allocation/core-trading')
+    return { task: 'ladder-mark', ...(await markLadderPositions(createAdminClient())) }
+  }
+
   if (task === 'daily-ops') {
     const now = new Date()
     const opsTasks = opsTasksFor(now)
@@ -783,7 +789,7 @@ export async function runCronTask(task: string): Promise<CronResult> {
     try {
       const { data: stockPos } = await supabase
         .from('paper_positions')
-        .select('symbol, asset_class')
+        .select('symbol, asset_class').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('status', 'open')
         .in('asset_class', ['stocks', 'options'])
       const tickers = [...new Set((stockPos ?? []).map(p => (p.symbol as string).split(/[-/]/)[0].toUpperCase()))]
@@ -795,6 +801,13 @@ export async function runCronTask(task: string): Promise<CronResult> {
         results.newsSentiment = 'skipped (no stock positions)'
       }
     } catch (e) { results.newsSentiment = e instanceof Error ? e.message : 'error' }
+
+    // 3b. Mark Core / Safety fund positions to market (price only — the
+    // strategy exit sweep skips them by design, so nothing else reprices them).
+    try {
+      const { markLadderPositions } = await import('@/lib/allocation/core-trading')
+      results.ladderMark = await markLadderPositions(supabase)
+    } catch (e) { results.ladderMark = e instanceof Error ? e.message : 'error' }
 
     // 4. Paper trading (exit stale positions + open new ones for all users)
     try {

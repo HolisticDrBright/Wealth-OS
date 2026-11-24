@@ -1,5 +1,88 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Wealth-manager allocation, Phase 3: Core is real (paper)
+
+Core and Tier 1 Safety are now actual paper fund positions, distinguishable
+everywhere from strategy (Explore) positions.
+
+- **Tagging** (`lib/allocation/sleeves.ts`): Core / Safety rows are ordinary
+  `paper_positions` rows with the RESERVED `strategy_key` `'core'` / `'safety'`
+  (no new column, so strategy queries can never fail open against a
+  database that lacks the migration). Every strategy-level reader — learning,
+  scorecards, promotion readiness, lifecycle, equity curve, exits, position
+  monitor, kill switch, book exposure, correlation caps, Explore in-use, the
+  risk strip's halt impact, cron fan-outs — now excludes them; account-level
+  totals include them. Fund rows also carry a no-exit seatbelt
+  (`LADDER_NO_EXIT`: 100% stop, unreachable target, ~228,000-year hold).
+- **One-tap setup now trades** (`approveLadderSetup`): after the approval is
+  recorded it buys SGOV for the Tier 1 shortfall (grossed up for the purchase
+  cost so Safety lands full, never below `CORE_MIN_TRADE_USD`), then — only if
+  Tier 1 will be full — each Core fund up to target, furthest below target
+  first. Any Phase 2 designation is converted into a real SGOV position.
+- **No double counting** (`computeLadder`): fund purchases are paid with the
+  person's recorded money, so recorded cash (and any designation) counts toward
+  Tier 1 only while it is still "unplaced". Core's target now uses the FULL
+  Tier 1 target, so a short Tier 1 can't inflate it. The setup can only spend
+  free money plus recorded cash beyond the Tier 1 target — never the
+  cash-like fund itself.
+- **Deposits** (`depositFunds`, web "Add money" on /advisor, phone "Add money"
+  on Goals, `POST /api/mobile/deposit`): recorded in `paper_deposits`, then
+  Tier 1 first, then Core (largest dollar gap first, leftovers by weight).
+  Deposits never touch strategy equity.
+- **Core drift** (`coreDrift`): when Core's stock share is more than
+  `CORE_DRIFT_THRESHOLD` (5 points) from its glide-path target, a "Rebalance
+  your core funds" decision appears (web Command Center + /advisor, phone
+  Home + Approve). Core is never traded without that approval; the plan is
+  self-funded (sells first, then buys).
+- **Pause** ("Stop new trades and sell Explore" / Flatten & Halt) sells
+  strategy positions only — Core and Tier 1 are never sold. Web dialog and
+  phone Pause screen say so; the phone pause impact counts Explore only.
+- **Bad-year dollars from the actual tier mix** (`lib/allocation/bad-year.ts`):
+  Safety doesn't drop; Core stocks move like the S&P 500 series; Core bonds
+  like BND's own monthly history (stock series if unavailable — overstates,
+  never understates); Explore and anything not yet placed count as stocks.
+  Series are blended month by month. Used by the web simple dashboard, phone
+  Home / Goals, and the approval screen's before/after.
+- **Totals**: simple dashboard and phone "total value" / "since you started"
+  add deposits and the funds' P&L (the strategy equity curve is now
+  strategy-only). Weekly summary adds one sentence for approved fund moves;
+  phone Activity labels fund trades Core / Safety with their own reasons.
+- **Daily mark-to-market** of fund positions (`markLadderPositions`, a step in
+  the `daily` cron and a standalone `ladder-mark` task) — price and
+  unrealized P&L only; the strategy exit sweep skips these rows by design.
+
+**Pre-existing bugs found and fixed (both only reduce or make honest):**
+1. `paper_positions.exit_reason` CHECK rejected `'manual_flatten'`, so Flatten
+   & Halt / phone "sell Explore" never actually closed anything against a real
+   database — and `PaperBroker.closeAt` ignored the update error, so it
+   reported success. Migration widens the CHECK; `closeAt` now checks the
+   error, retries with the always-valid `'manual'`, and reports a failure
+   otherwise.
+2. Correlation caps (`cio-decision-engine`) read `size_notional_usd` from
+   `user_copied_positions` — a column that doesn't exist — so every row was $0
+   and the sector/factor/counterparty/asset-class caps never bound; they also
+   stamped every row with the NEW trade's asset class. Now
+   `loadCorrelationBook` reads open paper strategy + copied positions with
+   their real notional and own asset class. The cap denominator (recorded
+   assets) is unchanged and already includes the money behind Core/Safety.
+3. `paper_trades` only allows service-role inserts, so trade-log rows written
+   from a user's own session were silently dropped. Migration adds a narrow
+   INSERT policy for the user's own `'core'`/`'safety'` rows only; the weekly
+   summary reads position rows so it works either way.
+
+**New constants** (`lib/config/product-defaults.ts`): `CORE_DRIFT_THRESHOLD`
+0.05, `CORE_MIN_TRADE_USD` 10.
+
+**New migration**: `20260704m_core_positions.sql` — widened exit_reason CHECK
+(`manual_flatten`, `rebalance`); `(user_id, strategy_key, status)` index;
+`paper_deposits` (RLS: owner); `core_rebalance` + `deposit` approval kinds;
+user INSERT policy on `paper_trades` for ladder keys only.
+
+**Known limitation**: paper SGOV doesn't credit its monthly distribution, so
+its marked price dips at each ex-dividend date. A dip below the Tier 1 target
+re-raises a small "top up your safety cushion" decision and closes Explore
+until approved (strict by design).
+
 ## 2026-11-20 — Wealth-manager allocation, Phase 2: the three-tier ladder
 
 A person's money is filled in order — **Tier 1 Safety** (cash-like),

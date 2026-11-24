@@ -20,6 +20,7 @@ import { buildRunbookChecklist, type RunbookChecklist } from '@/lib/paper-tradin
 import { buildReadinessMatrix, type BrokerReadinessRow, type CertificationRow } from '@/lib/paper-trading/broker-certification'
 import { findDeadWorkers } from '@/lib/ops/reconcile'
 import { STRATEGY_REGISTRY_CONFIG } from '@/lib/strategies/strategy-registry'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface BrokerStatusRow {
   id: string
@@ -151,14 +152,14 @@ export async function getPaperValidationData(): Promise<PaperValidationData> {
         .limit(12),
       supabase
         .from('paper_positions')
-        .select('strategy_key, symbol, asset_class, direction, entry_price, current_price, notional_usd, unrealized_pnl_usd, opened_at')
+        .select('strategy_key, symbol, asset_class, direction, entry_price, current_price, notional_usd, unrealized_pnl_usd, opened_at').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('user_id', user.id)
         .eq('status', 'open')
         .order('opened_at', { ascending: false })
         .limit(50),
       supabase
         .from('paper_positions')
-        .select('strategy_key, symbol, direction, realized_pnl_usd, realized_pnl_pct, exit_reason, closed_at')
+        .select('strategy_key, symbol, direction, realized_pnl_usd, realized_pnl_pct, exit_reason, closed_at').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('user_id', user.id)
         .eq('status', 'closed')
         .order('closed_at', { ascending: false })

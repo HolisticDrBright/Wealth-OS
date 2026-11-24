@@ -36,7 +36,7 @@ export interface HomeData {
   valueSeries: Array<{ date: string; valueUsd: number }>
   goal: GoalView | null
   goalCount: number
-  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'rebalance'; title: string; subtitle: string; count: number } | null
+  decision: { kind: 'ladder_expenses' | 'ladder_setup' | 'core_rebalance' | 'rebalance'; title: string; subtitle: string; count: number } | null
   weekItems: string[]
 }
 
@@ -54,8 +54,21 @@ export interface ExploreUsage {
 }
 
 /** The three-tier ladder (mirrors lib/allocation/ladder.ts on the server). */
+export interface CoreFund {
+  slot: string
+  symbol: string
+  assetClass: 'stock' | 'bond' | 'cash'
+  weight: number
+  targetUsd: number
+  heldUsd: number
+}
+
 export interface Ladder {
   investableUsd: number
+  fundingUsd: number
+  depositsUsd: number
+  ladderPnlUsd: number
+  unplacedUsd: number
   tier1: {
     status: 'funded' | 'short' | 'needs_expenses'
     funded: boolean
@@ -64,11 +77,13 @@ export interface Ladder {
     shortGoalsUsd: number
     shortGoals: Array<{ name: string; targetAmountUsd: number; targetDate: string | null }>
     heldUsd: number
+    inFundUsd: number
     amountUsd: number
     shortfallUsd: number
     reason: string | null
   }
-  core: { amountUsd: number; stockShare: number; bondShare: number }
+  /** Core = real paper fund positions; heldUsd is what they're worth now. */
+  core: { targetUsd: number; heldUsd: number; invested: boolean; stockShare: number; bondShare: number; funds: CoreFund[] }
   explore: { capFraction: number; baseUsd: number; capUsd: number; inUseUsd: number; leftUsd: number; open: boolean; reason: string | null }
 }
 
@@ -79,11 +94,12 @@ export interface GoalData {
   exploreUsage: ExploreUsage
   ladder: Ladder
   ladderSetupUsd: number
+  coreRebalanceNeeded: boolean
 }
 
 export interface ActivityItem {
   id: string
-  sleeve: 'Core' | 'Explore'
+  sleeve: 'Safety' | 'Core' | 'Explore'
   type: string
   dateIso: string
   headline: string
@@ -92,7 +108,7 @@ export interface ActivityItem {
 }
 
 export interface ApproveDecision {
-  kind: 'ladder_setup' | 'rebalance'
+  kind: 'ladder_setup' | 'core_rebalance' | 'rebalance'
   title: string
   explanation: string
   /** Before/after bar, e.g. { label: 'cash', beforePct: 4, afterPct: 18 }. */
@@ -162,8 +178,12 @@ export const api = {
   activity: () => getJson<{ items: ActivityItem[] }>('/api/mobile/activity'),
   approval: () => getJson<{ decision: ApproveDecision | null }>('/api/mobile/approve'),
   approve: (kind: ApproveDecision['kind'], summary: string) =>
-    postJson<{ ok: boolean; kind: string; executed: number; skippedOrders: string[]; errors: string[]; designatedUsd?: number }>(
+    postJson<{ ok: boolean; kind: string; executed: number; skippedOrders: string[]; errors: string[]; safetyUsd?: number; coreUsd?: number }>(
       '/api/mobile/approve', { kind, approved_summary: summary }),
+  /** Add practice money: fills Safety first, then Core. */
+  deposit: (amount: number) =>
+    postJson<{ ok: boolean; safetyUsd: number; coreUsd: number; executed: number; errors: string[] }>(
+      '/api/mobile/deposit', { amount_usd: amount }),
   setMonthlyExpenses: (amount: number) =>
     postJson<{ ok: boolean }>('/api/mobile/goal', { monthly_expenses_usd: amount }),
   explore: () => getJson<ExploreData>('/api/mobile/explore'),

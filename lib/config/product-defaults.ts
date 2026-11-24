@@ -77,6 +77,16 @@ export const PROFILE_TILT_MAX = 0.15
 /** Product default: the profile the tilt is measured from. */
 export const GLIDE_REFERENCE_PROFILE = 'balanced'
 
+/**
+ * Product default: when Core's stock (or bond) share drifts more than this
+ * many points (as a fraction) from its glide-path target, a rebalance
+ * decision is raised. Core is never traded without approval.
+ */
+export const CORE_DRIFT_THRESHOLD = 0.05
+
+/** Product default: Core / Safety fund trades smaller than this are skipped (dust). */
+export const CORE_MIN_TRADE_USD = 10
+
 // ─── Explore (Tier 3) ────────────────────────────────────────────────────────
 
 /** Product default: Explore's share of portfolio value for new users. */

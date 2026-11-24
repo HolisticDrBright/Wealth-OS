@@ -13,6 +13,7 @@ import { revalidatePath } from 'next/cache'
 import { getRiskControl } from '@/lib/strategies/risk-controls'
 import { computeDrawdownPct } from '@/lib/risk/kill-switch'
 import { roundTripCostUsd } from '@/lib/costs/transaction-costs'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface RiskStripData {
   /** Always 'paper' until live trading exists. */
@@ -38,8 +39,8 @@ export async function getRiskStripData(): Promise<RiskStripData | null> {
 
   const [flagsRes, closedRes, openRes, rc, assetsRes] = await Promise.all([
     supabase.from('system_flags').select('user_id, enabled, reason').eq('key', 'trading_halted'),
-    supabase.from('paper_positions').select('closed_at, realized_pnl_usd').eq('user_id', user.id).eq('status', 'closed'),
-    supabase.from('paper_positions').select('asset_class, notional_usd, unrealized_pnl_usd').eq('user_id', user.id).eq('status', 'open'),
+    supabase.from('paper_positions').select('closed_at, realized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('user_id', user.id).eq('status', 'closed'),
+    supabase.from('paper_positions').select('asset_class, notional_usd, unrealized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER).eq('user_id', user.id).eq('status', 'open'),
     getRiskControl(supabase, user.id),
     supabase.from('assets').select('current_value').eq('user_id', user.id),
   ])
@@ -102,7 +103,7 @@ export async function getHaltImpact(): Promise<HaltImpact | null> {
 
   const [openRes, intentsRes] = await Promise.all([
     supabase.from('paper_positions')
-      .select('asset_class, notional_usd')
+      .select('asset_class, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
       .eq('user_id', user.id).eq('status', 'open'),
     supabase.from('order_intents')
       .select('id')

@@ -5,6 +5,7 @@ import type { PaperFillResult } from './types'
 import { fetchCurrentPrice } from './price-feed'
 import { modelFill } from './fill-model'
 import { alertPositionClosed } from '@/lib/alerts/auto-alerts'
+import { strategyRowsOnly } from '@/lib/allocation/sleeves'
 
 // Exit-side one-way slippage estimates per asset class (bps). Entry fills use
 // the richer spread+impact model in fill-model.ts; exits keep this flat model
@@ -263,13 +264,15 @@ export class PaperBroker {
   // ── Check and close positions that hit their exit conditions ───────────────
 
   async checkAndExitPositions(supabase: SupabaseClient, userId: string): Promise<number> {
-    const { data: positions } = await supabase
+    const { data: rows } = await supabase
       .from('paper_positions')
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'open')
 
-    if (!positions?.length) return 0
+    // Core / Safety holdings never take stop, target, or timeout exits.
+    const positions = strategyRowsOnly((rows ?? []) as Array<Record<string, unknown> & { strategy_key?: string | null }>)
+    if (!positions.length) return 0
 
     let closed = 0
 
@@ -311,13 +314,15 @@ export class PaperBroker {
     userId: string,
     exitReason = 'manual_flatten'
   ): Promise<{ closed: number; failures: string[] }> {
-    const { data: positions } = await supabase
+    const { data: rows } = await supabase
       .from('paper_positions')
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'open')
 
-    if (!positions?.length) return { closed: 0, failures: [] }
+    // A pause sells EXPLORE only — Core and Tier 1 Safety are never sold.
+    const positions = strategyRowsOnly((rows ?? []) as Array<Record<string, unknown> & { strategy_key?: string | null }>)
+    if (!positions.length) return { closed: 0, failures: [] }
 
     let closed = 0
     const failures: string[] = []
@@ -364,17 +369,27 @@ export class PaperBroker {
         : 0
       const realizedPct = (pos.notional_usd as number) > 0 ? pnlUsd / (pos.notional_usd as number) : 0
 
-      await supabase.from('paper_positions').update({
+      const closeRow = (reason: string) => supabase.from('paper_positions').update({
         status:            'closed',
         closed_at:         new Date().toISOString(),
         current_price:     currentPrice,
         exit_price:        exitPrice,
         realized_pnl_usd:  pnlUsd,
         realized_pnl_pct:  realizedPct,
-        exit_reason:       exitReason,
+        exit_reason:       reason,
         unrealized_pnl_usd: null,
         unrealized_pnl_pct: null,
       }).eq('id', pos.id)
+
+      // A failed close must surface — never report a position closed when the
+      // row is still open. 'manual_flatten' / 'rebalance' need migration
+      // 20260704m; until it is applied the CHECK rejects them, so retry as the
+      // always-valid 'manual'.
+      let { error: closeErr } = await closeRow(exitReason)
+      if (closeErr && exitReason !== 'manual' && /exit_reason|check constraint/i.test(closeErr.message ?? '')) {
+        ({ error: closeErr } = await closeRow('manual'))
+      }
+      if (closeErr) throw new Error(`close failed for ${String(pos.symbol)}: ${closeErr.message}`)
 
       await supabase.from('paper_trades').insert({
         user_id:      userId,

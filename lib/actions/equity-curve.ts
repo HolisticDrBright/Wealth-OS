@@ -8,6 +8,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface EquityPoint {
   /** YYYY-MM-DD */
@@ -40,7 +41,7 @@ export async function getEquityCurve(): Promise<EquityCurveView | null> {
     const [{ data: closed }, { data: shadowClosed }, { data: open }] = await Promise.all([
       supabase
         .from('paper_positions')
-        .select('closed_at, realized_pnl_usd')
+        .select('closed_at, realized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('user_id', user.id)
         .eq('status', 'closed')
         .order('closed_at', { ascending: true })
@@ -54,7 +55,7 @@ export async function getEquityCurve(): Promise<EquityCurveView | null> {
         .limit(5000),
       supabase
         .from('paper_positions')
-        .select('unrealized_pnl_usd')
+        .select('unrealized_pnl_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
         .eq('user_id', user.id)
         .eq('status', 'open'),
     ])

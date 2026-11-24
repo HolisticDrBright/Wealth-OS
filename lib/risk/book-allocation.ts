@@ -12,6 +12,7 @@ import {
   bookFor, regimeBookMultiplier, BOOK_NOTIONAL_CAP, ALL_BOOKS,
   type StrategyBook,
 } from '@/lib/strategies/strategy-books'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 export interface BookExposure {
   book: StrategyBook
@@ -39,7 +40,7 @@ export async function computeBookExposures(
 
   const { data } = await supabase
     .from('paper_positions')
-    .select('strategy_key, notional_usd')
+    .select('strategy_key, notional_usd').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', userId)
     .eq('status', 'open')
 

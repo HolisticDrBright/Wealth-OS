@@ -1,73 +1,115 @@
 /**
- * GET  /api/mobile/approve — the top pending decision in plain English.
- *      Ladder setup comes FIRST (Explore is $0 until Tier 1 Safety is
- *      funded); otherwise the pending Core rebalance. One shape for both:
- *      before/after bar, amount moved, estimated cost, estimated tax effect,
- *      the bad-year dollar drop before and after, the "do nothing" line, and
- *      the exact summary the user approves.
+ * GET  /api/mobile/approve — the top pending decision in plain English, in
+ *      ladder order: the one-tap ladder setup first (Explore is $0 until
+ *      Tier 1 Safety is funded), then a Core fund rebalance (raised only when
+ *      Core drifts past CORE_DRIFT_THRESHOLD), then the legacy recorded-account
+ *      rebalance. One shape for all: before/after bar, amount moved, estimated
+ *      cost, estimated tax effect, the bad-year dollar drop before and after,
+ *      the "do nothing" line, and the exact summary the user approves.
  * POST /api/mobile/approve — approve it ({ kind, approved_summary }).
- *      ladder_setup → approveLadderSetup (records the approval, then
- *      designates Tier 1). rebalance → records accept_rebalance, then runs
- *      the web's guarded rebalance path. Nothing happens without approval.
+ *      ladder_setup   → approveLadderSetup   (records approval, then paper fund buys)
+ *      core_rebalance → approveCoreRebalance (records approval, then paper fund trades)
+ *      rebalance      → records accept_rebalance, then the web's guarded rebalance path.
+ *      Nothing happens without approval. Core is never traded automatically.
  *
- * Bad-year dollars derive from the same 20y S&P series as everywhere else,
- * scaled by the share of money exposed to the market.
+ * Bad-year dollars come from the ACTUAL tier mix (lib/allocation/bad-year.ts):
+ * Safety doesn't drop, Core stocks and bonds move like their own histories.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { userClientFromBearer } from '@/lib/supabase/bearer'
 import { runRebalanceScan } from '@/lib/workers/rebalance-scan'
-import { fetchSpxMonthlyReturns } from '@/lib/planning/market-returns'
-import { yearRangeUsd } from '@/lib/planning/goal-projection'
+import { fetchSpxMonthlyReturns, fetchMonthlyReturns } from '@/lib/planning/market-returns'
 import { roundTripCostUsd } from '@/lib/costs/transaction-costs'
-import { loadLadder, approveLadderSetup, ladderSetupSummary } from '@/lib/allocation/ladder-data'
-import { ladderSetupAmount } from '@/lib/allocation/ladder'
+import {
+  loadLadder, approveLadderSetup, ladderSetupSummary, approveCoreRebalance, coreRebalanceSummary,
+} from '@/lib/allocation/ladder-data'
+import { planLadderSetup, setupNeeded, coreDrift, planCoreRebalance, type FundTrade } from '@/lib/allocation/core-plans'
+import { tierMixOf, mixAfterTrades, yearRangeForMix } from '@/lib/allocation/bad-year'
+import { CORE_FUNDS } from '@/lib/config/product-defaults'
 
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
+const pct = (n: number) => Math.round(n * 1000) / 10
+const oneWayCost = (trades: FundTrade[]) =>
+  Math.round(trades.reduce((s, t) => s + roundTripCostUsd(t.usd, 'stocks') / 2, 0) * 100) / 100
 
 export async function GET(req: NextRequest) {
   const ctx = await userClientFromBearer(req)
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const [ladder, returns] = await Promise.all([
+    const [ladder, stockReturns, bondReturns] = await Promise.all([
       loadLadder(ctx.supabase, ctx.userId),
       fetchSpxMonthlyReturns(),
+      fetchMonthlyReturns(CORE_FUNDS.bonds),
     ])
     const investable = ladder.investableUsd
+    const mixBefore = tierMixOf(ladder)
+    const badYear = (trades: FundTrade[]) => {
+      const before = yearRangeForMix(mixBefore, stockReturns, bondReturns)
+      const after = yearRangeForMix(mixAfterTrades(mixBefore, trades, ladder), stockReturns, bondReturns)
+      return { badYearBeforeUsd: before?.badYearUsd ?? null, badYearAfterUsd: after?.badYearUsd ?? null }
+    }
 
-    // ── 1. Ladder setup (Tier 1 first) ──────────────────────────────────────
-    const setupUsd = ladderSetupAmount(ladder)
-    if (setupUsd > 0 && ladder.tier1.targetUsd != null && investable > 0) {
-      const range = yearRangeUsd(investable, returns)
-      const exposedBefore = 1 - ladder.tier1.heldUsd / investable
-      const exposedAfter = 1 - (ladder.tier1.heldUsd + setupUsd) / investable
+    // ── 1. Ladder setup (Tier 1 first, then Core) ───────────────────────────
+    if (setupNeeded(ladder) && investable > 0) {
+      const trades = planLadderSetup(ladder)
+      const safetyUsd = trades.filter(t => t.sleeve === 'safety').reduce((s, t) => s + t.usd, 0)
+      const coreUsd = trades.filter(t => t.sleeve === 'core').reduce((s, t) => s + t.usd, 0)
+      const change = safetyUsd > 0
+        ? { label: 'safety cushion', beforePct: pct(ladder.tier1.heldUsd / investable), afterPct: pct((ladder.tier1.heldUsd + safetyUsd) / investable) }
+        : { label: 'core funds', beforePct: pct(ladder.core.heldUsd / investable), afterPct: pct((ladder.core.heldUsd + coreUsd) / investable) }
       return NextResponse.json({
         decision: {
           kind: 'ladder_setup',
-          title: 'Set up your safety cushion',
+          title: safetyUsd > 0 ? 'Set up your money ladder' : 'Invest your core',
           explanation:
-            `Before anything is invested for the long term, ${usd(ladder.tier1.targetUsd)} should sit in a cash-like fund ` +
-            `for emergencies and goals due soon. This moves ${usd(setupUsd)} of practice money there; Explore stays at $0 until it is done.`,
-          change: {
-            label: 'cash',
-            beforePct: Math.round((ladder.tier1.heldUsd / investable) * 1000) / 10,
-            afterPct: Math.round(((ladder.tier1.heldUsd + setupUsd) / investable) * 1000) / 10,
-          },
-          amountMovedUsd: Math.round(setupUsd),
-          estimatedCostUsd: Math.round(roundTripCostUsd(setupUsd, 'stocks') * 100) / 100,
+            (safetyUsd > 0
+              ? `First, ${usd(ladder.tier1.targetUsd ?? 0)} should sit in a cash-like fund (${CORE_FUNDS.cashLike}) for emergencies and goals due soon. `
+              : '') +
+            (coreUsd > 0
+              ? `Long-term money goes into broad, low-cost funds (${trades.filter(t => t.sleeve === 'core').map(t => t.symbol).join(', ')}). `
+              : '') +
+            'Explore stays small and capped. Practice money.',
+          change,
+          amountMovedUsd: Math.round(safetyUsd + coreUsd),
+          estimatedCostUsd: oneWayCost(trades),
           estimatedTaxUsd: 0,
           taxNote: 'none — practice money, nothing real is sold',
-          badYearBeforeUsd: range ? Math.round(range.badYearUsd * exposedBefore) : null,
-          badYearAfterUsd: range ? Math.round(range.badYearUsd * exposedAfter) : null,
-          doNothing:
-            'If you do nothing, your safety cushion stays short and Explore stays at $0. Nothing happens until you approve.',
-          summary: ladderSetupSummary(setupUsd, ladder.tier1.targetUsd),
+          ...badYear(trades),
+          doNothing: ladder.tier1.funded
+            ? 'If you do nothing, your long-term money stays uninvested. Nothing happens until you approve.'
+            : 'If you do nothing, your safety cushion stays short and Explore stays at $0. Nothing happens until you approve.',
+          summary: ladderSetupSummary(trades),
         },
       })
     }
 
-    // ── 2. Core rebalance ───────────────────────────────────────────────────
+    // ── 2. Core fund rebalance (drift past CORE_DRIFT_THRESHOLD) ────────────
+    const drift = coreDrift(ladder)
+    if (drift.needsRebalance && drift.heldStockShare != null) {
+      const trades = planCoreRebalance(ladder)
+      return NextResponse.json({
+        decision: {
+          kind: 'core_rebalance',
+          title: 'Rebalance your core funds',
+          explanation:
+            `Your core is ${Math.round(drift.heldStockShare * 100)}% stocks; your plan calls for ${Math.round(drift.targetStockShare * 100)}%. ` +
+            'This sells a little of what grew and buys what lagged to bring you back to plan. Your safety cushion is not touched.',
+          change: { label: 'stocks', beforePct: pct(drift.heldStockShare), afterPct: pct(drift.targetStockShare) },
+          amountMovedUsd: Math.round(trades.filter(t => t.side === 'sell').reduce((s, t) => s + t.usd, 0)),
+          estimatedCostUsd: oneWayCost(trades),
+          estimatedTaxUsd: 0,
+          taxNote: 'none — practice money, nothing real is sold',
+          ...badYear(trades),
+          doNothing:
+            'If you do nothing, your core stays as it is and carries more (or less) risk than your plan. Nothing happens until you approve.',
+          summary: coreRebalanceSummary(trades),
+        },
+      })
+    }
+
+    // ── 3. Legacy recorded-account rebalance ────────────────────────────────
     const scan = await runRebalanceScan(ctx.supabase, ctx.userId, { executeTrades: false })
     if (!scan.trades.length) {
       return NextResponse.json({ decision: null })
@@ -84,16 +126,18 @@ export async function GET(req: NextRequest) {
     const suggestions = scan.suggestions as Array<{ tax_drag_usd?: number | null }>
     const taxDragUsd = suggestions.reduce((s, r) => s + (r.tax_drag_usd ?? 0), 0)
 
-    const range = yearRangeUsd(Math.max(1, investable), returns)
-    const badYearBeforeUsd = range && beforeStockPct != null ? Math.round(range.badYearUsd * (beforeStockPct / 100)) : null
-    const badYearAfterUsd = range && afterStockPct != null ? Math.round(range.badYearUsd * (afterStockPct / 100)) : null
+    // Stock share before/after scales the stock part of the tier-mix bad year.
+    const stockOnly = yearRangeForMix(
+      { cashUsd: 0, stocksUsd: Math.max(1, investable), bondsUsd: 0, otherUsd: 0 }, stockReturns, bondReturns)
+    const badYearBeforeUsd = stockOnly && beforeStockPct != null ? Math.round(stockOnly.badYearUsd * (beforeStockPct / 100)) : null
+    const badYearAfterUsd = stockOnly && afterStockPct != null ? Math.round(stockOnly.badYearUsd * (afterStockPct / 100)) : null
 
     return NextResponse.json({
       decision: {
         kind: 'rebalance',
-        title: 'Rebalance your core portfolio',
+        title: 'Rebalance your accounts',
         explanation:
-          'Part of your mix has grown past the share your plan calls for. This sells a little of what grew and buys what lagged to bring you back to plan.',
+          'Part of your recorded mix has grown past the share your plan calls for. This sells a little of what grew and buys what lagged to bring you back to plan.',
         change: beforeStockPct != null && afterStockPct != null
           ? { label: 'stocks', beforePct: beforeStockPct, afterPct: afterStockPct }
           : null,
@@ -106,7 +150,7 @@ export async function GET(req: NextRequest) {
         doNothing:
           'If you do nothing, your portfolio stays as it is and carries a bit more risk than you chose. Nothing happens until you approve.',
         summary:
-          `Rebalance my core portfolio: move about ${usd(amountMovedUsd)} back to my plan, ` +
+          `Rebalance my accounts: move about ${usd(amountMovedUsd)} back to my plan, ` +
           `estimated cost about ${usd(estimatedCostUsd)}, estimated tax effect ${taxDragUsd > 0 ? `about ${usd(taxDragUsd)}` : 'none'}.`,
       },
     })
@@ -129,10 +173,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'approval_required: approved_summary missing' }, { status: 400 })
   }
 
-  if (body.kind === 'ladder_setup') {
-    const res = await approveLadderSetup(ctx.supabase, ctx.userId, summary)
-    if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
-    return NextResponse.json({ ok: true, kind: 'ladder_setup', designatedUsd: res.designatedUsd, executed: 0, skippedOrders: [], errors: [] })
+  if (body.kind === 'ladder_setup' || body.kind === 'core_rebalance') {
+    const res = body.kind === 'ladder_setup'
+      ? await approveLadderSetup(ctx.supabase, ctx.userId, summary)
+      : await approveCoreRebalance(ctx.supabase, ctx.userId, summary)
+    if (res.error) return NextResponse.json({ error: res.error }, { status: 400 })
+    return NextResponse.json({
+      ok: res.ok, kind: body.kind,
+      safetyUsd: res.safetyUsd, coreUsd: res.coreUsd,
+      executed: res.executed, skippedOrders: [], errors: res.failures,
+    })
   }
 
   const { error: apprErr } = await ctx.supabase.from('automation_approvals').insert({

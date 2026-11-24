@@ -11,6 +11,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { LADDER_KEYS_FILTER } from '@/lib/allocation/sleeves'
 
 const HORIZON_BY_CLASS: Record<string, number> = {
   stocks: 5, options: 5, crypto: 3, forex: 2, 'multi-asset': 3,
@@ -25,7 +26,7 @@ export async function POST() {
   // Fetch ALL positions (open and closed), excluding polymarket
   const { data: positions, error: posErr } = await supabase
     .from('paper_positions')
-    .select('id, strategy_key, symbol, asset_class, direction, opened_at, status, realized_pnl_pct, realized_pnl_usd, closed_at')
+    .select('id, strategy_key, symbol, asset_class, direction, opened_at, status, realized_pnl_pct, realized_pnl_usd, closed_at').not('strategy_key', 'in', LADDER_KEYS_FILTER)
     .eq('user_id', user.id)
     .neq('asset_class', 'polymarket')
 
