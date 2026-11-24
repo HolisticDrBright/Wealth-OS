@@ -48,9 +48,11 @@ export async function POST(req: NextRequest) {
     try {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       const { meteredCreate } = await import('@/lib/ai/usage')
+      const { AI_MODEL_FAST, AI_EFFORT_VOTE } = await import('@/lib/config/product-defaults')
       const msg = await meteredCreate(anthropic, {
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
+        model: AI_MODEL_FAST,
+        max_tokens: 2000,   // room for thinking (on by default) plus the short JSON
+        output_config: { effort: AI_EFFORT_VOTE },
         messages: [{
           role: 'user',
           content: `You are a financial screener. Analyze ${symbol} (${asset_class ?? 'stock'}) as a trading opportunity.
@@ -66,7 +68,10 @@ Return JSON only:
         }],
       }, { caller: 'opportunity_screener', agentName: 'OpportunityScreener', userId, symbol })
 
-      const text = (msg.content[0] as { text: string }).text
+      // Read by block type: on current models the first block is usually a
+      // thinking block. A safety decline yields no opportunity.
+      const { wasDeclined } = await import('@/lib/ai/usage')
+      const text = wasDeclined(msg) ? '' : (msg.content.find(b => b.type === 'text')?.text ?? '')
       const match = text.match(/\{[\s\S]*\}/)
       if (match) {
         const parsed = JSON.parse(match[0])

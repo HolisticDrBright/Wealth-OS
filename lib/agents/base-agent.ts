@@ -2,8 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { TradeContext, AgentOutput, AgentRecommendation, ConfidenceLevel } from './types'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { VAULT_TOOLS, dispatchVaultTool, isVaultToolName } from './tools/vault-tools'
-import { meteredCreate, type UsageMeta } from '@/lib/ai/usage'
-import { PROTECTED_COMMITTEE_AGENTS } from '@/lib/config/product-defaults'
+import { meteredCreate, wasDeclined, type UsageMeta } from '@/lib/ai/usage'
+import { PROTECTED_COMMITTEE_AGENTS, AI_EFFORT_VOTE, AI_VOTE_MAX_TOKENS } from '@/lib/config/product-defaults'
 
 const anthropic = new Anthropic()
 
@@ -59,10 +59,14 @@ export abstract class BaseAgent {
     }
 
     try {
+      // Current models think by default and thinking counts toward
+      // max_tokens, so the cap leaves room for it; a JSON vote needs little
+      // deliberation, so effort stays low.
       const baseParams = {
         model: this.model,
-        max_tokens: 1024,
+        max_tokens: AI_VOTE_MAX_TOKENS,
         thinking: { type: 'adaptive' as const },
+        output_config: { effort: AI_EFFORT_VOTE },
         system: this.buildSystemPrompt(),
       }
 
@@ -97,6 +101,15 @@ export abstract class BaseAgent {
           ...baseParams,
           messages: [{ role: 'user', content: userPrompt }],
         }, meta)
+      }
+
+      // A safety decline is an abstention — never read as a vote.
+      if (wasDeclined(msg)) {
+        return {
+          agent: this.name, recommendation: 'defer', confidence: 'low', score: 50,
+          reasoning: `${this.name} declined to assess this trade (safety check) — abstaining.`,
+          keyPoints: [], metadata: { declined: true },
+        }
       }
 
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'

@@ -260,6 +260,7 @@ export const MODEL_PRICES_USD_PER_MTOK: Record<string, { input: number; output: 
   'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
   'claude-haiku-4-5':  { input: 1.00, output: 5.00 },
   'claude-sonnet-5':   { input: 2.00, output: 10.00 },
+  'claude-opus-4-8':   { input: 5.00, output: 25.00 },   // a server-side fallback target
   'claude-opus-5-5':   { input: 4.00, output: 20.00 },
   'claude-sonnet-5-5': { input: 2.00, output: 10.00 },
   'claude-haiku-5-5':  { input: 0.10, output: 0.50 },
@@ -281,3 +282,35 @@ export const COMMITTEE_MIN_GRADED_VETOES = 20
  * never be turned off from the cost report.
  */
 export const PROTECTED_COMMITTEE_AGENTS: readonly string[] = ['RiskManagementAgent']
+
+// ─── Which Claude model does what (model switch) ─────────────────────────────
+
+/** Product default: high-volume votes and quick checks (committee agents, Kronos, screener). */
+export const AI_MODEL_FAST = 'claude-haiku-5-5'
+/** Product default: mid-tier analysis (orchestrator, macro agent, prediction-market agent, research ideas). */
+export const AI_MODEL_STANDARD = 'claude-sonnet-5-5'
+/** Product default: the deepest reasoning (CIO synthesis, MiroFish simulation). */
+export const AI_MODEL_DEEP = 'claude-opus-5-5'
+
+/** Product default: effort for one-shot JSON votes and checks — Anthropic's advice for simple sub-agent tasks. */
+export const AI_EFFORT_VOTE = 'low' as const
+/** Product default: effort for synthesis, simulations and multistep tool use. */
+export const AI_EFFORT_ANALYSIS = 'medium' as const
+
+/**
+ * Product default: reply cap for a vote. Thinking counts toward max_tokens on
+ * the current models, so a cap sized for the JSON alone could cut the vote off.
+ */
+export const AI_VOTE_MAX_TOKENS = 4000
+
+/**
+ * Product default: models whose safety declines are retried server-side on
+ * another model (Anthropic's recommended `fallbacks: "default"`). Haiku 5.5
+ * has no server-side fallback; a decline there counts as an abstention.
+ */
+export const AI_FALLBACK_MODELS: readonly string[] = ['claude-opus-5-5', 'claude-sonnet-5-5']
+
+/** Product default: Haiku 5.5's second rate card — prompts over 100K tokens bill at these rates. */
+export const MODEL_LONG_PROMPT_PRICES: Record<string, { thresholdTokens: number; input: number; output: number }> = {
+  'claude-haiku-5-5': { thresholdTokens: 100_000, input: 0.50, output: 2.50 },
+}

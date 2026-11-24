@@ -194,10 +194,12 @@ Write a CIO synthesis as JSON:
     const synthStart = Date.now()
     try {
       const { meteredCreate } = await import('@/lib/ai/usage')
+      const { AI_MODEL_DEEP, AI_EFFORT_ANALYSIS, AI_VOTE_MAX_TOKENS } = await import('@/lib/config/product-defaults')
       const msg = await meteredCreate(anthropic, {
-        model: 'claude-opus-4-6',
-        max_tokens: 1024,
+        model: AI_MODEL_DEEP,
+        max_tokens: AI_VOTE_MAX_TOKENS,
         thinking: { type: 'adaptive' },
+        output_config: { effort: AI_EFFORT_ANALYSIS },
         ...(systemPrompt ? { system: systemPrompt } : {}),
         messages: [{ role: 'user', content: summaryPrompt }],
       }, { caller: 'cio_synthesis', agentName: 'CIOSynthesis', userId: user.id, runId: context.runId ?? null, symbol: trade.symbol })

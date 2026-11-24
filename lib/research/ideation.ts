@@ -20,9 +20,11 @@ export const defaultComplete: LlmComplete = async ({ system, prompt }) => {
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
   const client = new Anthropic()
   const { meteredCreate } = await import('@/lib/ai/usage')
+  const { AI_MODEL_STANDARD, AI_EFFORT_ANALYSIS } = await import('@/lib/config/product-defaults')
   const msg = await meteredCreate(client, {
-    model: 'claude-sonnet-5',
-    max_tokens: 1500,
+    model: AI_MODEL_STANDARD,
+    max_tokens: 8000,   // thinking counts toward the cap
+    output_config: { effort: AI_EFFORT_ANALYSIS },
     system,
     messages: [{ role: 'user', content: prompt }],
   }, { caller: 'ideation', agentName: 'ResearchIdeation' })

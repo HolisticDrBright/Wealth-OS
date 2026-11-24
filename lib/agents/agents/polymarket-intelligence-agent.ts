@@ -1,4 +1,5 @@
 import { meteredCreate } from '@/lib/ai/usage'
+import { AI_MODEL_STANDARD, AI_EFFORT_ANALYSIS } from '@/lib/config/product-defaults'
 import Anthropic from '@anthropic-ai/sdk'
 import { VAULT_TOOLS, dispatchVaultTool, isVaultToolName } from '../tools/vault-tools'
 import type {
@@ -38,7 +39,7 @@ export interface PolymarketAnalysis {
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = AI_MODEL_STANDARD
 const MAX_TOOL_ROUNDS = 5
 
 const anthropic = new Anthropic()
@@ -161,9 +162,13 @@ Analyse this data. Use vault tools to read recent context, then write a brief an
     }
 
     try {
+      // Multistep vault tool use: adaptive thinking at medium effort, and a
+      // cap that leaves room for the thinking.
       const baseParams = {
         model: this.model,
-        max_tokens: 2048,
+        max_tokens: 8000,
+        thinking: { type: 'adaptive' as const },
+        output_config: { effort: AI_EFFORT_ANALYSIS },
         system: this.buildSystemPrompt(),
       }
 

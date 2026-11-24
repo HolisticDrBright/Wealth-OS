@@ -116,16 +116,22 @@ Simulate 1000 autonomous agents analyzing this trade. Return a JSON object:
   const { meteredCreate } = await import('@/lib/ai/usage')
   // The same simulation serves the copy committee (Agent 13) and the
   // strategies' MiroFish confluence; the run id tells them apart.
+  const { AI_MODEL_DEEP, AI_EFFORT_ANALYSIS, AI_VOTE_MAX_TOKENS } = await import('@/lib/config/product-defaults')
   const msg = await meteredCreate(client, {
-    model: 'claude-opus-4-6',
-    max_tokens: 1024,
+    model: AI_MODEL_DEEP,
+    max_tokens: AI_VOTE_MAX_TOKENS,
     thinking: { type: 'adaptive' },
+    output_config: { effort: AI_EFFORT_ANALYSIS },
     messages: [{ role: 'user', content: prompt }],
   }, {
     caller: context.runId ? 'committee' : 'mirofish', agentName: 'MiroFishSimulationAgent',
     userId: context.user.id, runId: context.runId ?? null, symbol: context.trade.symbol,
   })
 
+  // A safety decline is a failed simulation (callers already handle that:
+  // the committee abstains, the strategy pipeline skips the trade).
+  const { wasDeclined } = await import('@/lib/ai/usage')
+  if (wasDeclined(msg)) throw new Error('simulation declined by safety check')
   const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   const parsed = JSON.parse(jsonMatch?.[0] ?? '{}')

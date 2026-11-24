@@ -1,10 +1,13 @@
 import { BaseAgent } from '../base-agent'
 import type { TradeContext } from '../types'
 
-// Sonnet for orchestration, Haiku for fast analysis, Opus for critical decisions
-const OPUS = 'claude-opus-4-6'
-const SONNET = 'claude-sonnet-4-6'
-const HAIKU = 'claude-haiku-4-5-20251001'
+import { AI_MODEL_DEEP, AI_MODEL_STANDARD, AI_MODEL_FAST } from '@/lib/config/product-defaults'
+
+// Sonnet for orchestration, Haiku for fast analysis, Opus for critical decisions.
+// Model IDs are product defaults (lib/config/product-defaults.ts).
+const OPUS = AI_MODEL_DEEP
+const SONNET = AI_MODEL_STANDARD
+const HAIKU = AI_MODEL_FAST
 
 // ── Agent 1: OrchestratorAgent ────────────────────────────────────────────
 export class OrchestratorAgent extends BaseAgent {

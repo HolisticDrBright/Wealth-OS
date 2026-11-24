@@ -156,11 +156,16 @@ Base the forecast on realistic market dynamics for this symbol.`
 
     try {
       const { meteredCreate } = await import('@/lib/ai/usage')
+      const { AI_MODEL_FAST, AI_EFFORT_VOTE, AI_VOTE_MAX_TOKENS } = await import('@/lib/config/product-defaults')
       const msg = await meteredCreate(client, {
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        model: AI_MODEL_FAST,
+        max_tokens: AI_VOTE_MAX_TOKENS,   // room for thinking (on by default) plus the JSON forecast
+        output_config: { effort: AI_EFFORT_VOTE },
         messages: [{ role: 'user', content: prompt }],
       }, { caller: 'kronos', agentName: 'Kronos', symbol: params.symbol })
+      // A safety decline is "no forecast" (the low-confidence path below), not a neutral one.
+      const { wasDeclined } = await import('@/lib/ai/usage')
+      if (wasDeclined(msg)) throw new Error('kronos forecast declined')
       const text = msg.content.find(b => b.type === 'text')?.text ?? '{}'
       const match = text.match(/\{[\s\S]*\}/)
       const parsed = JSON.parse(match?.[0] ?? '{}')

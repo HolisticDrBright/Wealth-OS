@@ -1,5 +1,64 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Model switch: Haiku 5.5, Sonnet 5.5, Opus 5.5
+
+- **Models are named once** (`lib/config/product-defaults.ts`):
+  `AI_MODEL_FAST` = `claude-haiku-5-5`, `AI_MODEL_STANDARD` =
+  `claude-sonnet-5-5`, `AI_MODEL_DEEP` = `claude-opus-5-5`. Every switched
+  call site reads them, so a future change is one line.
+- **Switched**:
+  - nine committee agents (Haiku 4.5 → Haiku 5.5), plus Kronos and the
+    opportunity screener
+  - orchestrator, macro agent, prediction-market agent (Sonnet 4.6 → Sonnet 5.5)
+  - research ideation (Sonnet 5 → Sonnet 5.5)
+  - risk manager, CIO synthesis, MiroFish simulation (Opus 4.6 → Opus 5.5)
+- **Fixes the failing committee calls**: the nine Haiku 4.5 agents sent
+  adaptive thinking, which Haiku 4.5 rejects. Haiku 5.5 supports it, so those
+  agents should vote again. (Correction to the roadmap #7 entry: it was nine
+  of the twelve agents, not eight; the risk manager runs on Opus.)
+- **Settings for thinking-by-default models**:
+  - effort set explicitly: `AI_EFFORT_VOTE` (`low`) for votes, Kronos and
+    the screener; `AI_EFFORT_ANALYSIS` (`medium`) for synthesis, simulation,
+    multistep tool use and research
+  - reply caps raised so thinking can't cut off the answer:
+    `AI_VOTE_MAX_TOKENS` 4000 for votes and synthesis, 8000 for tool loops
+    and research, 2000 for the screener
+- **Safety declines**:
+  - a committee agent's decline is an abstention, never a vote
+  - Kronos and MiroFish treat a decline as "no signal", using their existing
+    failure paths, not as a neutral reading
+  - Opus 5.5 and Sonnet 5.5 calls use Anthropic's server-side fallback
+    (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`), which
+    retries a decline on another model inside the same call; cost is priced
+    at the model that served it. Haiku 5.5 has no server-side fallback.
+  - every call's `stop_reason` is logged, so declines show up in the AI
+    committee report
+- **Bug the switch would have caused, fixed first**: the opportunity screener
+  read `msg.content[0].text` by position. On the new models the first block is
+  usually a thinking block, so it would have failed silently every time. It
+  now reads by block type; a test fails if any code reads a response by
+  position.
+- **Pricing**: Haiku 5.5 $0.10/$0.50 per MTok ($0.50/$2.50 for prompts over
+  100K tokens, `MODEL_LONG_PROMPT_PRICES`), Sonnet 5.5 $2/$10, Opus 5.5
+  $4/$20, Opus 4.8 $5/$25 (a fallback target).
+
+**Not switched (separate, later)**: the streaming chat routes —
+`app/api/tax-advisor` and `app/api/retirement-advice` (Opus 4.6) and
+`app/api/portfolio-chat` (Sonnet 4.6). They still work; they also bypass the
+cost meter, because they stream.
+
+**New constants**: `AI_MODEL_FAST`, `AI_MODEL_STANDARD`, `AI_MODEL_DEEP`,
+`AI_EFFORT_VOTE` 'low', `AI_EFFORT_ANALYSIS` 'medium', `AI_VOTE_MAX_TOKENS`
+4000, `AI_FALLBACK_MODELS` ['claude-opus-5-5', 'claude-sonnet-5-5'],
+`MODEL_LONG_PROMPT_PRICES`; `claude-opus-4-8` added to the price table.
+
+**New migration**: `20260704t_llm_stop_reason.sql` (`stop_reason` on
+`llm_usage_log`; the meter keeps logging without it until it's applied).
+
+**Not verifiable here**: no live model calls in this sandbox. The first real
+week on the AI committee page is the before/after check: failures should
+drop, cost per decision should fall, and the votes start counting.
+
 ## 2026-11-24 — Roadmap #7: what the AI committee costs, and whether its vetoes pay
 
 - **Real cost meter** (`lib/ai/usage.ts`): every Anthropic call in the app
