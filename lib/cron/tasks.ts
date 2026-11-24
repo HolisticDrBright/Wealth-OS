@@ -809,6 +809,17 @@ export async function runCronTask(task: string): Promise<CronResult> {
       results.ladderMark = await markLadderPositions(supabase)
     } catch (e) { results.ladderMark = e instanceof Error ? e.message : 'error' }
 
+    // 3c. Refresh linked (Plaid, read-only) account balances.
+    try {
+      const { isPlaidConfigured } = await import('@/lib/plaid/client')
+      if (isPlaidConfigured()) {
+        const { syncAllItems } = await import('@/lib/plaid/service')
+        results.plaidSync = await syncAllItems(supabase)
+      } else {
+        results.plaidSync = 'skipped (Plaid not configured)'
+      }
+    } catch (e) { results.plaidSync = e instanceof Error ? e.message : 'error' }
+
     // 4. Paper trading (exit stale positions + open new ones for all users)
     try {
       const { data: stratRows } = await supabase

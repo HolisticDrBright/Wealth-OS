@@ -1,13 +1,14 @@
 /**
  * Provider-neutral account aggregation (upgrade item 1) — pure core.
  *
- * The architecture supports plaid/teller/finicity/broker_import providers,
- * but NO live credentials are configured: only the ManualProvider is real
- * today. The UI must say "manual or not connected" — never pretend an
- * institution is linked.
+ * The architecture supports plaid/teller/finicity/broker_import providers.
+ * Manual entry and Plaid (read-only, roadmap #2 — lib/plaid/) are real;
+ * the others are stubs. The UI must say "manual or not connected" unless an
+ * institution really is linked — never pretend.
  */
 
 import { panelQualityOf, type PanelQuality } from '@/lib/advisory/data-quality'
+import { isPlaidConfigured, plaidEnv } from '@/lib/plaid/client'
 
 export const ACCOUNT_TYPES = [
   'checking', 'savings', 'credit_card', 'brokerage',
@@ -58,10 +59,21 @@ class UnconfiguredProvider implements AggregationProvider {
   }
 }
 
+/** Plaid — real, read-only (balances + APRs). Needs client id, secret and the token key. */
+export class PlaidProvider implements AggregationProvider {
+  readonly id = 'plaid' as const
+  isConfigured(): boolean { return isPlaidConfigured() }
+  statusLabel(): string {
+    return this.isConfigured()
+      ? `Plaid (${plaidEnv()}) — read-only linking available on the Goals page`
+      : 'plaid not connected — set PLAID_CLIENT_ID, PLAID_SECRET and PLAID_TOKEN_KEY'
+  }
+}
+
 export function getAggregationProviders(): AggregationProvider[] {
   return [
     new ManualProvider(),
-    new UnconfiguredProvider('plaid', ['PLAID_CLIENT_ID', 'PLAID_SECRET']),
+    new PlaidProvider(),
     new UnconfiguredProvider('teller', ['TELLER_APPLICATION_ID']),
     new UnconfiguredProvider('finicity', ['FINICITY_PARTNER_ID', 'FINICITY_APP_KEY']),
     new UnconfiguredProvider('broker_import', ['BROKER_IMPORT_ENABLED']),

@@ -1,5 +1,53 @@
 # Wealth OS Changelog
 
+## 2026-11-24 — Roadmap #2: read-only account linking (Plaid)
+
+- **Plaid, read-only** (`lib/plaid/`): link a bank or card (Transactions +
+  optional Liabilities) or an investment/retirement account (Investments).
+  No product that can move money (Auth, Transfer, Payment, Signal) is ever
+  requested (tested). Setup steps: `docs/plaid-setup.md`.
+- **Tokens**: the access token is exchanged server-side, encrypted with
+  AES-256-GCM using `PLAID_TOKEN_KEY` (server env only), and stored in
+  `plaid_item_tokens`, which has RLS on and NO user policy, so only the service
+  role can read it. It never reaches the browser. Without the key, linking is
+  off (fails closed).
+- **Where linked money goes** (`lib/plaid/mapping.ts`), each into its existing home:
+  - checking/savings → `assets` as `cash` (counts toward the Safety cushion)
+  - brokerage, IRA, Roth, 401(k), HSA → `assets` as stock-like
+  - cards and loans → `debt_accounts` with APRs from Liabilities, feeding
+    "best next dollar"
+  - every account → `connected_account_profiles` (provider `plaid`, `synced`)
+  - non-USD accounts, accounts with no balance, and unknown types are skipped
+- **Lifecycle**: daily refresh (the `daily` cron) plus Refresh. If the bank
+  needs a fresh login, the link shows "Sign in again" (Plaid update mode).
+  Accounts that disappear from a link lose their mirrored rows. Disconnect
+  revokes the link at Plaid and deletes everything it created.
+- **UI**: "Linked accounts" panel on the Goals page (`/advisor`). It warns when
+  hand-entered balances might duplicate linked ones. The integrations page
+  reports Plaid's real status. Linking from the phone is not built yet (it
+  needs Plaid's native SDK); linked balances already flow into every phone
+  screen.
+- **Best next dollar**: mortgages no longer count as "high-interest debt" (a
+  synced 6.5% mortgage would have topped the waterfall), and a mortgage alone
+  no longer counts as "no card debt".
+
+**Effect on paper trading**: linked balances are real `assets`, so the Explore
+cap and strategy sizing (both measured on recorded assets) grow or shrink with
+what is actually linked. Still paper only.
+
+**New env vars**: `PLAID_ENV` (sandbox | production), `PLAID_CLIENT_ID`,
+`PLAID_SECRET`, `PLAID_TOKEN_KEY`.
+
+**New migration**: `20260704p_plaid.sql` — `plaid_items` (users read own;
+service-role writes), `plaid_item_tokens` (service role only),
+`plaid_account_id` (+ unique index) on `connected_account_profiles`, `assets`,
+`debt_accounts`.
+
+**Not verifiable here**: no live call to Plaid's sandbox. This session's network
+can't reach it, and a new "Wealth-OS" environment that can was created for the
+next session. All flows are tested against mocked Plaid responses shaped from
+Plaid's docs.
+
 ## 2026-11-24 — Roadmap #1: best next dollar on Home (+ #6 raise prompt)
 
 - **Home card, web and phone** (`NextDollarCard`): "Your best next dollar"

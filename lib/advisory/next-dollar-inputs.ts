@@ -32,7 +32,11 @@ export interface NextDollarSources {
 export function nextDollarInputsFrom(s: NextDollarSources): NextDollarInputs {
   const { profile, constants, params, yields, ladder } = s
   const matchStatus = matchCaptureStatus(s.benefits)
-  const debtSummary = summarizeDebts(s.debts)
+  // A mortgage isn't "high-interest debt" for this step (standard planning
+  // practice, and what the question tells the person) — linked accounts made
+  // this matter: a synced 6.5% mortgage would otherwise top the waterfall.
+  const consumerDebts = s.debts.filter(d => d.debtType !== 'mortgage')
+  const debtSummary = summarizeDebts(consumerDebts)
 
   // Roth path (direct vs backdoor) from MAGI + filing status + phase-out constants.
   const isMfj = profile.filing_status === 'mfj'
@@ -48,7 +52,8 @@ export function nextDollarInputsFrom(s: NextDollarSources): NextDollarInputs {
     : null
 
   // Debts: no rows means "unknown" unless the user told us there are none.
-  const highestApr = s.debts.length === 0
+  // (A mortgage alone doesn't tell us there's no card debt — still unknown.)
+  const highestApr = consumerDebts.length === 0
     ? (s.noHighInterestDebtConfirmed ? 0 : null)
     : (debtSummary.highestApr?.aprPct ?? 0)
 

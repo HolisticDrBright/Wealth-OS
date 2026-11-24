@@ -105,7 +105,7 @@ export function factsOf(src: LoadedSources): NextDollarFacts {
   const known: Record<FactKey, boolean> = {
     monthly_expenses: p.monthly_essential_expenses_usd != null,
     employer_match: src.benefits.matchAvailable != null,
-    debts: src.debts.length > 0 || src.noHighInterestDebtConfirmed,
+    debts: src.debts.some(d => d.debtType !== 'mortgage') || src.noHighInterestDebtConfirmed,
     health_plan: p.health_plan_type != null,
     household_income: p.magi_estimate_usd != null,
     filing_status: p.filing_status != null,
